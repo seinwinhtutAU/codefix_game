@@ -1,0 +1,870 @@
+import * as Phaser from "phaser";
+import { GameManager } from "../GameManager";
+
+export default class PreloadScene extends Phaser.Scene {
+  constructor() {
+    super("PreloadScene");
+  }
+
+  preload() {
+    const { width, height } = this.cameras.main;
+
+    // Background for the bar
+    const progressBox = this.add.graphics();
+    progressBox.fillStyle(0x222222, 0.8);
+    progressBox.fillRect(width / 2 - 160, height / 2 - 25, 320, 50);
+
+    const progressBar = this.add.graphics();
+    const loadingText = this.add
+      .text(width / 2, height / 2 - 50, "Loading...", {
+        fontSize: "20px",
+        color: "#ffffff",
+      })
+      .setOrigin(0.5);
+
+    // Event listener for the fill bar
+    this.load.on("progress", (value: number) => {
+      progressBar.clear();
+      progressBar.fillStyle(0x3498db, 1);
+      progressBar.fillRect(width / 2 - 150, height / 2 - 15, 300 * value, 30);
+    });
+
+    for (let i = 0; i < 100; i++) {
+      this.load.image(`test_${i}`, "/assets/ground.png");
+    }
+
+    this.load.on("complete", () => {
+      progressBar.destroy();
+      progressBox.destroy();
+      loadingText.setText("Loading Success");
+    });
+
+    // Asset loading (Ensure these are in /public/assets/)
+    this.load.image("player", "/player/idle/img.png");
+    this.load.image("ground", "/assets/bg.png");
+    this.load.image("door", "assets/door_closed.png");
+
+    for (let i = 0; i < 8; i++) {
+      this.load.image(`player_walk_${i}`, `/player/walk/img${i}.png`);
+    }
+  }
+
+  create() {
+    const saveGameState = GameManager.getSavedState();
+
+    if (saveGameState) {
+      this.scene.start(saveGameState.sceneKey, {
+        x: saveGameState.x,
+        y: saveGameState.y,
+      });
+
+      GameManager.clearState();
+    } else {
+      this.scene.start("MainMenuScene");
+    }
+  }
+}
+
+
+------------------------------------------------------------------------------------------------------------------------------------------------------
+
+import * as Phaser from "phaser";
+import { gameEvents } from "../events";
+
+export default class MainMenuScene extends Phaser.Scene {
+  constructor() {
+    super("MainMenuScene");
+  }
+
+  create() {
+    gameEvents.emit("scene-changed", "HIDDEN");
+    const { width, height } = this.cameras.main;
+
+    // Title
+    this.add
+      .text(width / 2, height / 2 - 100, "MY AWESOME GAME", {
+        fontSize: "48px",
+      })
+      .setOrigin(0.5);
+
+    // Start Button
+    const startButton = this.add
+      .text(width / 2, height / 2 + 50, "START GAME", {
+        fontSize: "32px",
+        color: "#00ff00",
+      })
+      .setOrigin(0.5)
+      .setInteractive({ useHandCursor: true });
+
+    startButton.on("pointerdown", () => {
+      console.log("Starting the game...");
+      this.scene.start("GameScene");
+    });
+
+    // Hover Effects
+    startButton.on("pointerover", () => startButton.setScale(1.2));
+    startButton.on("pointerout", () => startButton.setScale(1));
+  }
+}
+
+------------------------------------------------------------------------------------------------------------------------------------------------------
+
+import * as Phaser from "phaser";
+import Player from "../objects/Player";
+import { gameEvents, setGlobalScore } from "../events";
+import { GameManager } from "../GameManager";
+
+export interface WASDKeys {
+  W: Phaser.Input.Keyboard.Key;
+  A: Phaser.Input.Keyboard.Key;
+  S: Phaser.Input.Keyboard.Key;
+  D: Phaser.Input.Keyboard.Key;
+  space: Phaser.Input.Keyboard.Key;
+}
+
+export default class GameScene extends Phaser.Scene {
+  private player!: Player;
+  private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
+  private wasd!: WASDKeys;
+
+  private door!: Phaser.Types.Physics.Arcade.ImageWithStaticBody;
+  private doorMessage!: Phaser.GameObjects.Text;
+  private startPos!: { x: number; y: number };
+
+  constructor() {
+    super("GameScene");
+  }
+
+  init(data: { x: number; y: number }) {
+    this.startPos = {
+      x: data.x ?? 400,
+      y: data.y ?? 400,
+    };
+  }
+
+  create() {
+    gameEvents.emit("scene-changed", "GAME");
+    this.cameras.main.fadeIn(500, 0, 0, 0);
+    // --- Title ---
+    this.add.text(300, 250, "Game Start", {
+      fontSize: "32px",
+      color: "#ffffff",
+    });
+
+    // --- Door ---
+    this.door = this.physics.add.staticImage(400, 516, "door").setScale(2);
+
+    this.doorMessage = this.add
+      .text(400, 450, "Press Space to Enter", {
+        fontSize: "20px",
+        color: "#ffffff",
+      })
+      .setOrigin(0.5)
+      .setDepth(100)
+      .setVisible(false);
+
+    // --- Keyboard ---
+    this.cursors = this.input.keyboard!.createCursorKeys();
+    this.wasd = this.input.keyboard!.addKeys({
+      W: Phaser.Input.Keyboard.KeyCodes.W,
+      A: Phaser.Input.Keyboard.KeyCodes.A,
+      S: Phaser.Input.Keyboard.KeyCodes.S,
+      D: Phaser.Input.Keyboard.KeyCodes.D,
+      space: Phaser.Input.Keyboard.KeyCodes.SPACE,
+    }) as WASDKeys;
+
+    // --- Player ---
+    this.player = new Player(this, this.startPos.x, this.startPos.y);
+
+    this.anims.create({
+      key: "walk",
+      frames: [
+        { key: "player_walk_0" },
+        { key: "player_walk_1" },
+        { key: "player_walk_2" },
+        { key: "player_walk_3" },
+        { key: "player_walk_4" },
+        { key: "player_walk_5" },
+        { key: "player_walk_6" },
+        { key: "player_walk_7" },
+      ],
+      frameRate: 12,
+      repeat: -1,
+    });
+
+    this.anims.create({
+      key: "idle",
+      frames: [{ key: "player" }],
+      frameRate: 1,
+    });
+
+    // --- Ground ---
+    const platform = this.physics.add.staticGroup();
+
+    for (let i = 0; i < 800; i += 64) {
+      platform.create(i, 580, "ground");
+    }
+
+    platform.children.iterate((child) => {
+      (child as Phaser.Physics.Arcade.Sprite).refreshBody();
+      return true;
+    });
+
+    this.physics.add.collider(this.player, platform);
+
+    // --- Example score update ---
+    gameEvents.emit("score-changed", 30);
+
+    // --- Remove old listeners (important on restart) ---
+    gameEvents.off("request-pause", this.pauseGame, this);
+    gameEvents.off("request-resume", this.resumeGame, this);
+    gameEvents.off("request-restart", this.restartGame, this);
+    gameEvents.off("request-exit", this.exitToMenu, this);
+
+    // --- Add listeners ---
+    gameEvents.on("request-pause", this.pauseGame, this);
+    gameEvents.on("request-resume", this.resumeGame, this);
+    gameEvents.on("request-restart", this.restartGame, this);
+    gameEvents.on("request-exit", this.exitToMenu, this);
+
+    // --- Cleanup ---
+    this.events.once("shutdown", this.shutdown, this);
+  }
+
+  update() {
+    if (!this.sys.isActive()) return;
+
+    this.player.move(this.cursors, this.wasd);
+
+    // Jump
+    const jumpPressed =
+      Phaser.Input.Keyboard.JustDown(this.wasd.W) ||
+      Phaser.Input.Keyboard.JustDown(this.cursors.up!);
+
+    if (jumpPressed) {
+      this.player.jump();
+    }
+
+    this.checkDoorDistance();
+  }
+
+  private goToProblem() {
+    GameManager.saveGameState(this, { x: this.player.x, y: this.player.y });
+    gameEvents.emit("go-to-problem");
+  }
+
+  private checkDoorDistance() {
+    const distance = Phaser.Math.Distance.Between(
+      this.player.x,
+      this.player.y,
+      this.door.x,
+      this.door.y
+    );
+
+    if (distance < 60) {
+      this.doorMessage.setVisible(true);
+
+      if (Phaser.Input.Keyboard.JustDown(this.wasd.space)) {
+        this.doorMessage.setText("Entering door...");
+        this.goToProblem();
+        this.scene.stop();
+      }
+    } else {
+      this.doorMessage.setVisible(false);
+      this.doorMessage.setText("Press Space to Enter");
+    }
+  }
+
+  private pauseGame() {
+    if (!this.sys.isActive()) return;
+
+    this.physics.pause();
+    this.scene.pause();
+    gameEvents.emit("paused");
+  }
+
+  private resumeGame() {
+    if (!this.sys.isPaused()) return;
+
+    this.physics.resume();
+    this.scene.resume();
+    gameEvents.emit("resumed");
+  }
+
+  private restartGame() {
+    gameEvents.emit("resumed");
+    this.scene.resume();
+    this.scene.restart();
+  }
+
+  private exitToMenu() {
+    gameEvents.emit("resumed");
+    this.scene.resume();
+    this.scene.stop();
+    this.scene.start("MainMenuScene");
+  }
+
+  private shutdown() {
+    gameEvents.off("request-pause", this.pauseGame, this);
+    gameEvents.off("request-resume", this.resumeGame, this);
+    gameEvents.off("request-restart", this.restartGame, this);
+    gameEvents.off("request-exit", this.exitToMenu, this);
+  }
+}
+
+----------------------------------------------------------------------------------------------------
+
+
+import * as Phaser from "phaser";
+import { WASDKeys } from "../scenes/GameScene";
+
+export default class Player extends Phaser.Physics.Arcade.Sprite {
+  constructor(scene: Phaser.Scene, x: number, y: number) {
+    super(scene, x, y, "player");
+    scene.add.existing(this);
+    scene.physics.add.existing(this);
+
+    const bodyWidth = 192;
+    const bodyHeight = 320;
+
+    this.setBodySize(bodyWidth, bodyHeight);
+    this.setDisplaySize(bodyWidth, bodyWidth);
+
+    this.setOffset(
+      (this.width - bodyWidth) / 2,
+      this.height - bodyHeight - 246
+    );
+
+    this.setCollideWorldBounds(true);
+    this.setBounce(0.1);
+  }
+
+  move(cursors: Phaser.Types.Input.Keyboard.CursorKeys, wasd: WASDKeys) {
+    const speed = 200;
+    this.setVelocityX(0);
+
+    if (cursors.left?.isDown || wasd.A.isDown) {
+      this.setVelocityX(-speed);
+      this.setFlipX(false);
+      this.play("walk", true);
+    } else if (cursors.right?.isDown || wasd.D.isDown) {
+      this.setVelocityX(speed);
+      this.setFlipX(true);
+      this.play("walk", true);
+    } else {
+      this.play("idle");
+    }
+  }
+}
+
+------------------------------------------------------------------------------------------------
+
+import Phaser from "phaser";
+import Player from "../objects/Player";
+
+type WASDKeys = {
+  W: Phaser.Input.Keyboard.Key;
+  A: Phaser.Input.Keyboard.Key;
+  S: Phaser.Input.Keyboard.Key;
+  D: Phaser.Input.Keyboard.Key;
+};
+
+export default class IntroScene extends Phaser.Scene {
+  private player!: Player;
+  private wife!: Phaser.GameObjects.Image;
+  private car!: Phaser.GameObjects.Image;
+  private nextButton!: Phaser.GameObjects.Text;
+
+  // Controls
+  private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
+  private wasd!: WASDKeys;
+  private canMove: boolean = false;
+
+  // Dialog UI
+  private dialogContainer!: Phaser.GameObjects.Container;
+  private dialogBox!: Phaser.GameObjects.Graphics;
+  private dialogText!: Phaser.GameObjects.Text;
+
+  // Audio
+  private bgMusic!: Phaser.Sound.BaseSound;
+
+  constructor() {
+    super("IntroScene");
+  }
+
+  preload() {
+    this.load.image("house-bg", "/intro/house-bg.png");
+    this.load.image("player", "/player/idle/img.png");
+    this.load.image("wife", "/player/idle/img.png");
+    this.load.image("car", "/intro/car_1.png");
+
+    for (let i = 0; i < 8; i++) {
+      this.load.image(`player_walk_${i}`, `/player/walk/img${i}.png`);
+    }
+
+    this.load.audio("bgm", "/audio/bgm.mp3");
+    this.load.audio("speech-blip", "/audio/blip.mp3");
+  }
+
+  create() {
+    this.cameras.main.fadeIn(1000, 0, 0, 0);
+
+    // --- MUSIC ---
+    this.bgMusic = this.sound.add("bgm", { loop: true, volume: 0.15 });
+    this.bgMusic.play();
+
+    // 1. Setup Inputs
+    this.cursors = this.input.keyboard!.createCursorKeys();
+    this.wasd = this.input.keyboard!.addKeys("W,A,S,D") as WASDKeys;
+
+    // 2. Background
+    this.add.image(0, 0, "house-bg").setOrigin(0, 0);
+
+    // 3. Add Car
+    this.car = this.add.image(400, 670, "car");
+    this.car.setDisplaySize(260, 130);
+
+    // 4. Add Player
+    this.player = new Player(this, 750, 670).setFlipX(true);
+
+    // 5. Add Wife
+    this.wife = this.add.image(1000, 660, "wife");
+    this.wife.setDisplaySize(256, 256);
+
+    // 6. Add "Next" Button
+    const { width, height } = this.scale;
+    this.nextButton = this.add
+      .text(width - 150, height - 100, "NEXT >", {
+        fontSize: "32px",
+        color: "#ffffff",
+        backgroundColor: "#000000",
+        padding: { x: 20, y: 10 },
+      })
+      .setInteractive({ useHandCursor: true })
+      .setVisible(false)
+      .on("pointerdown", () => {
+        // TRIGGER GOODBYE SEQUENCE INSTEAD OF LEAVING IMMEDIATELY
+        this.handleGoodbyeSequence();
+      });
+
+    // 7. Setup Dialog UI
+    this.createDialogComponents();
+
+    // 8. Start Intro Story
+    this.time.delayedCall(1000, () => this.runIntroSequence());
+  }
+
+  update(time: number, delta: number) {
+    if (this.canMove) {
+      this.player.move(this.cursors, this.wasd, delta);
+      this.checkCarProximity();
+    }
+  }
+
+  // --- LOGIC ---
+
+  private checkCarProximity() {
+    // Check horizontal center alignment
+    const dist = Math.abs(this.player.x - this.car.x);
+
+    if (dist < 50) {
+      this.nextButton.setVisible(true);
+    } else {
+      this.nextButton.setVisible(false);
+    }
+  }
+
+  // Sequence 1: Start of the scene
+  private runIntroSequence() {
+    this.showDialogAt(this.wife.x, this.wife.y - 180, "Don't forget your code");
+
+    this.time.delayedCall(3000, () => {
+      this.showDialogAt(this.player.x, this.player.y - 180, "I won't, honey!");
+
+      this.time.delayedCall(2000, () => {
+        this.dialogContainer.setVisible(false);
+        this.canMove = true;
+      });
+    });
+  }
+
+  // Sequence 2: End of the scene (Triggered by Button)
+  private handleGoodbyeSequence() {
+    // 1. Lock movement and UI
+    this.canMove = false;
+    this.player.play("idle", true); // Stop walking animation
+    this.nextButton.setVisible(false); // Hide button so they don't click twice
+
+    // 2. Player says Bye
+    this.showDialogAt(this.player.x, this.player.y - 180, "Bye bye!");
+
+    // 3. Wait 2 seconds, then Wife responds
+    this.time.delayedCall(2000, () => {
+      this.showDialogAt(this.wife.x, this.wife.y - 180, "Good luck!");
+
+      // 4. Wait 2 seconds, then Fade Out
+      this.time.delayedCall(2000, () => {
+        this.dialogContainer.setVisible(false);
+
+        // Fade out screen
+        this.cameras.main.fadeOut(1000, 0, 0, 0);
+
+        // Fade out music
+        this.tweens.add({
+          targets: this.bgMusic,
+          volume: 0,
+          duration: 1000,
+        });
+
+        // Switch Scene when fade completes
+        this.cameras.main.once(
+          Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE,
+          () => {
+            this.bgMusic.stop();
+            this.scene.start("CarDriveScene");
+          }
+        );
+      });
+    });
+  }
+
+  // --- UI HELPER FUNCTIONS ---
+
+  private createDialogComponents() {
+    this.dialogContainer = this.add.container(0, 0);
+    this.dialogBox = this.add.graphics();
+
+    this.dialogText = this.add
+      .text(0, 0, "", {
+        fontFamily: '"Press Start 2P", "Courier", monospace',
+        fontSize: "20px",
+        color: "#000000",
+        align: "center",
+        wordWrap: { width: 300 },
+      })
+      .setOrigin(0.5);
+
+    this.dialogContainer.add([this.dialogBox, this.dialogText]);
+    this.dialogContainer.setVisible(false);
+  }
+
+  private showDialogAt(x: number, y: number, message: string) {
+    this.dialogContainer.setVisible(true);
+    this.dialogContainer.setPosition(x, y);
+
+    const boxW = 350;
+    const boxH = 80;
+    this.dialogBox.clear();
+    this.dialogBox.fillStyle(0xffffff, 1);
+    this.dialogBox.lineStyle(3, 0x000000, 1);
+    this.dialogBox.fillRoundedRect(-(boxW / 2), -(boxH / 2), boxW, boxH, 40);
+    this.dialogBox.strokeRoundedRect(-(boxW / 2), -(boxH / 2), boxW, boxH, 40);
+
+    this.typewriteText(message);
+  }
+
+  private typewriteText(message: string) {
+    this.dialogText.setText("");
+    const words = message.split(" ");
+    let i = 0;
+
+    this.time.addEvent({
+      delay: 300,
+      callback: () => {
+        this.dialogText.text += words[i] + " ";
+        this.sound.play("speech-blip", {
+          volume: 0.5,
+          detune: Phaser.Math.Between(-200, 200),
+        });
+        i++;
+      },
+      repeat: words.length - 1,
+    });
+  }
+}
+
+
+------------------------------------------------------------------------------------------------
+
+import Phaser from "phaser";
+
+export default class CarDriveScene extends Phaser.Scene {
+  // --- ASSETS ---
+  private car!: Phaser.GameObjects.Sprite;
+  private worldContainer!: Phaser.GameObjects.Container;
+  private policeCar!: Phaser.GameObjects.Sprite;
+
+  // --- UI ELEMENTS ---
+  private dialogContainer!: Phaser.GameObjects.Container;
+  private dialogBox!: Phaser.GameObjects.Graphics;
+  private dialogText!: Phaser.GameObjects.Text;
+
+  // The "Solve Code" Button
+  private solveButtonContainer!: Phaser.GameObjects.Container;
+
+  // --- INPUTS ---
+  private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
+  private keyD!: Phaser.Input.Keyboard.Key;
+
+  // --- CONFIGURATION ---
+  private readonly SCREEN_WIDTH = 1376;
+  private readonly SCREEN_HEIGHT = 768;
+  private scrollSpeed: number = 8;
+
+  // --- STATE ---
+  private isDriving: boolean = true;
+  private eventTriggered: boolean = false;
+
+  // --- AUDIO ---
+  private sirenSound!: Phaser.Sound.BaseSound;
+  private blipSound!: Phaser.Sound.BaseSound;
+
+  constructor() {
+    super("CarDriveScene");
+  }
+
+  preload() {
+    // 1. Backgrounds
+    for (let i = 1; i <= 4; i++) {
+      this.load.image(`city_${i}`, `/intro/city_${i}.png`);
+    }
+
+    // 2. Vehicles
+    this.load.image("car", "/intro/car_1.png");
+    this.load.image("police_car", "/intro/police1.png");
+
+    // 3. Audio
+    this.load.audio("siren", "/audio/blip.mp3");
+    this.load.audio("speech-blip", "/audio/blip.mp3");
+  }
+
+  create() {
+    // --- 1. INPUTS ---
+    if (this.input.keyboard) {
+      this.cursors = this.input.keyboard.createCursorKeys();
+      this.keyD = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D);
+    }
+
+    // --- 2. WORLD CONTAINER ---
+    this.worldContainer = this.add.container(0, 0);
+
+    const bgNames = ["city_1", "city_2", "city_3", "city_4"];
+    bgNames.forEach((name, index) => {
+      const bg = this.add.image(index * 2000, 0, name).setOrigin(0, 0);
+      this.worldContainer.add(bg);
+    });
+
+    // --- 3. PLAYER CAR ---
+    this.car = this.add.sprite(400, 670, "car");
+    this.car.setDisplaySize(260, 130);
+
+    // Idle Animation
+    this.tweens.add({
+      targets: this.car,
+      y: 671,
+      duration: 100,
+      yoyo: true,
+      repeat: -1,
+      ease: "Sine.easeInOut",
+    });
+
+    // --- 4. POLICE CAR (Hidden) ---
+    this.policeCar = this.add.sprite(-300, 670, "police_car");
+    this.policeCar.setDisplaySize(260, 130);
+
+    // --- 5. UI SETUP ---
+    this.createDialogComponents();
+    this.createSolveButton(); // Create the button (initially hidden)
+
+    // --- 6. AUDIO ---
+    this.sirenSound = this.sound.add("siren", { volume: 0.3, loop: true });
+    this.blipSound = this.sound.add("speech-blip", { volume: 0.5 });
+
+    this.cameras.main.fadeIn(1000, 0, 0, 0);
+  }
+
+  update(time: number, delta: number) {
+    if (!this.isDriving) return;
+
+    if (this.cursors.right.isDown || this.keyD.isDown) {
+      this.worldContainer.x -= this.scrollSpeed;
+
+      // --- EVENT TRIGGER: 1/3 of Image 2 ---
+      const triggerWorldX = 2000 + 2000 / 3;
+      const currentTriggerScreenX = triggerWorldX + this.worldContainer.x;
+
+      if (!this.eventTriggered && currentTriggerScreenX < 400) {
+        this.triggerPoliceEvent();
+      }
+    }
+  }
+
+  // --- EVENT LOGIC ---
+
+  private triggerPoliceEvent() {
+    this.eventTriggered = true;
+    this.isDriving = false;
+
+    this.sirenSound.play();
+
+    this.tweens.add({
+      targets: this.policeCar,
+      x: 100,
+      duration: 1500,
+      ease: "Power2",
+      onComplete: () => {
+        this.sirenSound.stop();
+        this.startDialogSequence();
+      },
+    });
+  }
+
+  private startDialogSequence() {
+    // 1. Police: Accusation
+    this.showDialogAt(
+      this.policeCar.x + 50,
+      this.policeCar.y - 150,
+      "HALT! You ran a red light!"
+    );
+
+    this.time.delayedCall(3000, () => {
+      // 2. Player: Excuse
+      this.showDialogAt(
+        this.car.x,
+        this.car.y - 150,
+        "Sorry! I was in a hurry."
+      );
+
+      this.time.delayedCall(3000, () => {
+        // 3. Police: THE PENALTY (Updated Text)
+        this.showDialogAt(
+          this.policeCar.x + 50,
+          this.policeCar.y - 150,
+          "Your penalty: Solve this code!"
+        );
+
+        // 4. Show the "Solve Code" Button
+        this.time.delayedCall(1500, () => {
+          this.showSolveButton();
+        });
+      });
+    });
+  }
+
+  // --- BUTTON UI ---
+
+  private createSolveButton() {
+    this.solveButtonContainer = this.add.container(
+      this.SCREEN_WIDTH / 2,
+      this.SCREEN_HEIGHT / 2
+    );
+    this.solveButtonContainer.setVisible(false);
+    this.solveButtonContainer.setDepth(100);
+
+    // Button Background (Dark Blue for "Coding/Tech" feel)
+    const bg = this.add.graphics();
+    bg.fillStyle(0x000044, 1);
+    bg.lineStyle(4, 0x00ff00, 1); // Green border like a terminal
+    bg.fillRoundedRect(-120, -30, 240, 60, 15);
+    bg.strokeRoundedRect(-120, -30, 240, 60, 15);
+
+    // Button Text (Updated)
+    const text = this.add
+      .text(0, 0, "SOLVE CODE >", {
+        fontFamily: '"Press Start 2P", "Courier", monospace',
+        fontSize: "20px",
+        color: "#00ff00", // Green text
+        fontStyle: "bold",
+      })
+      .setOrigin(0.5);
+
+    // Interactive Zone
+    const hitArea = this.add
+      .zone(0, 0, 240, 60)
+      .setInteractive({ useHandCursor: true });
+
+    hitArea.on("pointerdown", () => {
+      console.log("Navigating to problem...");
+      window.location.href = "/problem";
+    });
+
+    // Hover Effects
+    hitArea.on("pointerover", () => {
+      bg.clear();
+      bg.fillStyle(0x002200, 1);
+      bg.lineStyle(4, 0x00ff00, 1);
+      bg.fillRoundedRect(-120, -30, 240, 60, 15);
+      bg.strokeRoundedRect(-120, -30, 240, 60, 15);
+    });
+
+    hitArea.on("pointerout", () => {
+      bg.clear();
+      bg.fillStyle(0x000044, 1);
+      bg.lineStyle(4, 0x00ff00, 1);
+      bg.fillRoundedRect(-120, -30, 240, 60, 15);
+      bg.strokeRoundedRect(-120, -30, 240, 60, 15);
+    });
+
+    this.solveButtonContainer.add([bg, text, hitArea]);
+  }
+
+  private showSolveButton() {
+    this.solveButtonContainer.setVisible(true);
+    this.solveButtonContainer.setScale(0);
+
+    // Pop-up animation
+    this.tweens.add({
+      targets: this.solveButtonContainer,
+      scale: 1,
+      duration: 300,
+      ease: "Back.out",
+    });
+  }
+
+  // --- DIALOG UI HELPERS ---
+
+  private createDialogComponents() {
+    this.dialogContainer = this.add.container(0, 0);
+    this.dialogBox = this.add.graphics();
+    this.dialogText = this.add
+      .text(0, 0, "", {
+        fontFamily: '"Press Start 2P", "Courier", monospace',
+        fontSize: "20px",
+        color: "#000000",
+        align: "center",
+        wordWrap: { width: 300 },
+      })
+      .setOrigin(0.5);
+    this.dialogContainer.add([this.dialogBox, this.dialogText]);
+    this.dialogContainer.setVisible(false);
+  }
+
+  private showDialogAt(x: number, y: number, message: string) {
+    this.dialogContainer.setVisible(true);
+    this.dialogContainer.setPosition(x, y);
+
+    const w = 350,
+      h = 80;
+    this.dialogBox.clear();
+    this.dialogBox.fillStyle(0xffffff, 1);
+    this.dialogBox.lineStyle(3, 0x000000, 1);
+    this.dialogBox.fillRoundedRect(-(w / 2), -(h / 2), w, h, 20);
+    this.dialogBox.strokeRoundedRect(-(w / 2), -(h / 2), w, h, 20);
+
+    this.dialogText.setText("");
+    const words = message.split(" ");
+    let i = 0;
+    this.time.removeAllEvents();
+    this.time.addEvent({
+      delay: 200,
+      callback: () => {
+        if (i < words.length) {
+          this.dialogText.text += words[i] + " ";
+          this.blipSound.play();
+          i++;
+        }
+      },
+      repeat: words.length,
+    });
+  }
+}

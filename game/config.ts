@@ -1,0 +1,22 @@
+import * as Phaser from "phaser";
+// import GameScene from "./scenes/GameScene";
+import PreloadScene from "./scenes/PreLoadScene";
+import MainMenuScene from "./scenes/MainMenuScene";
+import IntroScene from "./scenes/IntroScene";
+import CarDriveScene from "./scenes/CarDriveScene";
+
+export const phaserConfig: Phaser.Types.Core.GameConfig = {
+  type: Phaser.AUTO,
+  parent: "phaser-container",
+  backgroundColor: "#1a1a2e",
+  width: 1376,
+  height: 768,
+  physics: {
+    default: "arcade",
+    arcade: {
+      gravity: { x: 0, y: 800 },
+      debug: false,
+    },
+  },
+  scene: [PreloadScene, MainMenuScene, IntroScene, CarDriveScene],
+};
