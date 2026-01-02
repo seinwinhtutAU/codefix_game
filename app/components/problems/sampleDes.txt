@@ -1,0 +1,29 @@
+const desData = `
+**Question**: Given a number \`n\`, return the factorial.
+
+\`\`\`python
+def factorial(n):
+    if n == 0 <mark>__</mark>
+        return 1
+    return n * factorial(n - 1)
+\`\`\`
+`;
+
+# This is H1 - Largest text (text-3xl)
+## This is H2 - Large text (text-2xl)
+### This is H3 - Medium-large text (text-xl)
+#### This is H4 - Medium text (text-lg)
+##### This is H5 - Normal text (text-base)
+###### This is H6 - Small text (text-sm)
+
+Regular paragraph text with **bold** and *italic*.
+
+- List items
+- More items
+
+> Blockquotes for important notes
+
+Inline `code` snippets
+
+**This is bold text using strong tags**
+*This is italic text*

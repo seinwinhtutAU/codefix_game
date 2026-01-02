@@ -1,0 +1,121 @@
+import { useState, useCallback } from "react";
+import { Problem, ProblemFile } from "@/lib/types";
+import {
+  fetchProblem,
+  fetchUserCode,
+  checkExistingSolveRecord,
+} from "@/services";
+import { extractFileContents, findFirstFile } from "@/utils";
+
+export function useProblemLoader(problemId: string, userId: string) {
+  const [problem, setProblem] = useState<Problem | null>(null);
+  const [selectedFile, setSelectedFile] = useState<ProblemFile | null>(null);
+  const [fileContents, setFileContents] = useState<Record<string, string>>({});
+  const [originalFileContents, setOriginalFileContents] = useState<
+    Record<string, string>
+  >({});
+  const [isLoading, setIsLoading] = useState(true);
+  const [hasCompleted, setHasCompleted] = useState(false);
+  const [totalTimeSpent, setTotalTimeSpent] = useState<number>(0);
+
+  const loadProblemData = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      const [problemData, userCodeData] = await Promise.all([
+        fetchProblem(problemId),
+        fetchUserCode(userId, problemId),
+      ]);
+
+      if (problemData.success && userCodeData.success) {
+        const enrichedProblem = {
+          ...problemData.problem,
+          userCodeFiles: userCodeData.files,
+        };
+
+        setProblem(enrichedProblem);
+
+        const { currentContents, originalContents } = extractFileContents(
+          userCodeData.files,
+          problemData.problem.files
+        );
+
+        setFileContents(currentContents);
+        setOriginalFileContents(originalContents);
+
+        const firstFile = findFirstFile(problemData.problem.files);
+        setSelectedFile(firstFile);
+
+        // Check for existing solve record
+        const existingRecord = await checkExistingSolveRecord(
+          userId,
+          problemId
+        );
+
+        // Debug log to see what we're getting from the API
+        console.log("Existing solve record:", existingRecord);
+
+        if (existingRecord?.data) {
+          // Set states based on existing record
+          setHasCompleted(true);
+          setTotalTimeSpent(existingRecord.data.timeSpent || 0);
+
+          return {
+            hintUsages: existingRecord.data.hintUsages || [],
+            totalTimeSpent: existingRecord.data.timeSpent || 0,
+            hasCompleted: true,
+          };
+        } else {
+          // No existing record found
+          setHasCompleted(false);
+          setTotalTimeSpent(0);
+
+          return {
+            hintUsages: [],
+            totalTimeSpent: 0,
+            hasCompleted: false,
+          };
+        }
+      } else {
+        // If fetch failed, set defaults
+        setHasCompleted(false);
+        setTotalTimeSpent(0);
+
+        return {
+          hintUsages: [],
+          totalTimeSpent: 0,
+          hasCompleted: false,
+        };
+      }
+    } catch (error) {
+      console.error("Error loading problem:", error);
+      // On error, set defaults
+      setHasCompleted(false);
+      setTotalTimeSpent(0);
+
+      return {
+        hintUsages: [],
+        totalTimeSpent: 0,
+        hasCompleted: false,
+      };
+    } finally {
+      setIsLoading(false);
+    }
+  }, [problemId, userId]);
+
+  return {
+    problem,
+    setProblem,
+    selectedFile,
+    setSelectedFile,
+    fileContents,
+    setFileContents,
+    originalFileContents,
+    setOriginalFileContents,
+    isLoading,
+    hasCompleted,
+    setHasCompleted,
+    totalTimeSpent,
+    setTotalTimeSpent,
+    loadProblemData,
+  };
+}
