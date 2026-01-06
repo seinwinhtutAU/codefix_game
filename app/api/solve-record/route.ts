@@ -13,6 +13,7 @@ interface SolveRecordRequestBody {
   pointsEarned?: number;
   hintUsages?: IncomingHint[];
   level: string;
+  attempt?: number;
 }
 
 interface RecordsFilter {
@@ -26,8 +27,15 @@ export async function POST(req: NextRequest) {
     await dbConnect();
 
     const body: SolveRecordRequestBody = await req.json();
-    const { userId, problemId, timeSpent, pointsEarned, hintUsages, level } =
-      body;
+    const {
+      userId,
+      problemId,
+      timeSpent,
+      pointsEarned,
+      hintUsages,
+      level,
+      attempt,
+    } = body;
 
     if (!userId || !problemId || typeof timeSpent !== "number") {
       return NextResponse.json(
@@ -92,6 +100,7 @@ export async function POST(req: NextRequest) {
       completedAt: new Date(),
       hintUsages: processedHintUsages,
       level: level,
+      attempt: attempt,
     });
 
     console.log("new Record in API Post: ", JSON.stringify(newRecord, null, 2));

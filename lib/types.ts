@@ -224,21 +224,6 @@ export interface HintsResponse {
 // ============================================================================
 // Tracking Spending Time and Points Types
 // ============================================================================
-export interface HintUsage {
-  hintId: string;
-  hintLevel: "small" | "medium" | "big";
-  usedAt: Date;
-}
-
-export interface ProblemSolveRecord {
-  userId: string;
-  problemId: string;
-  timeSpent: number; // in seconds
-  pointsEarned: number;
-  hintUsage: HintUsage[];
-  completedAt: Date;
-  startedAt: Date;
-}
 
 // ============================================================================
 // User Type
@@ -252,6 +237,12 @@ export interface User {
 // ============================================================================
 // Solve Record Type
 // ============================================================================
+export interface HintUsage {
+  hintId: string;
+  hintLevel: "small" | "medium" | "big";
+  usedAt: Date;
+}
+
 export interface SolveRecordRequest {
   userId: string;
   problemId: string;
@@ -259,6 +250,7 @@ export interface SolveRecordRequest {
   pointsEarned: number;
   hintUsages: HintUsage[];
   level: string;
+  attempt?: number;
 }
 
 export interface ProblemSolveRecord {
@@ -268,6 +260,10 @@ export interface ProblemSolveRecord {
   timeSpent: number;
   pointsEarned: number;
   hintUsages?: HintUsage[];
+  level?: string;
+  attempt?: number;
+  completedAt: Date;
+  startedAt: Date;
 }
 
 export interface SolveRecordResponse {
@@ -309,6 +305,7 @@ export interface IGameProgress {
       taskType: "code_problem" | "none";
       taskId?: string;
       status: "none" | "in_progress" | "completed";
+      attempts?: number;
     };
   };
 }

@@ -1,6 +1,7 @@
 import AudioManager from "../AudioManager";
 import GameScene from "./GameScene";
 import { checkExistingSolveRecord } from "@/services/problem";
+import { EventBus } from "@/game/events";
 
 export default class EasyLevelScene extends GameScene {
   private problemIds: string[] = [
@@ -45,8 +46,14 @@ export default class EasyLevelScene extends GameScene {
     super.create();
     const { width, height } = this.scale;
 
+    // Listen for the "problem-solved" event from React
+    EventBus.on("problem-solved", () => {
+      // Restart the scene to re-fetch solving status and update icons
+      this.scene.restart();
+    });
+
     const loadingText = this.add
-      .text(width / 2, height / 2, "Loading...", {
+      .text(width / 2, height / 2, "ACCESSING DATA...", {
         fontFamily: '"Press Start 2P", monospace',
         fontSize: "20px",
         color: "#ffffff",
@@ -75,32 +82,33 @@ export default class EasyLevelScene extends GameScene {
       const objectId = this.problemIds[index];
       const isSolved = solveStatuses[index];
       const isCurrent = index === solvedCount;
-      const isLocked = index > solvedCount;
 
       const circleKey = isCurrent ? "easy-circle-current" : "easy-circle";
       const circle = this.add
         .image(point.x, point.y, circleKey)
         .setDisplaySize(100, 70);
 
+      // Animation for the current target
       if (isCurrent && !isLevelComplete) {
         this.tweens.add({
           targets: circle,
-          scale: 1.05,
-          duration: 1000,
+          scale: 1.08,
+          duration: 800,
           yoyo: true,
           repeat: -1,
         });
       }
 
-      // Updated Logic: Only 'isSolved' gets the unlock icon
       const iconKey = isSolved ? "easy-unlock" : "easy-lock";
       this.add.image(point.x - 5, point.y - 5, iconKey).setDisplaySize(30, 40);
 
+      // Open the overlay instead of navigating
       if (isCurrent && !isLevelComplete) {
         circle.setInteractive({ useHandCursor: true });
         circle.on("pointerdown", () => {
           AudioManager.getInstance().playSound("click");
-          window.location.href = `/problem/${objectId}`;
+          // Signal GamePage to show the React ProblemOverlay
+          EventBus.emit("ui-open-problem", objectId);
         });
       }
     });
@@ -111,10 +119,9 @@ export default class EasyLevelScene extends GameScene {
   }
 
   private async getBatchSolveStatus(userId: string): Promise<boolean[]> {
-    const checkPromises = this.problemIds.map((id) => {
-      return checkExistingSolveRecord(userId, id);
-    });
-
+    const checkPromises = this.problemIds.map((id) =>
+      checkExistingSolveRecord(userId, id)
+    );
     const results = await Promise.all(checkPromises);
     return results.map((record) => record?.data !== null);
   }
@@ -147,20 +154,9 @@ export default class EasyLevelScene extends GameScene {
       this.scene.start("MainMenuScene");
     });
 
-    const nextBtn = this.add
-      .text(width / 2, height / 2 + 100, "NEXT LEVEL >", {
-        fontSize: "20px",
-        fontFamily: '"Press Start 2P", monospace',
-        backgroundColor: "#00ff00",
-        color: "#000000",
-        padding: { x: 20, y: 10 },
-      })
-      .setOrigin(0.5)
-      .setInteractive({ useHandCursor: true });
-
-    nextBtn.on("pointerdown", () => {
-      AudioManager.getInstance().playSound("click");
-      this.scene.start("MediumIntroPage");
+    // Clean up event listeners when leaving scene
+    this.events.on("shutdown", () => {
+      EventBus.off("problem-solved");
     });
   }
 }

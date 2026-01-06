@@ -8,6 +8,7 @@ export interface CurrentTask {
   taskType: "code_problem" | "none";
   taskId?: Types.ObjectId;
   status: "none" | "in_progress" | "completed";
+  attempts?: number;
 }
 
 export interface GameState {
@@ -42,6 +43,10 @@ const currentTaskSchema = new Schema<CurrentTask>(
       type: String,
       enum: ["none", "in_progress", "completed"],
       default: "none",
+    },
+    attempts: {
+      type: Number,
+      default: 0,
     },
   },
   { _id: false }

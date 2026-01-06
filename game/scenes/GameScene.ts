@@ -20,6 +20,10 @@ export default class GameScene extends Phaser.Scene {
 
   create() {
     // 1. Notify React which scene is active
+    EventBus.on("request-current-scene", () => {
+      EventBus.emit("ui-scene", this.scene.key);
+    });
+
     EventBus.emit("ui-scene", this.scene.key);
 
     // 2. Setup standard listeners

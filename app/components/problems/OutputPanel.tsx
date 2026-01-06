@@ -26,7 +26,7 @@ interface Props {
   isVisible: boolean;
   isSubmitting: boolean;
   onClose: () => void;
-  containerRef: React.RefObject<HTMLDivElement>;
+  containerRef?: React.RefObject<HTMLDivElement>;
   onResize?: (width: number) => void;
   defaultWidth?: number;
   minWidth?: number;

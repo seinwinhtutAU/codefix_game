@@ -47,7 +47,7 @@ export default class MainMenuScene extends GameScene {
       .setInteractive({ useHandCursor: true });
 
     startButton.on("pointerdown", () => {
-      AudioManager.getInstance().playSound("click");
+      AudioManager.getInstance().playSound("click", { volume: 0.5 });
       AudioManager.getInstance().stopMusic();
 
       // 3. LOGIC: Redirect based on progress
@@ -60,7 +60,8 @@ export default class MainMenuScene extends GameScene {
         } else if (this.savedProgress?.gameState?.eventFlags?.arrivedAtOffice) {
           this.scene.start("OfficeScene", this.savedProgress);
         } else if (
-          this.savedProgress?.gameState?.eventFlags?.policeStoppedPlayer
+          this.savedProgress?.gameState?.eventFlags?.policeStoppedPlayer ||
+          isIntroDone
         ) {
           this.scene.start("CarDriveScene", this.savedProgress ?? undefined);
         }

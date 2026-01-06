@@ -3,6 +3,7 @@ import Player from "../objects/Player";
 import AudioManager from "../AudioManager";
 import DialogBox from "../ui/DialogBox";
 import GameScene from "./GameScene";
+import { EventBus } from "../events";
 
 type WASDKeys = {
   W: Phaser.Input.Keyboard.Key;
@@ -31,10 +32,11 @@ export default class IntroScene extends GameScene {
   preload() {}
 
   create() {
+    // 1. Initialize GameScene (Sets up EventBus listeners for mute/pause/audio)
     super.create();
+
     // 2. CHECK IF ALREADY COMPLETED
     if (this.savedProgress?.gameState?.eventFlags?.introCompleted) {
-      // If already done, skip straight to the drive scene
       this.scene.start("CarDriveScene", this.savedProgress);
       return;
     }
@@ -44,8 +46,10 @@ export default class IntroScene extends GameScene {
 
     this.cameras.main.fadeIn(1000, 0, 0, 0);
 
-    this.cursors = this.input.keyboard!.createCursorKeys();
-    this.wasd = this.input.keyboard!.addKeys("W,A,S,D") as WASDKeys;
+    if (this.input.keyboard) {
+      this.cursors = this.input.keyboard.createCursorKeys();
+      this.wasd = this.input.keyboard.addKeys("W,A,S,D") as WASDKeys;
+    }
 
     this.add.image(0, 0, "house-bg").setOrigin(0, 0);
 
@@ -60,6 +64,8 @@ export default class IntroScene extends GameScene {
     this.dialogBox = new DialogBox(this);
 
     const { width, height } = this.scale;
+
+    // Setup Next Button
     this.nextButton = this.add
       .text(width - 150, height - 100, "NEXT >", {
         fontFamily: '"Press Start 2P", monospace',
@@ -68,9 +74,26 @@ export default class IntroScene extends GameScene {
         backgroundColor: "#000000",
         padding: { x: 20, y: 10 },
       })
+      .setOrigin(0.5) // Origin to center for better scaling effects
       .setInteractive({ useHandCursor: true })
-      .setVisible(false)
-      .on("pointerdown", () => this.handleGoodbyeSequence());
+      .setVisible(false);
+
+    // Button PointerDown logic
+    this.nextButton.on("pointerdown", () => {
+      // PLAY UI SOUND via EventBus
+      AudioManager.getInstance().playSound("click", { volume: 0.5 });
+
+      // Visual feedback tween
+      this.tweens.add({
+        targets: this.nextButton,
+        scale: 0.9,
+        duration: 80,
+        yoyo: true,
+        ease: "Cubic.easeOut",
+      });
+
+      this.handleGoodbyeSequence();
+    });
 
     this.time.delayedCall(1000, () => this.runIntroSequence());
   }
@@ -84,7 +107,8 @@ export default class IntroScene extends GameScene {
 
   private checkCarProximity() {
     const dist = Math.abs(this.player.x - this.car.x);
-    this.nextButton.setVisible(dist < 50);
+    // Button only appears when player is near the car
+    this.nextButton.setVisible(dist < 80);
   }
 
   private runIntroSequence() {
@@ -124,13 +148,9 @@ export default class IntroScene extends GameScene {
     });
   }
 
-  // 3. SAVE PROGRESS TO DATABASE
   private async completeIntro() {
     if (!this.savedProgress) return;
 
-    console.log("IntroScene userId: ", this.savedProgress.userId);
-
-    // Prepare the update
     const updatedPayload = {
       userId: this.savedProgress.userId,
       lastLocation: "/game",
@@ -144,11 +164,6 @@ export default class IntroScene extends GameScene {
       },
     };
 
-    console.log(
-      "IntroScene payload: ",
-      JSON.stringify(updatedPayload, null, 2)
-    );
-
     try {
       const response = await fetch("/api/game-progress", {
         method: "POST",
@@ -157,18 +172,18 @@ export default class IntroScene extends GameScene {
       });
 
       const newProgress = await response.json();
-      this.savedProgress = newProgress; // Update local memory
+      this.savedProgress = newProgress;
     } catch (e) {
       console.error("Failed to save intro progress:", e);
     }
 
-    // Move to next scene
+    // Transition Logic
     AudioManager.getInstance().stopMusic();
     this.cameras.main.fadeOut(1000, 0, 0, 0);
     this.cameras.main.once(
       Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE,
       () => {
-        this.scene.start("CarDriveScene", this.savedProgress ?? undefined);
+        this.scene.start("CarDriveScene", this.savedProgress);
       }
     );
   }

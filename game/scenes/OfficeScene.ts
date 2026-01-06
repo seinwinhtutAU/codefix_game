@@ -96,8 +96,8 @@ export default class OfficeScene extends GameScene {
 
   // --- SAVE PROGRESS TO DATABASE ---
   private async completeOffice() {
-    this.nextButton.disableInteractive(); // Prevent double clicks
-    AudioManager.getInstance().playSound("click");
+    this.nextButton.disableInteractive();
+    AudioManager.getInstance().playSound("click", { volume: 0.5 });
 
     if (!this.savedProgress) {
       // Fallback if no progress object exists

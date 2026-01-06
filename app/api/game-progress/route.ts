@@ -11,7 +11,8 @@ interface GameProgressRequest {
     currentTask: {
       taskType: "code_problem" | "none";
       taskId: string;
-      status: "none" | "in_progress";
+      status: "none" | "in_progress" | "completed";
+      attempt: number;
     };
   };
 }
@@ -44,7 +45,9 @@ export async function GET(req: Request) {
           },
           currentTask: {
             taskType: "none",
+            taskId: "none",
             status: "none",
+            attempt: 0,
           },
         },
       });

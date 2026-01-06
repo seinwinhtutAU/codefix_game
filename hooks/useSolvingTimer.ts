@@ -4,38 +4,49 @@ import { Problem } from "@/lib/types";
 export function useSolvingTimer(
   initialTimeSpent: number,
   hasCompleted: boolean,
-  problem: Problem | null
+  problem: Problem | null,
+  timeLimit: number = 30
 ) {
   const [totalTimeSpent, setTotalTimeSpent] =
     useState<number>(initialTimeSpent);
   const [isSolving, setIsSolving] = useState<boolean>(true);
+  const [isTimeUp, setIsTimeUp] = useState(false);
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
 
-    if (isSolving && !hasCompleted && problem) {
+    if (isSolving && !hasCompleted && problem && !isTimeUp) {
       interval = setInterval(() => {
-        setTotalTimeSpent((prev) => prev + 1);
+        setTotalTimeSpent((prev) => {
+          const nextTime = prev + 1;
+          if (nextTime >= timeLimit) {
+            setIsTimeUp(true);
+            setIsSolving(false);
+            return timeLimit;
+          }
+          return nextTime;
+        });
       }, 1000);
     }
 
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [isSolving, hasCompleted, problem]);
+  }, [isSolving, hasCompleted, problem, timeLimit, isTimeUp]);
 
-  const updateTotalTimeSpent = useCallback((time: number) => {
-    setTotalTimeSpent(time);
-  }, []);
-
-  const setIsSolvingState = useCallback((state: boolean) => {
-    setIsSolving(state);
+  const resetTimer = useCallback(() => {
+    setTotalTimeSpent(0);
+    setIsTimeUp(false);
+    setIsSolving(true);
   }, []);
 
   return {
     totalTimeSpent,
-    setTotalTimeSpent: updateTotalTimeSpent,
+    timeLeft: Math.max(0, timeLimit - totalTimeSpent),
+    isTimeUp,
+    resetTimer,
+    setTotalTimeSpent,
     isSolving,
-    setIsSolving: setIsSolvingState,
+    setIsSolving,
   };
 }

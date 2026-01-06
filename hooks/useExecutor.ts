@@ -20,6 +20,7 @@ interface UseExecutorProps {
   hasCompleted: boolean;
   setHasCompleted: (completed: boolean) => void;
   level: string;
+  attempt?: number;
 }
 
 export function useExecutor({
@@ -31,6 +32,7 @@ export function useExecutor({
   hasCompleted,
   setHasCompleted,
   level,
+  attempt,
 }: UseExecutorProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isContinuing, setIsContinuing] = useState(false);
@@ -123,6 +125,7 @@ export function useExecutor({
 
         // Calculate points based on hint usage and time spent
         let pointsEarned = 0;
+        const reduceAttemptPoint = attempt ? attempt * 10 : 0;
 
         if (hintUsages.length == 0) {
           pointsEarned = 100;
@@ -138,6 +141,10 @@ export function useExecutor({
           }
         }
 
+        if (pointsEarned > reduceAttemptPoint) {
+          pointsEarned = pointsEarned - reduceAttemptPoint;
+        }
+
         // Save solve record
         try {
           const newRecord: SolveRecordRequest = {
@@ -147,6 +154,7 @@ export function useExecutor({
             hintUsages: hintUsages,
             pointsEarned: pointsEarned,
             level: level,
+            attempt: attempt,
           };
 
           console.log(

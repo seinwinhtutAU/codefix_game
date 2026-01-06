@@ -1,10 +1,22 @@
-import * as Phaser from "phaser";
+// game/events.ts
+import mitt from "mitt";
+import { GameNotificationProps } from "./components/GameNotification";
+import { IGameProgress } from "@/lib/types";
 
-export const EventBus = new Phaser.Events.EventEmitter();
+type Events = {
+  "ui-reset-start": void;
+  "ui-open-problem": string;
+  "show-notification": GameNotificationProps;
+  "hide-notification": void;
+  "play-ui-sound": string;
+  "ui-toggle-pause": boolean;
+  "ui-action": string;
+  "ui-toggle-mute": boolean;
+  "ui-scene": string;
+  "request-current-scene": void;
+  "start-scene": IGameProgress;
+  "problem-solved": { id: string; attempt: number };
+  "resume-after-solve": void;
+};
 
-export type SceneState = "MENU" | "GAME" | "HIDDEN";
-
-export const getGlobalScore = () =>
-  Number(localStorage.getItem("current_score") || "0");
-export const setGlobalScore = (val: number) =>
-  localStorage.setItem("current_score", val.toString());
+export const EventBus = mitt<Events>();

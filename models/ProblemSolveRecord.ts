@@ -14,6 +14,7 @@ export interface IProblemSolveRecord {
   completedAt: Date;
   hintUsages?: HintUsage[];
   level: string;
+  attempt: number;
 }
 
 const hintUsageSchema = new mongoose.Schema<HintUsage>(
@@ -63,6 +64,10 @@ const problemSolveRecordSchema = new mongoose.Schema<IProblemSolveRecord>({
   level: {
     type: String,
     required: true,
+  },
+  attempt: {
+    type: Number,
+    default: 0,
   },
 });
 

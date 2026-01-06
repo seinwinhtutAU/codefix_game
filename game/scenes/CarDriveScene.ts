@@ -3,6 +3,7 @@ import AudioManager from "../AudioManager";
 import DialogBox from "../ui/DialogBox";
 import { IGameProgress } from "@/lib/types";
 import GameScene from "./GameScene";
+import { EventBus } from "@/game/events";
 
 export default class CarDriveScene extends GameScene {
   // --- ASSETS ---
@@ -22,7 +23,8 @@ export default class CarDriveScene extends GameScene {
   private readonly SCREEN_WIDTH = 1376;
   private readonly SCREEN_HEIGHT = 768;
   private scrollSpeed: number = 10;
-  private readonly OFFICE_X_TARGET = -6500; // Middle of City 4
+  private readonly OFFICE_X_TARGET = -6500;
+  private readonly POLICE_TRIGGER_X = -2666;
 
   // --- GAME STATE ---
   private isDriving: boolean = true;
@@ -46,27 +48,54 @@ export default class CarDriveScene extends GameScene {
       this.keyD = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D);
     }
 
+    // 1. Setup world first
     this.setupWorld();
+    // 2. Setup cars (they will check the flag to position themselves)
     this.setupCars();
+    // 3. Setup UI
     this.dialogBox = new DialogBox(this);
     this.createSolveButton();
 
+    // 4. Check progress to override states
     this.checkStoryProgress();
+
     this.cameras.main.fadeIn(1000, 0, 0, 0);
+
+    EventBus.on(
+      "problem-solved",
+      async (data: { id: string; attempt: number }) => {
+        // 1. Update the database to completed
+        await this.updateProgress({
+          gameState: {
+            ...this.savedProgress?.gameState,
+            currentTask: {
+              ...this.savedProgress?.gameState.currentTask,
+              taskId: data.id,
+              status: "completed",
+              attempts: data.attempt,
+            },
+          },
+        });
+      }
+    );
+
+    EventBus.on("resume-after-solve", () => {
+      this.handlePoliceSuccess();
+    });
   }
 
   private setupWorld() {
     this.worldContainer = this.add.container(0, 0);
 
+    // If already stopped by police, teleport the background to the stop point
     if (this.savedProgress?.gameState?.eventFlags?.policeStoppedPlayer) {
-      this.worldContainer.x = -2200;
-
+      this.worldContainer.x = this.POLICE_TRIGGER_X;
       this.eventTriggered = true;
+      this.isDriving = false; // Freeze movement immediately
     }
 
     const bgNames = ["city_1", "city_2", "city_3", "city_4", "city_5"];
     bgNames.forEach((name, index) => {
-      // Each background is 2000px wide
       const bg = this.add.image(index * 2000, 0, name).setOrigin(0, 0);
       this.worldContainer.add(bg);
     });
@@ -84,7 +113,12 @@ export default class CarDriveScene extends GameScene {
       ease: "Sine.easeInOut",
     });
 
-    this.policeCar = this.add.sprite(-300, 670, "police_car");
+    // Determine police car starting position based on flag
+    const isStopped =
+      this.savedProgress?.gameState?.eventFlags?.policeStoppedPlayer;
+    const policeInitialX = isStopped ? 100 : -300;
+
+    this.policeCar = this.add.sprite(policeInitialX, 670, "police_car");
     this.policeCar.setDisplaySize(260, 130);
   }
 
@@ -92,13 +126,13 @@ export default class CarDriveScene extends GameScene {
     if (this.savedProgress?.gameState) {
       const { eventFlags, currentTask } = this.savedProgress.gameState;
 
-      // If they already arrived at the office in a previous session
       if (eventFlags.arrivedAtOffice) {
         this.scene.start("OfficeScene", this.savedProgress);
         return;
       }
 
       if (eventFlags.policeStoppedPlayer) {
+        this.isDriving = false; // Prevent movement update
         if (currentTask.status === "completed") {
           this.handlePoliceSuccess();
         } else {
@@ -107,6 +141,7 @@ export default class CarDriveScene extends GameScene {
         return;
       }
     }
+
     AudioManager.getInstance().playMusic("drive-bgm", {
       loop: true,
       volume: 0.15,
@@ -119,14 +154,14 @@ export default class CarDriveScene extends GameScene {
     if (this.cursors.right.isDown || this.keyD.isDown) {
       this.worldContainer.x -= this.scrollSpeed;
 
-      // 1. Check for Police Trigger (End of City 1)
+      // Check for Police Trigger
       const triggerWorldX = 2000 + 2000 / 3;
       const currentTriggerScreenX = triggerWorldX + this.worldContainer.x;
       if (!this.eventTriggered && currentTriggerScreenX < 400) {
         this.triggerPoliceEvent();
       }
 
-      // 2. Check for Office Arrival (Middle of City 4)
+      // Check for Office Arrival
       if (
         !this.hasReachedOffice &&
         this.worldContainer.x <= this.OFFICE_X_TARGET
@@ -136,51 +171,36 @@ export default class CarDriveScene extends GameScene {
     }
   }
 
-  /* =====================================================
-     Office Arrival Logic
-  ===================================================== */
-
   private async handleArrivalAtOffice() {
     this.hasReachedOffice = true;
     this.isDriving = false;
 
-    // Show Dialogue
     this.dialogBox.show(
       this.car.x,
       this.car.y - 150,
       "The office! I finally made it."
     );
 
-    // SAVE PROGRESS: Mark arrivedAtOffice as true
     await this.updateProgress({
-      lastLocation: "/game",
       gameState: {
         currentScene: "OfficeScene",
         eventFlags: {
           ...this.savedProgress?.gameState?.eventFlags,
           arrivedAtOffice: true,
         },
-        currentTask: { taskType: "none", status: "none" }, // Clear the police task
+        currentTask: { taskType: "none", status: "none" },
       },
     });
 
     this.time.delayedCall(3000, () => {
-      this.dialogBox.setVisible(false); // Clean up UI
+      this.dialogBox.setVisible(false);
       this.cameras.main.fadeOut(1000, 0, 0, 0);
       AudioManager.getInstance().stopMusic();
       this.cameras.main.once("camerafadeoutcomplete", () => {
-        if (this.savedProgress) {
-          this.scene.start("OfficeScene", this.savedProgress);
-        } else {
-          this.scene.start("OfficeScene");
-        }
+        this.scene.start("OfficeScene", this.savedProgress);
       });
     });
   }
-
-  /* =====================================================
-     Police Event Logic
-  ===================================================== */
 
   private triggerPoliceEvent() {
     this.eventTriggered = true;
@@ -205,6 +225,7 @@ export default class CarDriveScene extends GameScene {
     this.eventTriggered = true;
     this.car.setPosition(400, 670);
     this.policeCar.setPosition(100, 670);
+    this.solveButtonContainer.setVisible(false); // Hide button if visible
 
     this.dialogBox.show(
       this.policeCar.x + 50,
@@ -213,7 +234,7 @@ export default class CarDriveScene extends GameScene {
     );
 
     this.time.delayedCall(3000, () => {
-      this.dialogBox.setVisible(false); // Fix: Hide dialog
+      this.dialogBox.setVisible(false);
       this.tweens.add({
         targets: this.policeCar,
         x: -400,
@@ -244,26 +265,22 @@ export default class CarDriveScene extends GameScene {
       this.policeCar.y - 150,
       "HALT! You ran a red light!"
     );
-    this.time.delayedCall(3000, () => {
+    this.time.delayedCall(2000, () => {
       this.dialogBox.show(
         this.car.x,
         this.car.y - 150,
         "Sorry! I was in a hurry."
       );
-      this.time.delayedCall(3000, () => {
+      this.time.delayedCall(2000, () => {
         this.dialogBox.show(
           this.policeCar.x + 50,
           this.policeCar.y - 150,
           "Your penalty: Solve this code!"
         );
-        this.time.delayedCall(1500, () => this.showSolveButton());
+        this.time.delayedCall(1000, () => this.showSolveButton());
       });
     });
   }
-
-  /* =====================================================
-     Database & UI Helpers
-  ===================================================== */
 
   private createSolveButton() {
     this.solveButtonContainer = this.add.container(
@@ -299,9 +316,7 @@ export default class CarDriveScene extends GameScene {
     hitArea.on("pointerdown", async () => {
       AudioManager.getInstance().playSound("speech-blip", { volume: 1.0 });
 
-      // Save that the police stopped them before leaving
       await this.updateProgress({
-        lastLocation: "/game",
         gameState: {
           currentScene: "CarDriveScene",
           eventFlags: {
@@ -316,26 +331,21 @@ export default class CarDriveScene extends GameScene {
         },
       });
 
-      window.location.href = "/problem/69582fb37538b18589a46564";
+      // INTEGRATION: Open the overlay without page refresh
+      EventBus.emit("ui-open-problem", "69582fb37538b18589a46564");
     });
 
     this.solveButtonContainer.add([bg, text, hitArea]);
   }
 
-  // Unified helper to send data to your Next.js API
   private async updateProgress(payload: Partial<IGameProgress>) {
     if (!this.savedProgress) return;
-
     try {
       const response = await fetch("/api/game-progress", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          userId: this.savedProgress.userId,
-          ...payload,
-        }),
+        body: JSON.stringify({ userId: this.savedProgress.userId, ...payload }),
       });
-      // Update local copy so we have latest flags
       const updatedData = await response.json();
       this.savedProgress = updatedData;
     } catch (e) {
