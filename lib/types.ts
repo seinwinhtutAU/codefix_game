@@ -297,6 +297,23 @@ export interface ProblemGuide {
 }
 
 // ============================================================================
+// Game Progress
+// ============================================================================
+export interface IGameProgress {
+  userId: string;
+  lastLocation: string;
+  gameState: {
+    currentScene: string;
+    eventFlags: Record<string, boolean>;
+    currentTask: {
+      taskType: "code_problem" | "none";
+      taskId?: string;
+      status: "none" | "in_progress" | "completed";
+    };
+  };
+}
+
+// ============================================================================
 // Type Aliases for Better Semantics
 // ============================================================================
 

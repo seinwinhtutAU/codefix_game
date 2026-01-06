@@ -1,77 +1,78 @@
 import Phaser from "phaser";
 import AudioManager from "../AudioManager";
-import DialogBox from "../ui/DialogBox"; // Import the component
+import DialogBox from "../ui/DialogBox";
+import { IGameProgress } from "@/lib/types";
+import GameScene from "./GameScene";
 
-export default class CarDriveScene extends Phaser.Scene {
+export default class CarDriveScene extends GameScene {
   // --- ASSETS ---
   private car!: Phaser.GameObjects.Sprite;
   private worldContainer!: Phaser.GameObjects.Container;
   private policeCar!: Phaser.GameObjects.Sprite;
 
-  // --- UI ELEMENTS ---
-  private dialogBox!: DialogBox; // Clean UI Component
+  // --- UI ---
+  private dialogBox!: DialogBox;
   private solveButtonContainer!: Phaser.GameObjects.Container;
 
   // --- INPUTS ---
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
   private keyD!: Phaser.Input.Keyboard.Key;
 
-  // --- CONFIGURATION ---
+  // --- CONFIG ---
   private readonly SCREEN_WIDTH = 1376;
   private readonly SCREEN_HEIGHT = 768;
-  private scrollSpeed: number = 8;
+  private scrollSpeed: number = 10;
+  private readonly OFFICE_X_TARGET = -6500; // Middle of City 4
 
-  // --- STATE ---
+  // --- GAME STATE ---
   private isDriving: boolean = true;
   private eventTriggered: boolean = false;
-
-  // --- AUDIO ---
-  // Siren is local because we need to control it precisely (start/stop)
-  // tied to the police car animation, not global state.
+  private hasReachedOffice: boolean = false;
   private sirenSound!: Phaser.Sound.BaseSound;
 
   constructor() {
     super("CarDriveScene");
   }
 
-  preload() {
-    // 1. Visuals
-    for (let i = 1; i <= 4; i++) {
-      this.load.image(`city_${i}`, `/intro/city_${i}.png`);
-    }
-    this.load.image("car", "/intro/car_1.png");
-    this.load.image("police_car", "/intro/police1.png");
-
-    // 2. Audio
-    this.load.audio("siren", "/audio/siren.mp3");
-    this.load.audio("speech-blip", "/audio/blip.mp3");
-    this.load.audio("drive-bgm", "/audio/bgm.mp3"); // Using bgm as driving music
-  }
+  preload() {}
 
   create() {
-    // 1. Initialize Audio Manager
+    super.create();
     AudioManager.getInstance().init(this.game);
-    // Play BGM with fade-in
-    AudioManager.getInstance().playMusic("drive-bgm", {
-      loop: true,
-      volume: 0.15,
-    });
+    this.sirenSound = this.sound.add("siren", { volume: 0.3, loop: true });
 
-    // 2. Inputs
     if (this.input.keyboard) {
       this.cursors = this.input.keyboard.createCursorKeys();
       this.keyD = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D);
     }
 
-    // 3. World Setup
+    this.setupWorld();
+    this.setupCars();
+    this.dialogBox = new DialogBox(this);
+    this.createSolveButton();
+
+    this.checkStoryProgress();
+    this.cameras.main.fadeIn(1000, 0, 0, 0);
+  }
+
+  private setupWorld() {
     this.worldContainer = this.add.container(0, 0);
-    const bgNames = ["city_1", "city_2", "city_3", "city_4"];
+
+    if (this.savedProgress?.gameState?.eventFlags?.policeStoppedPlayer) {
+      this.worldContainer.x = -2200;
+
+      this.eventTriggered = true;
+    }
+
+    const bgNames = ["city_1", "city_2", "city_3", "city_4", "city_5"];
     bgNames.forEach((name, index) => {
+      // Each background is 2000px wide
       const bg = this.add.image(index * 2000, 0, name).setOrigin(0, 0);
       this.worldContainer.add(bg);
     });
+  }
 
-    // 4. Player Car
+  private setupCars() {
     this.car = this.add.sprite(400, 670, "car");
     this.car.setDisplaySize(260, 130);
     this.tweens.add({
@@ -83,42 +84,107 @@ export default class CarDriveScene extends Phaser.Scene {
       ease: "Sine.easeInOut",
     });
 
-    // 5. Police Car
     this.policeCar = this.add.sprite(-300, 670, "police_car");
     this.policeCar.setDisplaySize(260, 130);
-
-    // 6. UI Setup
-    this.dialogBox = new DialogBox(this); // Init reusable component
-    this.createSolveButton();
-
-    // 7. Local Audio Setup
-    this.sirenSound = this.sound.add("siren", { volume: 0.3, loop: true });
-
-    this.cameras.main.fadeIn(1000, 0, 0, 0);
   }
 
-  update(time: number, delta: number) {
+  private checkStoryProgress() {
+    if (this.savedProgress?.gameState) {
+      const { eventFlags, currentTask } = this.savedProgress.gameState;
+
+      // If they already arrived at the office in a previous session
+      if (eventFlags.arrivedAtOffice) {
+        this.scene.start("OfficeScene", this.savedProgress);
+        return;
+      }
+
+      if (eventFlags.policeStoppedPlayer) {
+        if (currentTask.status === "completed") {
+          this.handlePoliceSuccess();
+        } else {
+          this.setupPoliceStandby();
+        }
+        return;
+      }
+    }
+    AudioManager.getInstance().playMusic("drive-bgm", {
+      loop: true,
+      volume: 0.15,
+    });
+  }
+
+  update() {
     if (!this.isDriving) return;
 
     if (this.cursors.right.isDown || this.keyD.isDown) {
       this.worldContainer.x -= this.scrollSpeed;
 
+      // 1. Check for Police Trigger (End of City 1)
       const triggerWorldX = 2000 + 2000 / 3;
       const currentTriggerScreenX = triggerWorldX + this.worldContainer.x;
-
       if (!this.eventTriggered && currentTriggerScreenX < 400) {
         this.triggerPoliceEvent();
+      }
+
+      // 2. Check for Office Arrival (Middle of City 4)
+      if (
+        !this.hasReachedOffice &&
+        this.worldContainer.x <= this.OFFICE_X_TARGET
+      ) {
+        this.handleArrivalAtOffice();
       }
     }
   }
 
-  // --- EVENT LOGIC ---
+  /* =====================================================
+     Office Arrival Logic
+  ===================================================== */
+
+  private async handleArrivalAtOffice() {
+    this.hasReachedOffice = true;
+    this.isDriving = false;
+
+    // Show Dialogue
+    this.dialogBox.show(
+      this.car.x,
+      this.car.y - 150,
+      "The office! I finally made it."
+    );
+
+    // SAVE PROGRESS: Mark arrivedAtOffice as true
+    await this.updateProgress({
+      lastLocation: "/game",
+      gameState: {
+        currentScene: "OfficeScene",
+        eventFlags: {
+          ...this.savedProgress?.gameState?.eventFlags,
+          arrivedAtOffice: true,
+        },
+        currentTask: { taskType: "none", status: "none" }, // Clear the police task
+      },
+    });
+
+    this.time.delayedCall(3000, () => {
+      this.dialogBox.setVisible(false); // Clean up UI
+      this.cameras.main.fadeOut(1000, 0, 0, 0);
+      AudioManager.getInstance().stopMusic();
+      this.cameras.main.once("camerafadeoutcomplete", () => {
+        if (this.savedProgress) {
+          this.scene.start("OfficeScene", this.savedProgress);
+        } else {
+          this.scene.start("OfficeScene");
+        }
+      });
+    });
+  }
+
+  /* =====================================================
+     Police Event Logic
+  ===================================================== */
 
   private triggerPoliceEvent() {
     this.eventTriggered = true;
     this.isDriving = false;
-
-    // AUDIO LOGIC: Stop the music to make the siren scary
     AudioManager.getInstance().stopMusic();
     this.sirenSound.play();
 
@@ -134,59 +200,95 @@ export default class CarDriveScene extends Phaser.Scene {
     });
   }
 
+  private handlePoliceSuccess() {
+    this.isDriving = false;
+    this.eventTriggered = true;
+    this.car.setPosition(400, 670);
+    this.policeCar.setPosition(100, 670);
+
+    this.dialogBox.show(
+      this.policeCar.x + 50,
+      this.policeCar.y - 150,
+      "Excellent work. You're free to go!"
+    );
+
+    this.time.delayedCall(3000, () => {
+      this.dialogBox.setVisible(false); // Fix: Hide dialog
+      this.tweens.add({
+        targets: this.policeCar,
+        x: -400,
+        duration: 2000,
+        ease: "Power2",
+        onComplete: () => {
+          this.isDriving = true;
+          AudioManager.getInstance().playMusic("drive-bgm", {
+            loop: true,
+            volume: 0.15,
+          });
+        },
+      });
+    });
+  }
+
+  private setupPoliceStandby() {
+    this.isDriving = false;
+    this.eventTriggered = true;
+    this.car.setPosition(400, 670);
+    this.policeCar.setPosition(100, 670);
+    this.showSolveButton();
+  }
+
   private startDialogSequence() {
-    // 1. Police
     this.dialogBox.show(
       this.policeCar.x + 50,
       this.policeCar.y - 150,
       "HALT! You ran a red light!"
     );
-
     this.time.delayedCall(3000, () => {
-      // 2. Player
       this.dialogBox.show(
         this.car.x,
         this.car.y - 150,
         "Sorry! I was in a hurry."
       );
-
       this.time.delayedCall(3000, () => {
-        // 3. Police
         this.dialogBox.show(
           this.policeCar.x + 50,
           this.policeCar.y - 150,
           "Your penalty: Solve this code!"
         );
-
-        this.time.delayedCall(1500, () => {
-          this.showSolveButton();
-        });
+        this.time.delayedCall(1500, () => this.showSolveButton());
       });
     });
   }
 
-  // --- BUTTON UI ---
+  /* =====================================================
+     Database & UI Helpers
+  ===================================================== */
 
   private createSolveButton() {
     this.solveButtonContainer = this.add.container(
       this.SCREEN_WIDTH / 2,
       this.SCREEN_HEIGHT / 2
     );
-    this.solveButtonContainer.setVisible(false);
-    this.solveButtonContainer.setDepth(100);
+    this.solveButtonContainer.setVisible(false).setDepth(100);
 
-    const bg = this.add.graphics();
-    bg.fillStyle(0x000044, 1);
-    bg.lineStyle(4, 0x00ff00, 1);
-    bg.fillRoundedRect(-120, -30, 240, 60, 15);
-    bg.strokeRoundedRect(-120, -30, 240, 60, 15);
+    const bg = this.add
+      .graphics()
+      .fillStyle(0x000044, 1)
+      .lineStyle(4, 0x00ff00, 1);
+    bg.fillRoundedRect(-120, -30, 240, 60, 15).strokeRoundedRect(
+      -120,
+      -30,
+      240,
+      60,
+      15
+    );
 
     const text = this.add
       .text(0, 0, "SOLVE CODE >", {
-        fontFamily: '"Press Start 2P", "Courier", monospace',
+        fontFamily: '"Press Start 2P", monospace',
         fontSize: "20px",
         color: "#00ff00",
-        fontStyle: "bold",
       })
       .setOrigin(0.5);
 
@@ -194,47 +296,55 @@ export default class CarDriveScene extends Phaser.Scene {
       .zone(0, 0, 240, 60)
       .setInteractive({ useHandCursor: true });
 
-    // Interaction Logic
-    hitArea.on("pointerdown", () => {
-      // 1. Play Feedback Sound via Manager
-      AudioManager.getInstance().playSound("speech-blip", {
-        volume: 1.0,
-        detune: 500,
+    hitArea.on("pointerdown", async () => {
+      AudioManager.getInstance().playSound("speech-blip", { volume: 1.0 });
+
+      // Save that the police stopped them before leaving
+      await this.updateProgress({
+        lastLocation: "/game",
+        gameState: {
+          currentScene: "CarDriveScene",
+          eventFlags: {
+            ...this.savedProgress?.gameState?.eventFlags,
+            policeStoppedPlayer: true,
+          },
+          currentTask: {
+            taskType: "code_problem",
+            taskId: "69582fb37538b18589a46564",
+            status: "in_progress",
+          },
+        },
       });
 
-      // 2. Clean up audio before navigating
-      AudioManager.getInstance().stopMusic();
-      this.sound.stopAll();
-
-      // 3. Navigate after short delay
-      this.time.delayedCall(150, () => {
-        window.location.href = "/problem";
-      });
-    });
-
-    hitArea.on("pointerover", () => {
-      bg.clear();
-      bg.fillStyle(0x002200, 1);
-      bg.lineStyle(4, 0x00ff00, 1);
-      bg.fillRoundedRect(-120, -30, 240, 60, 15);
-      bg.strokeRoundedRect(-120, -30, 240, 60, 15);
-    });
-
-    hitArea.on("pointerout", () => {
-      bg.clear();
-      bg.fillStyle(0x000044, 1);
-      bg.lineStyle(4, 0x00ff00, 1);
-      bg.fillRoundedRect(-120, -30, 240, 60, 15);
-      bg.strokeRoundedRect(-120, -30, 240, 60, 15);
+      window.location.href = "/problem/69582fb37538b18589a46564";
     });
 
     this.solveButtonContainer.add([bg, text, hitArea]);
   }
 
-  private showSolveButton() {
-    this.solveButtonContainer.setVisible(true);
-    this.solveButtonContainer.setScale(0);
+  // Unified helper to send data to your Next.js API
+  private async updateProgress(payload: Partial<IGameProgress>) {
+    if (!this.savedProgress) return;
 
+    try {
+      const response = await fetch("/api/game-progress", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: this.savedProgress.userId,
+          ...payload,
+        }),
+      });
+      // Update local copy so we have latest flags
+      const updatedData = await response.json();
+      this.savedProgress = updatedData;
+    } catch (e) {
+      console.error("Database Save Error:", e);
+    }
+  }
+
+  private showSolveButton() {
+    this.solveButtonContainer.setVisible(true).setScale(0);
     this.tweens.add({
       targets: this.solveButtonContainer,
       scale: 1,

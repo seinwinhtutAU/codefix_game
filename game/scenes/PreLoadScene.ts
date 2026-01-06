@@ -1,19 +1,27 @@
 import * as Phaser from "phaser";
+import { IGameProgress } from "@/lib/types";
+import { EventBus } from "../events";
 
 export default class PreloadScene extends Phaser.Scene {
-  // Store the text object so we can change it later
   private loadingText!: Phaser.GameObjects.Text;
   private progressBar!: Phaser.GameObjects.Graphics;
   private progressBox!: Phaser.GameObjects.Graphics;
+
+  // --- TEACHER'S ADDITION: Store the progress data ---
+  private savedProgress!: IGameProgress;
 
   constructor() {
     super("PreloadScene");
   }
 
   preload() {
+    EventBus.on("start-scene", (data: IGameProgress) => {
+      this.savedProgress = data;
+    });
+
     const { width, height } = this.cameras.main;
 
-    // 1. Setup UI
+    // UI Setup
     this.progressBox = this.add.graphics();
     this.progressBox.fillStyle(0x222222, 0.8);
     this.progressBox.fillRect(width / 2 - 160, height / 2 - 25, 320, 50);
@@ -21,13 +29,14 @@ export default class PreloadScene extends Phaser.Scene {
     this.progressBar = this.add.graphics();
 
     this.loadingText = this.add
-      .text(width / 2, height / 2 - 50, "Loading...", {
+      .text(width / 2, height / 2 - 50, "Loading Assets...", {
+        fontFamily: "monospace",
         fontSize: "20px",
         color: "#ffffff",
       })
       .setOrigin(0.5);
 
-    // 2. Progress Event
+    // Progress Event
     this.load.on("progress", (value: number) => {
       this.progressBar.clear();
       this.progressBar.fillStyle(0x3498db, 1);
@@ -39,23 +48,51 @@ export default class PreloadScene extends Phaser.Scene {
       );
     });
 
-    // 3. Fake Load for testing (Keep your existing asset loads here)
-    for (let i = 0; i < 100; i++) {
-      this.load.image(`test_${i}`, "/assets/bg.png"); // Make sure this path exists or remove this loop
+    this.load.image("house-bg", "/intro/house-bg.png");
+    this.load.image("wife", "/player/idle/img.png");
+    this.load.image("car", "/intro/car_1.png");
+    this.load.image("police_car", "/intro/police1.png");
+    this.load.image("office-bg", "/intro/office_work.png");
+
+    // City backgrounds in CarDriveScene
+    for (let i = 1; i <= 5; i++) {
+      this.load.image(`city_${i}`, `/intro/city_${i}.png`);
     }
 
-    // 4. Load ACTUAL Audio
-    // Ensure these paths are correct in your public folder
+    // Player
+    this.load.image("player", "/player/idle/img.png");
+    for (let i = 0; i < 8; i++) {
+      this.load.image(`player_walk_${i}`, `/player/walk/img${i}.png`);
+    }
+
+    // Audio
+    this.load.audio("bgm", "/audio/bgm.mp3");
     this.load.audio("menu-bgm", "/audio/bgm.mp3");
+    this.load.audio("drive-bgm", "/audio/bgm.mp3");
+    this.load.audio("siren", "/audio/siren.mp3");
     this.load.audio("click", "/audio/click.mp3");
+    this.load.audio("speech-blip", "/audio/blip.mp3");
   }
 
   create() {
+    // 3. CLEAN UP AND PREPARE FOR START
     this.progressBar.destroy();
     this.progressBox.destroy();
-    this.loadingText.setText("Click to Start").setInteractive();
+
+    this.loadingText.setText("READY - CLICK TO START");
+
     this.input.once("pointerdown", () => {
-      this.scene.start("MainMenuScene");
+      if (this.sound instanceof Phaser.Sound.WebAudioSoundManager) {
+        if (this.sound.context.state === "suspended") {
+          this.sound.context.resume();
+        }
+      }
+
+      console.log(
+        "Phaser saveProgress: ",
+        JSON.stringify(this.savedProgress, null, 2)
+      );
+      this.scene.start("MainMenuScene", this.savedProgress);
     });
   }
 }

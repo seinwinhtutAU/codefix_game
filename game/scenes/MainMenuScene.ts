@@ -1,13 +1,15 @@
-import * as Phaser from "phaser";
 import AudioManager from "../AudioManager";
-export default class MainMenuScene extends Phaser.Scene {
+import { EventBus } from "../events";
+import GameScene from "./GameScene";
+
+export default class MainMenuScene extends GameScene {
   constructor() {
     super("MainMenuScene");
   }
 
-  preload() {}
-
   create() {
+    super.create();
+    // Initialize Audio
     AudioManager.getInstance().init(this.game);
     AudioManager.getInstance().playMusic("menu-bgm", {
       loop: true,
@@ -20,13 +22,24 @@ export default class MainMenuScene extends Phaser.Scene {
     // Title
     this.add
       .text(width / 2, height / 2 - 100, "MY AWESOME GAME", {
+        fontFamily: '"Press Start 2P", monospace', // Optional: Retro font
         fontSize: "48px",
+        color: "#ffffff",
       })
       .setOrigin(0.5);
 
-    // Start Button
+    console.log(
+      "MainMenu saveProgress: ",
+      JSON.stringify(this.savedProgress, null, 2)
+    );
+    // 2. LOGIC: Determine button text based on event flags
+    const isIntroDone =
+      this.savedProgress?.gameState?.eventFlags?.introCompleted;
+    const buttonText = isIntroDone ? "CONTINUE GAME" : "START NEW GAME";
+
+    // Start / Continue Button
     const startButton = this.add
-      .text(width / 2, height / 2 + 50, "START GAME", {
+      .text(width / 2, height / 2 + 50, buttonText, {
         fontSize: "32px",
         color: "#00ff00",
       })
@@ -34,16 +47,76 @@ export default class MainMenuScene extends Phaser.Scene {
       .setInteractive({ useHandCursor: true });
 
     startButton.on("pointerdown", () => {
-      console.log("Starting the game...");
-
-      // 5. Add a click sound for feedback
       AudioManager.getInstance().playSound("click");
+      AudioManager.getInstance().stopMusic();
 
-      this.scene.start("IntroScene");
+      // 3. LOGIC: Redirect based on progress
+      if (!isIntroDone) {
+        // Brand new player or intro not finished
+        this.scene.start("IntroScene", this.savedProgress ?? undefined);
+      } else {
+        if (this.savedProgress?.gameState?.eventFlags?.officeCompleted) {
+          this.scene.start("EasyLevelScene", this.savedProgress);
+        } else if (this.savedProgress?.gameState?.eventFlags?.arrivedAtOffice) {
+          this.scene.start("OfficeScene", this.savedProgress);
+        } else if (
+          this.savedProgress?.gameState?.eventFlags?.policeStoppedPlayer
+        ) {
+          this.scene.start("CarDriveScene", this.savedProgress ?? undefined);
+        }
+      }
     });
 
     // Hover Effects
-    startButton.on("pointerover", () => startButton.setScale(1.2));
+    startButton.on("pointerover", () => startButton.setScale(1.1));
     startButton.on("pointerout", () => startButton.setScale(1));
+
+    // Inside create() method of MainMenuScene
+    if (isIntroDone) {
+      const resetText = this.add
+        .text(width / 2, height - 50, "RESET DATA", {
+          fontSize: "16px",
+          color: "#ff0000",
+        })
+        .setOrigin(0.5)
+        .setInteractive({ useHandCursor: true });
+
+      resetText.on("pointerdown", async () => {
+        // 1. Confirm with the user
+        const confirmReset = window.confirm(
+          "Are you sure? This will delete all progress!"
+        );
+
+        if (confirmReset) {
+          try {
+            // 2. Call the DELETE method we added to the API
+            const response = await fetch(
+              `/api/game-progress?userId=${this.savedProgress.userId}`,
+              {
+                method: "DELETE",
+              }
+            );
+
+            if (response.ok) {
+              EventBus.emit("ui-reset-start");
+
+              // 3. Reset local memory and restart the engine
+              // We redirect to IntroScene as if it's a brand new game
+              AudioManager.getInstance().stopMusic();
+
+              setTimeout(() => {
+                window.location.reload();
+              }, 100);
+            }
+          } catch (error) {
+            console.error("Failed to delete progress:", error);
+          }
+        }
+      });
+
+      // Simple hover effect for the reset text
+      resetText.on("pointerover", () => resetText.setColor("#ffffff"));
+      resetText.on("pointerout", () => resetText.setColor("#ff0000"));
+    }
   }
 }

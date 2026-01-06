@@ -3,18 +3,27 @@
 import { useEffect, useRef } from "react";
 import type Phaser from "phaser";
 import AudioManager from "@/game/AudioManager";
+import { getPlayerProgress } from "@/services/game";
+import { EventBus } from "../events";
 
-export default function PhaserGame() {
+export default function PhaserGame({ onBooted }: { onBooted: () => void }) {
   const gameRef = useRef<Phaser.Game | null>(null);
 
   useEffect(() => {
     const initPhaser = async () => {
+      // Phase 1: Background work
+      const progress = await getPlayerProgress();
       const PhaserModule = await import("phaser");
       const { phaserConfig } = await import("@/game/config");
 
       if (!gameRef.current) {
-        // Initialize using the imported module
-        gameRef.current = new PhaserModule.Game(phaserConfig);
+        const game = new PhaserModule.Game(phaserConfig);
+        gameRef.current = game;
+
+        game.events.once("ready", () => {
+          EventBus.emit("start-scene", progress);
+          onBooted();
+        });
       }
     };
 

@@ -4,6 +4,8 @@ import PreloadScene from "./scenes/PreLoadScene";
 import MainMenuScene from "./scenes/MainMenuScene";
 import IntroScene from "./scenes/IntroScene";
 import CarDriveScene from "./scenes/CarDriveScene";
+import OfficeScene from "./scenes/OfficeScene";
+import EasyLevelScene from "./scenes/EasyLevelScene";
 
 export const phaserConfig: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
@@ -18,5 +20,12 @@ export const phaserConfig: Phaser.Types.Core.GameConfig = {
       debug: false,
     },
   },
-  scene: [PreloadScene, MainMenuScene, IntroScene, CarDriveScene],
+  scene: [
+    PreloadScene,
+    MainMenuScene,
+    IntroScene,
+    CarDriveScene,
+    OfficeScene,
+    EasyLevelScene,
+  ],
 };

@@ -1,7 +1,8 @@
 import Phaser from "phaser";
 import Player from "../objects/Player";
 import AudioManager from "../AudioManager";
-import DialogBox from "../ui/DialogBox"; // Import the component
+import DialogBox from "../ui/DialogBox";
+import GameScene from "./GameScene";
 
 type WASDKeys = {
   W: Phaser.Input.Keyboard.Key;
@@ -10,51 +11,42 @@ type WASDKeys = {
   D: Phaser.Input.Keyboard.Key;
 };
 
-export default class IntroScene extends Phaser.Scene {
+export default class IntroScene extends GameScene {
+  // --- OBJECTS ---
   private player!: Player;
   private wife!: Phaser.GameObjects.Image;
   private car!: Phaser.GameObjects.Image;
   private nextButton!: Phaser.GameObjects.Text;
 
-  // Controls
+  // --- CONTROLS ---
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
   private wasd!: WASDKeys;
   private canMove: boolean = false;
-
-  // REPLACEMENT: We use the class instead of raw graphics/text
   private dialogBox!: DialogBox;
 
   constructor() {
     super("IntroScene");
   }
 
-  preload() {
-    this.load.image("house-bg", "/intro/house-bg.png");
-    this.load.image("player", "/player/idle/img.png");
-    this.load.image("wife", "/player/idle/img.png");
-    this.load.image("car", "/intro/car_1.png");
-
-    for (let i = 0; i < 8; i++) {
-      this.load.image(`player_walk_${i}`, `/player/walk/img${i}.png`);
-    }
-
-    // Audio assets
-    this.load.audio("bgm", "/audio/bgm.mp3");
-    this.load.audio("speech-blip", "/audio/blip.mp3");
-  }
+  preload() {}
 
   create() {
-    // 1. Initialize Audio
+    super.create();
+    // 2. CHECK IF ALREADY COMPLETED
+    if (this.savedProgress?.gameState?.eventFlags?.introCompleted) {
+      // If already done, skip straight to the drive scene
+      this.scene.start("CarDriveScene", this.savedProgress);
+      return;
+    }
+
     AudioManager.getInstance().init(this.game);
     AudioManager.getInstance().playMusic("bgm", { loop: true, volume: 0.15 });
 
     this.cameras.main.fadeIn(1000, 0, 0, 0);
 
-    // 2. Setup Inputs
     this.cursors = this.input.keyboard!.createCursorKeys();
     this.wasd = this.input.keyboard!.addKeys("W,A,S,D") as WASDKeys;
 
-    // 3. World Objects
     this.add.image(0, 0, "house-bg").setOrigin(0, 0);
 
     this.car = this.add.image(400, 670, "car");
@@ -65,25 +57,21 @@ export default class IntroScene extends Phaser.Scene {
     this.wife = this.add.image(1000, 660, "wife");
     this.wife.setDisplaySize(256, 256);
 
-    // 4. Setup UI Component
     this.dialogBox = new DialogBox(this);
 
-    // 5. Next Button
     const { width, height } = this.scale;
     this.nextButton = this.add
       .text(width - 150, height - 100, "NEXT >", {
-        fontSize: "32px",
+        fontFamily: '"Press Start 2P", monospace',
+        fontSize: "24px",
         color: "#ffffff",
         backgroundColor: "#000000",
         padding: { x: 20, y: 10 },
       })
       .setInteractive({ useHandCursor: true })
       .setVisible(false)
-      .on("pointerdown", () => {
-        this.handleGoodbyeSequence();
-      });
+      .on("pointerdown", () => this.handleGoodbyeSequence());
 
-    // 6. Start Intro Story
     this.time.delayedCall(1000, () => this.runIntroSequence());
   }
 
@@ -94,19 +82,16 @@ export default class IntroScene extends Phaser.Scene {
     }
   }
 
-  // --- LOGIC ---
-
   private checkCarProximity() {
     const dist = Math.abs(this.player.x - this.car.x);
     this.nextButton.setVisible(dist < 50);
   }
 
   private runIntroSequence() {
-    // Using the clean component API
     this.dialogBox.show(
       this.wife.x,
       this.wife.y - 180,
-      "Don't forget your code"
+      "Don't forget your code!"
     );
 
     this.time.delayedCall(3000, () => {
@@ -123,9 +108,8 @@ export default class IntroScene extends Phaser.Scene {
     });
   }
 
-  private handleGoodbyeSequence() {
+  private async handleGoodbyeSequence() {
     this.canMove = false;
-    this.player.play("idle", true);
     this.nextButton.setVisible(false);
 
     this.dialogBox.show(this.player.x, this.player.y - 180, "Bye bye!");
@@ -135,20 +119,57 @@ export default class IntroScene extends Phaser.Scene {
 
       this.time.delayedCall(2000, () => {
         this.dialogBox.hide();
-
-        // Screen Fade
-        AudioManager.getInstance().stopMusic();
-
-        // 2. Start fading out the screen (1000ms)
-        this.cameras.main.fadeOut(1000, 0, 0, 0);
-
-        this.cameras.main.once(
-          Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE,
-          () => {
-            this.scene.start("CarDriveScene");
-          }
-        );
+        this.completeIntro();
       });
     });
+  }
+
+  // 3. SAVE PROGRESS TO DATABASE
+  private async completeIntro() {
+    if (!this.savedProgress) return;
+
+    console.log("IntroScene userId: ", this.savedProgress.userId);
+
+    // Prepare the update
+    const updatedPayload = {
+      userId: this.savedProgress.userId,
+      lastLocation: "/game",
+      gameState: {
+        currentScene: "CarDriveScene",
+        eventFlags: {
+          ...this.savedProgress.gameState?.eventFlags,
+          introCompleted: true,
+        },
+        currentTask: { taskType: "none", status: "none" },
+      },
+    };
+
+    console.log(
+      "IntroScene payload: ",
+      JSON.stringify(updatedPayload, null, 2)
+    );
+
+    try {
+      const response = await fetch("/api/game-progress", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updatedPayload),
+      });
+
+      const newProgress = await response.json();
+      this.savedProgress = newProgress; // Update local memory
+    } catch (e) {
+      console.error("Failed to save intro progress:", e);
+    }
+
+    // Move to next scene
+    AudioManager.getInstance().stopMusic();
+    this.cameras.main.fadeOut(1000, 0, 0, 0);
+    this.cameras.main.once(
+      Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE,
+      () => {
+        this.scene.start("CarDriveScene", this.savedProgress ?? undefined);
+      }
+    );
   }
 }
