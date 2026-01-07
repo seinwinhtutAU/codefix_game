@@ -20,7 +20,8 @@ interface UseExecutorProps {
   hasCompleted: boolean;
   setHasCompleted: (completed: boolean) => void;
   level: string;
-  attempt?: number;
+  attempt: number;
+  timeLimited: number; // second
 }
 
 export function useExecutor({
@@ -33,6 +34,7 @@ export function useExecutor({
   setHasCompleted,
   level,
   attempt,
+  timeLimited,
 }: UseExecutorProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isContinuing, setIsContinuing] = useState(false);
@@ -150,7 +152,7 @@ export function useExecutor({
           const newRecord: SolveRecordRequest = {
             userId: userId,
             problemId: problem._id,
-            timeSpent: timerTimeSpent,
+            timeSpent: timerTimeSpent + attempt * timeLimited,
             hintUsages: hintUsages,
             pointsEarned: pointsEarned,
             level: level,

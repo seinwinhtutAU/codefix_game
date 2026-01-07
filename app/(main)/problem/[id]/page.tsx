@@ -124,6 +124,8 @@ export default function ProblemDetailPage() {
     hasCompleted,
     setHasCompleted,
     level,
+    attempt: 0,
+    timeLimited: 15,
   });
 
   const [isSaving, setIsSaving] = useState(false);

@@ -9,6 +9,7 @@ export interface CurrentTask {
   taskId?: Types.ObjectId;
   status: "none" | "in_progress" | "completed";
   attempts?: number;
+  timer?: number;
 }
 
 export interface GameState {
@@ -47,6 +48,10 @@ const currentTaskSchema = new Schema<CurrentTask>(
     attempts: {
       type: Number,
       default: 0,
+    },
+    timer: {
+      type: Number,
+      default: 15,
     },
   },
   { _id: false }

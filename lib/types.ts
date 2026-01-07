@@ -306,6 +306,7 @@ export interface IGameProgress {
       taskId?: string;
       status: "none" | "in_progress" | "completed";
       attempts?: number;
+      timer?: number;
     };
   };
 }

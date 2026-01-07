@@ -13,6 +13,7 @@ interface GameProgressRequest {
       taskId: string;
       status: "none" | "in_progress" | "completed";
       attempt: number;
+      timer: number;
     };
   };
 }

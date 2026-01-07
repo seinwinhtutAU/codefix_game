@@ -12,6 +12,7 @@ import {
   Upload,
   X,
   Timer,
+  Sparkle,
 } from "lucide-react";
 import {
   ProblemDescription,
@@ -30,8 +31,9 @@ import {
   useExecutor,
   useUIState,
 } from "@/hooks";
-import { saveUserCode } from "@/services";
+import { checkExistingSolveRecord, saveUserCode } from "@/services";
 import { EventBus } from "@/game/events";
+import { ProblemSolveRecord } from "@/lib/types";
 
 interface ProblemOverlayProps {
   problemId: string;
@@ -49,6 +51,7 @@ export function ProblemOverlay({ problemId, onClose }: ProblemOverlayProps) {
   const [showGameOver, setShowGameOver] = useState(false);
   // FIX: Initialize attempts at 0 always (do not read from localStorage)
   const [attempts, setAttempts] = useState<number>(0);
+  const [finalRecord, setFinalRecord] = useState<ProblemSolveRecord>();
 
   const {
     showProblem,
@@ -73,7 +76,6 @@ export function ProblemOverlay({ problemId, onClose }: ProblemOverlayProps) {
     isLoading,
     hasCompleted,
     setHasCompleted,
-    totalTimeSpent: initialTime,
     loadProblemData,
   } = useProblemLoader(problemId, userId);
 
@@ -88,9 +90,10 @@ export function ProblemOverlay({ problemId, onClose }: ProblemOverlayProps) {
     isAnyFileModified,
   } = useUserCodeManager();
 
-  // --- TIMER HOOK (Set to 30s) ---
+  // --- TIMER HOOK (Set to 15s for testing) ---
+  const timeLimited = 15;
   const { totalTimeSpent, timeLeft, isTimeUp, resetTimer, setIsSolving } =
-    useSolvingTimer(0, hasCompleted, problem, 15);
+    useSolvingTimer(0, hasCompleted, problem, timeLimited);
 
   const level = problem ? problem.difficulty : "no level";
 
@@ -111,6 +114,7 @@ export function ProblemOverlay({ problemId, onClose }: ProblemOverlayProps) {
     setHasCompleted,
     level,
     attempt: attempts,
+    timeLimited: timeLimited,
   });
 
   const [isSaving, setIsSaving] = useState(false);
@@ -196,6 +200,15 @@ export function ProblemOverlay({ problemId, onClose }: ProblemOverlayProps) {
         setHasCompleted(true);
         setIsSolving(false);
         handleSaveCode();
+
+        const recordResponse = await checkExistingSolveRecord(
+          userId,
+          problemId
+        );
+        if (recordResponse?.data && recordResponse.success) {
+          setFinalRecord(recordResponse.data);
+        }
+
         setShowSuccessPopup(true);
         // FIX: Removed EventBus.emit here. Moved to handleFinalExit to ensure popup shows.
       }
@@ -223,6 +236,25 @@ export function ProblemOverlay({ problemId, onClose }: ProblemOverlayProps) {
     onClose();
   };
 
+  const calculateEstimatedPoints = () => {
+    if (hasCompleted && finalRecord) return finalRecord.pointsEarned;
+
+    // Base points if too many attempts
+    if (attempts >= 5) return 0;
+
+    // Deduction based on hints
+    let basePoints = 100;
+    const usedLevels = Object.values(hintUsages);
+
+    if (usedLevels.length > 0) basePoints = 50;
+    else if (usedLevels.length > 0) basePoints = 70;
+    else if (usedLevels.length > 0) basePoints = 90;
+
+    return basePoints - attempts * 10;
+  };
+
+  const estimatedPoints = calculateEstimatedPoints();
+
   if (isLoading || !problem) {
     return (
       <div className="absolute inset-0 z-[200] flex items-center justify-center bg-gray-900/90 backdrop-blur-sm">
@@ -242,11 +274,14 @@ export function ProblemOverlay({ problemId, onClose }: ProblemOverlayProps) {
           <GameNotification
             type="SUCCESS"
             title="Terminal Breached"
-            message={
-              attempts >= 5
-                ? "Access granted, but security trace was too high. Points Earned: 0"
-                : "Encryption keys acquired. System access granted. Points Earned: 100"
-            }
+            message={`Encryption keys acquired. 
+      
+              [STATS] 
+              Attempts: ${attempts} 
+              Time: ${finalRecord?.timeSpent || totalTimeSpent}s 
+              Points: ${
+                finalRecord?.pointsEarned ?? (attempts >= 5 ? 0 : 100)
+              }`}
             confirmLabel="RETURN TO FIELD"
             onConfirm={handleFinalExit}
           />
@@ -280,11 +315,12 @@ export function ProblemOverlay({ problemId, onClose }: ProblemOverlayProps) {
           >
             <X size={24} />
           </button>
+
           <h2 className="text-xl font-mono text-white tracking-tight underline decoration-blue-500">
             SECURE_TERMINAL // {problem.title}
           </h2>
 
-          {/* TIMER DISPLAY */}
+          {/* TIMER */}
           <div
             className={`flex items-center gap-2 px-3 py-1 rounded bg-black/40 border ${
               timeLeft < 10
@@ -306,11 +342,35 @@ export function ProblemOverlay({ problemId, onClose }: ProblemOverlayProps) {
           </div>
         </div>
 
-        <div className="flex items-center gap-4">
-          <span className="text-xs font-mono text-gray-400 uppercase tracking-widest">
-            Attempt: {attempts}/5
-          </span>
-          <span className="text-xs font-mono text-gray-400 uppercase tracking-widest">
+        <div className="flex items-center gap-6">
+          {/* ESTIMATED REWARD */}
+          <div className="flex flex-col items-end border-r border-gray-700 pr-6">
+            <span className="text-[10px] font-mono text-gray-500 uppercase tracking-widest">
+              Est. Reward
+            </span>
+            <div className="flex items-center gap-1">
+              <Sparkle size={14} className="text-yellow-400" />
+              <span className="text-xl font-mono font-bold text-yellow-400">
+                {estimatedPoints}
+              </span>
+            </div>
+          </div>
+
+          {/* SECURITY TRACE (ATTEMPTS) */}
+          <div className="flex flex-col items-end">
+            <span className="text-[10px] font-mono text-gray-500 uppercase tracking-widest">
+              Security Trace
+            </span>
+            <span
+              className={`font-mono text-xl font-bold ${
+                attempts >= 4 ? "text-red-500" : "text-gray-300"
+              }`}
+            >
+              {attempts}/5
+            </span>
+          </div>
+
+          <span className="text-xs font-mono text-blue-400 border border-blue-400/30 px-3 py-1 rounded bg-blue-400/5 uppercase tracking-widest">
             {hasCompleted ? "DECRYPTED" : "ENCRYPTED"}
           </span>
         </div>
