@@ -33,7 +33,8 @@ import {
 } from "@/hooks";
 import { checkExistingSolveRecord, saveUserCode } from "@/services";
 import { EventBus } from "@/game/events";
-import { ProblemSolveRecord } from "@/lib/types";
+import { CurrentTask, IGameProgress, ProblemSolveRecord } from "@/lib/types";
+import { getPlayerProgress } from "@/services/game";
 
 interface ProblemOverlayProps {
   problemId: string;
@@ -46,13 +47,101 @@ export function ProblemOverlay({ problemId, onClose }: ProblemOverlayProps) {
   ) as React.RefObject<HTMLDivElement>;
   const userId = useUserId();
 
-  // --- NEW LOGIC STATES ---
+  // --- UI STATES ---
   const [showSuccessPopup, setShowSuccessPopup] = useState(false);
   const [showGameOver, setShowGameOver] = useState(false);
-  // FIX: Initialize attempts at 0 always (do not read from localStorage)
-  const [attempts, setAttempts] = useState<number>(0);
-  const [finalRecord, setFinalRecord] = useState<ProblemSolveRecord>();
 
+  // --- DATA STATES ---
+  const [finalRecord, setFinalRecord] = useState<ProblemSolveRecord>();
+  const [progress, setProgress] = useState<IGameProgress>();
+
+  // ✅ DERIVED STATE: Single Source of Truth
+  // We read directly from the progress object. If it updates, this recalculates.
+  const attempts = progress?.gameState?.currentTask?.attempts ?? 0;
+
+  // --- 1. INITIAL LOAD ---
+  useEffect(() => {
+    const fetchProgress = async () => {
+      try {
+        const data = await getPlayerProgress();
+        console.log("Initial Progress:", JSON.stringify(data, null, 2));
+        setProgress(data);
+      } catch (err) {
+        console.error("Failed to load progress:", err);
+      }
+    };
+
+    fetchProgress();
+  }, []);
+
+  // --- 2. PROGRESS MODIFIERS ---
+  const incrementAttemptsInProgress = () => {
+    console.log("Run incrementAttemptsInProgress");
+    setProgress((prev) => {
+      if (!prev?.gameState?.currentTask) return prev;
+
+      const currentAttempts = prev.gameState.currentTask.attempts ?? 0;
+
+      // Logic: If currently 4 (becoming 5), reset to 0? Or keep at 5?
+      // Based on your previous code logic (resetting if >=5):
+      const newAttempts = currentAttempts + 1 >= 5 ? 0 : currentAttempts + 1;
+
+      return {
+        ...prev,
+        gameState: {
+          ...prev.gameState,
+          currentTask: {
+            ...prev.gameState.currentTask,
+            attempts: newAttempts,
+          },
+        },
+      };
+    });
+  };
+
+  // --- 3. DATABASE SYNC ---
+  useEffect(() => {
+    if (!progress) return;
+
+    console.log("Updated progress: ", JSON.stringify(progress, null, 2));
+
+    const updateProgress = async () => {
+      try {
+        await fetch("/api/game-progress", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            userId: progress.userId,
+            lastLocation: progress.lastLocation,
+            gameState: progress.gameState,
+          }),
+        });
+      } catch (e) {
+        console.error("Database Save Error:", e);
+      }
+    };
+
+    const timeoutId = setTimeout(updateProgress, 500); // Debounce slightly
+    return () => clearTimeout(timeoutId);
+  }, [progress]);
+
+  useEffect(() => {
+    if (!progress) return;
+
+    console.log("Updated progress: ", JSON.stringify(progress, null, 2));
+
+    const timeoutId = setTimeout(() => {
+      EventBus.emit("problem-update-progress", {
+        userId: progress.userId,
+        lastLocation: progress.lastLocation,
+        gameState: progress.gameState,
+      } as IGameProgress);
+    }, 500);
+
+    return () => clearTimeout(timeoutId);
+  }, [progress]);
+
+  // --- HOOKS & UI HELPERS ---
   const {
     showProblem,
     showExplorer,
@@ -90,7 +179,7 @@ export function ProblemOverlay({ problemId, onClose }: ProblemOverlayProps) {
     isAnyFileModified,
   } = useUserCodeManager();
 
-  // --- TIMER HOOK (Set to 15s for testing) ---
+  // --- TIMER LOGIC ---
   const timeLimited = 15;
   const { totalTimeSpent, timeLeft, isTimeUp, resetTimer, setIsSolving } =
     useSolvingTimer(0, hasCompleted, problem, timeLimited);
@@ -113,7 +202,7 @@ export function ProblemOverlay({ problemId, onClose }: ProblemOverlayProps) {
     hasCompleted,
     setHasCompleted,
     level,
-    attempt: attempts,
+    attempt: attempts, // Passes the derived value
     timeLimited: timeLimited,
   });
 
@@ -126,17 +215,14 @@ export function ProblemOverlay({ problemId, onClose }: ProblemOverlayProps) {
   const [outputPanelWidth, setOutputPanelWidth] = useState(500);
   const [testCasePanelHeight, setTestCasePanelHeight] = useState(288);
 
-  // --- REMOVED: localStorage useEffect that loaded old attempts ---
-
-  // --- ATTEMPT TRACKING LOGIC ---
+  // --- GAME OVER LOGIC ---
   useEffect(() => {
     if (isTimeUp && !hasCompleted) {
-      const newAttempts = attempts + 1;
-      setAttempts(newAttempts);
-      // FIX: Removed localStorage.setItem here to prevent persistence between sessions
+      incrementAttemptsInProgress(); // This updates 'progress', which updates 'attempts', which triggers DB save
       setShowGameOver(true);
     }
-  }, [isTimeUp, hasCompleted]); // Removed attempts from dependency to avoid loop issues
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isTimeUp, hasCompleted]);
 
   const handleTryAgain = () => {
     setShowGameOver(false);
@@ -210,7 +296,6 @@ export function ProblemOverlay({ problemId, onClose }: ProblemOverlayProps) {
         }
 
         setShowSuccessPopup(true);
-        // FIX: Removed EventBus.emit here. Moved to handleFinalExit to ensure popup shows.
       }
     } finally {
       setIsTestRunning(false);
@@ -225,12 +310,17 @@ export function ProblemOverlay({ problemId, onClose }: ProblemOverlayProps) {
   };
 
   const handleFinalExit = () => {
-    // FIX: Emit the solved event ONLY when the user clicks the exit button on the success popup
+    const currentTask: CurrentTask = {
+      taskType: "code_problem",
+      taskId: progress?.gameState.currentTask.taskId,
+      status: "completed",
+      attempts: attempts,
+      timer: progress?.gameState.currentTask.timer,
+    };
     if (hasCompleted) {
-      console.log("hasCompleted attempts: ", attempts);
-      EventBus.emit("problem-solved", { id: problemId, attempt: attempts });
+      console.log("Reporting solved with attempts:", attempts);
+      EventBus.emit("problem-solved", { currentTask: currentTask });
     }
-
     // Always trigger resume to unpause the game
     EventBus.emit("resume-after-solve");
     onClose();
@@ -246,11 +336,10 @@ export function ProblemOverlay({ problemId, onClose }: ProblemOverlayProps) {
     let basePoints = 100;
     const usedLevels = Object.values(hintUsages);
 
-    if (usedLevels.length > 0) basePoints = 50;
-    else if (usedLevels.length > 0) basePoints = 70;
-    else if (usedLevels.length > 0) basePoints = 90;
+    if (usedLevels.length > 0) basePoints = 50; // Simplified logic based on your snippet
 
-    return basePoints - attempts * 10;
+    // Deduction based on attempts
+    return Math.max(0, basePoints - attempts * 10);
   };
 
   const estimatedPoints = calculateEstimatedPoints();

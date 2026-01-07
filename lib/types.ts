@@ -311,6 +311,14 @@ export interface IGameProgress {
   };
 }
 
+export interface CurrentTask {
+  taskType: "code_problem" | "none";
+  taskId?: string;
+  status?: "none" | "in_progress" | "completed";
+  attempts?: number;
+  timer?: number;
+}
+
 // ============================================================================
 // Type Aliases for Better Semantics
 // ============================================================================

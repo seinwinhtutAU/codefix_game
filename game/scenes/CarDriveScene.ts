@@ -1,7 +1,7 @@
 import Phaser from "phaser";
 import AudioManager from "../AudioManager";
 import DialogBox from "../ui/DialogBox";
-import { IGameProgress } from "@/lib/types";
+import { IGameProgress, CurrentTask } from "@/lib/types";
 import GameScene from "./GameScene";
 import { EventBus } from "@/game/events";
 
@@ -50,29 +50,50 @@ export default class CarDriveScene extends GameScene {
 
     // 1. Setup world first
     this.setupWorld();
-    // 2. Setup cars (they will check the flag to position themselves)
+    // 2. Setup cars
     this.setupCars();
     // 3. Setup UI
     this.dialogBox = new DialogBox(this);
+    EventBus.on(
+      "problem-update-progress",
+      async (updatedProgress: IGameProgress) => {
+        console.log("Syncing progress from UI update...");
+
+        // Update the local scene's reference so 'this.savedProgress' is always fresh
+        this.savedProgress = updatedProgress;
+
+        // Optional: If the UI update says the task is completed,
+        // you might want to trigger the success animation immediately.
+        if (updatedProgress.gameState.currentTask.status === "completed") {
+          this.handlePoliceSuccess();
+        }
+      }
+    );
+
     this.createSolveButton();
 
-    // 4. Check progress to override states
+    // 4. Check progress
     this.checkStoryProgress();
 
     this.cameras.main.fadeIn(1000, 0, 0, 0);
 
+    // ✅ CRITICAL FIX: Receive the full task object
     EventBus.on(
       "problem-solved",
-      async (data: { id: string; attempt: number }) => {
-        // 1. Update the database to completed
+      async (data: { currentTask: CurrentTask }) => {
+        console.log(
+          "problem-solved(CurrentTask) in CardriveScene: ",
+          JSON.stringify(data.currentTask, null, 2)
+        );
         await this.updateProgress({
           gameState: {
             ...this.savedProgress?.gameState,
             currentTask: {
-              ...this.savedProgress?.gameState.currentTask,
-              taskId: data.id,
-              status: "completed",
-              attempts: data.attempt,
+              taskType: data.currentTask.taskType,
+              taskId: data.currentTask.taskId,
+              status: data.currentTask.status ?? "none",
+              attempts: data.currentTask.attempts,
+              timer: data.currentTask.timer,
             },
           },
         });
@@ -132,7 +153,7 @@ export default class CarDriveScene extends GameScene {
       }
 
       if (eventFlags.policeStoppedPlayer) {
-        this.isDriving = false; // Prevent movement update
+        this.isDriving = false;
         if (currentTask.status === "completed") {
           this.handlePoliceSuccess();
         } else {
@@ -188,7 +209,11 @@ export default class CarDriveScene extends GameScene {
           ...this.savedProgress?.gameState?.eventFlags,
           arrivedAtOffice: true,
         },
-        currentTask: { taskType: "none", status: "none" },
+        currentTask: {
+          ...this.savedProgress?.gameState?.currentTask,
+          taskType: "none",
+          status: "none",
+        },
       },
     });
 
@@ -225,7 +250,7 @@ export default class CarDriveScene extends GameScene {
     this.eventTriggered = true;
     this.car.setPosition(400, 670);
     this.policeCar.setPosition(100, 670);
-    this.solveButtonContainer.setVisible(false); // Hide button if visible
+    this.solveButtonContainer.setVisible(false);
 
     this.dialogBox.show(
       this.policeCar.x + 50,
@@ -315,23 +340,59 @@ export default class CarDriveScene extends GameScene {
 
     hitArea.on("pointerdown", async () => {
       AudioManager.getInstance().playSound("speech-blip", { volume: 1.0 });
+      const targetTaskId = "69582fb37538b18589a46564";
+      const existingTask = this.savedProgress?.gameState?.currentTask;
+      const isSameTask = existingTask?.taskId === targetTaskId;
 
-      await this.updateProgress({
+      const taskToSave = isSameTask
+        ? { ...existingTask } // Keep current status/attempts/timer
+        : {
+            taskType: "code_problem",
+            taskId: targetTaskId,
+            status: "in_progress",
+            attempts: 0,
+            timer: 0,
+          };
+
+      const updatedProgress = {
         gameState: {
+          ...this.savedProgress?.gameState,
           currentScene: "CarDriveScene",
           eventFlags: {
             ...this.savedProgress?.gameState?.eventFlags,
             policeStoppedPlayer: true,
           },
-          currentTask: {
-            taskType: "code_problem",
-            taskId: "69582fb37538b18589a46564",
-            status: "in_progress",
+          currentTask: taskToSave,
+        },
+      };
+
+      console.log(
+        "Update Progress: ",
+        JSON.stringify(updatedProgress, null, 2)
+      );
+
+      // We initialize the task here in the DB before opening the UI
+      await this.updateProgress({
+        gameState: {
+          ...this.savedProgress?.gameState,
+          currentScene: "CarDriveScene",
+          eventFlags: {
+            ...this.savedProgress?.gameState?.eventFlags,
+            policeStoppedPlayer: true,
           },
+          currentTask: isSameTask
+            ? { ...existingTask } // Keep current status/attempts/timer
+            : {
+                taskType: "code_problem",
+                taskId: targetTaskId,
+                status: "in_progress",
+                attempts: 0,
+                timer: 0,
+              },
         },
       });
 
-      // INTEGRATION: Open the overlay without page refresh
+      // Open the overlay
       EventBus.emit("ui-open-problem", "69582fb37538b18589a46564");
     });
 

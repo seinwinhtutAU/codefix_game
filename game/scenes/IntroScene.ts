@@ -160,7 +160,11 @@ export default class IntroScene extends GameScene {
           ...this.savedProgress.gameState?.eventFlags,
           introCompleted: true,
         },
-        currentTask: { taskType: "none", status: "none" },
+        currentTask: {
+          ...this.savedProgress.gameState?.currentTask,
+          taskType: "none",
+          status: "none",
+        },
       },
     };
 

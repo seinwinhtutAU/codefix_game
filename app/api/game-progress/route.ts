@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import dbConnect from "@/lib/db";
 import GameProgressModel from "@/models/GameProgress";
 
+export const dynamic = "force-dynamic";
+
 interface GameProgressRequest {
   userId: string;
   lastLocation: string;
@@ -12,11 +14,29 @@ interface GameProgressRequest {
       taskType: "code_problem" | "none";
       taskId: string;
       status: "none" | "in_progress" | "completed";
-      attempt: number;
+      attempts: number;
       timer: number;
     };
   };
 }
+
+// 2. CLEANUP: Define default state here to keep the GET function clean
+const DEFAULT_GAME_STATE = {
+  lastLocation: "/game",
+  gameState: {
+    currentScene: "IntroScene",
+    eventFlags: {
+      introCompleted: false,
+    },
+    currentTask: {
+      taskType: "none",
+      taskId: "none",
+      status: "none",
+      attempts: 0,
+      timer: 0,
+    },
+  },
+};
 
 export async function GET(req: Request) {
   try {
@@ -38,19 +58,7 @@ export async function GET(req: Request) {
     if (!progress) {
       return NextResponse.json({
         userId: userId, // Include the ID so Phaser knows who it is
-        lastLocation: "/game",
-        gameState: {
-          currentScene: "IntroScene",
-          eventFlags: {
-            introCompleted: false,
-          },
-          currentTask: {
-            taskType: "none",
-            taskId: "none",
-            status: "none",
-            attempt: 0,
-          },
-        },
+        ...DEFAULT_GAME_STATE, // Spread the default values defined above
       });
     }
 
@@ -84,12 +92,12 @@ export async function POST(req: Request) {
         gameState,
         updatedAt: new Date(),
       },
+      // upsert: create if doesn't exist; new: return the updated doc
       { upsert: true, new: true, runValidators: true }
     );
 
     return NextResponse.json(updatedProgress);
   } catch (error) {
-    // Type-safe error handling
     const errorMessage =
       error instanceof Error ? error.message : "Internal Server Error";
     console.error("Save Error:", errorMessage);

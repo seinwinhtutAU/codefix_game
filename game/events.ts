@@ -1,7 +1,7 @@
 // game/events.ts
 import mitt from "mitt";
 import { GameNotificationProps } from "./components/GameNotification";
-import { IGameProgress } from "@/lib/types";
+import { CurrentTask, IGameProgress } from "@/lib/types";
 
 type Events = {
   "ui-reset-start": void;
@@ -15,7 +15,8 @@ type Events = {
   "ui-scene": string;
   "request-current-scene": void;
   "start-scene": IGameProgress;
-  "problem-solved": { id: string; attempt: number };
+  "problem-solved": { currentTask: CurrentTask };
+  "problem-update-progress": IGameProgress;
   "resume-after-solve": void;
 };
 
