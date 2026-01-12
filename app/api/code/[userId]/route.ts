@@ -39,3 +39,30 @@ export async function GET(
     return createErrorResponse(error);
   }
 }
+
+export async function DELETE(
+  _req: NextRequest,
+  ctx: RouteContext<"/api/code/[userId]">
+) {
+  try {
+    await dbConnect();
+
+    const { userId } = await ctx.params;
+
+    const validationError = validateParams({ userId });
+    if (validationError) {
+      return NextResponse.json({ error: validationError }, { status: 400 });
+    }
+
+    const result = await UserCodeFile.deleteMany({
+      userId,
+    });
+
+    return NextResponse.json({
+      success: true,
+      deletedCount: result.deletedCount,
+    });
+  } catch (error) {
+    return createErrorResponse(error);
+  }
+}

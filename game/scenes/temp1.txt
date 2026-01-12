@@ -1,0 +1,329 @@
+import AudioManager from "../AudioManager";
+import GameScene from "./GameScene";
+import { checkExistingSolveRecord } from "@/services/problem";
+import { EventBus } from "@/game/events";
+import { IGameProgress } from "@/lib/types";
+
+export default class EasyLevelScene extends GameScene {
+  private problemIds: string[] = [
+    "69582fb37538b18589a46564",
+    "695c13b389e02a7e13dbe5ca",
+    // "69582fb37538b18589a46564",
+    // "69582fb37538b18589a46564",
+    // "69582fb37538b18589a46564",
+    // "69582fb37538b18589a46564",
+    // "69582fb37538b18589a46564",
+    // "695c13b389e02a7e13dbe5ca",
+    // "695c13b389e02a7e13dbe5ca",
+    // "695c13b389e02a7e13dbe5ca",
+  ];
+
+  private roadPoints = [
+    { x: 230, y: 640 },
+    { x: 130, y: 550 },
+    // { x: 140, y: 380 },
+    // { x: 250, y: 300 },
+    // { x: 450, y: 400 },
+    // { x: 680, y: 450 },
+    // { x: 920, y: 400 },
+    // { x: 1100, y: 300 },
+    // { x: 1230, y: 450 },
+    // { x: 1150, y: 640 },
+  ];
+
+  private levelCircles: Phaser.GameObjects.Image[] = [];
+  private levelIcons: Phaser.GameObjects.Image[] = [];
+  private currentActiveIndex: number = 0;
+  private currentTween: Phaser.Tweens.Tween | null = null;
+
+  constructor() {
+    super("EasyLevelScene");
+  }
+
+  preload() {
+    this.load.image("easy-map", "/easy/map.png");
+    this.load.image("easy-circle", "/easy/circle.png");
+    this.load.image("easy-circle-current", "/easy/circle_current.png");
+    this.load.image("easy-lock", "/easy/lock.png");
+    this.load.image("easy-unlock", "/easy/unlock1.png");
+  }
+
+  async create() {
+    super.create();
+    const { width, height } = this.scale;
+
+    // Reset arrays for clean state on restart
+    this.levelCircles = [];
+    this.levelIcons = [];
+
+    EventBus.on(
+      "problem-update-progress",
+      async (updatedProgress: IGameProgress) => {
+        console.log("Syncing progress from UI update...");
+
+        // Update the local scene's reference so 'this.savedProgress' is always fresh
+        this.savedProgress = updatedProgress;
+      }
+    );
+
+    // 1. LISTENERS
+    EventBus.on("problem-solved", async ({ currentTask }) => {
+      const isSolved = currentTask.status === "completed";
+      await this.handleManualProgression(isSolved);
+    });
+
+    // Listen for progress updates (Skip/Resume logic)
+    EventBus.on("resume-after-solve", (updatedProgress) => {
+      this.savedProgress = updatedProgress;
+
+      // If status is completed, it was solved; otherwise, it was a skip/resume
+      const isSolved =
+        updatedProgress.gameState.currentTask.status === "completed";
+
+      console.log("EasyLevelScene: ", isSolved);
+      this.handleManualProgression(isSolved);
+    });
+
+    // 2. INITIALIZATION
+    const loadingText = this.add
+      .text(width / 2, height / 2, "ACCESSING DATA...", {
+        fontFamily: '"Press Start 2P", monospace',
+        fontSize: "20px",
+        color: "#ffffff",
+      })
+      .setOrigin(0.5);
+
+    AudioManager.getInstance().init(this.game);
+    AudioManager.getInstance().playMusic("menu-bgm", {
+      loop: true,
+      volume: 0.15,
+    });
+
+    // Load state from savedProgress
+    this.currentActiveIndex =
+      this.savedProgress.gameState.currentTask.currentActiveIndex || 0;
+    const userId = this.savedProgress.userId;
+    const solveStatuses = await this.getBatchSolveStatus(userId);
+
+    loadingText.destroy();
+    this.add
+      .image(0, 0, "easy-map")
+      .setOrigin(0, 0)
+      .setDisplaySize(width, height);
+
+    const isLevelComplete = this.currentActiveIndex >= this.problemIds.length;
+
+    // 3. RENDER LEVELS
+    this.roadPoints.forEach((point, index) => {
+      const objectId = this.problemIds[index];
+      const isSolved = solveStatuses[index];
+      const isCurrent = index === this.currentActiveIndex;
+
+      const circleKey = isCurrent ? "easy-circle-current" : "easy-circle";
+      const circle = this.add
+        .image(point.x, point.y, circleKey)
+        .setDisplaySize(100, 70);
+      this.levelCircles.push(circle);
+
+      // Visual Logic: If passed but not solved, it was skipped
+      if (index < this.currentActiveIndex && !isSolved) {
+        circle.setTint(0xff5555); // Red tint
+      }
+
+      if (isCurrent && !isLevelComplete) {
+        this.startActiveTween(circle, objectId);
+      }
+
+      const iconKey = isSolved ? "easy-unlock" : "easy-lock";
+      const icon = this.add
+        .image(point.x - 5, point.y - 5, iconKey)
+        .setDisplaySize(30, 40);
+      this.levelIcons.push(icon);
+    });
+
+    if (isLevelComplete) {
+      this.showSuccessUI();
+    }
+
+    this.events.once("shutdown", () => {
+      EventBus.off("problem-solved");
+      EventBus.off("resume-after-solve");
+    });
+  }
+
+  private async handleManualProgression(isSolved: boolean) {
+    const oldIdx = this.currentActiveIndex;
+
+    // 1. 更新完成的节点
+    if (this.levelCircles[oldIdx]) {
+      const prevCircle = this.levelCircles[oldIdx];
+
+      // 移除交互
+      prevCircle.off("pointerdown");
+      prevCircle.disableInteractive();
+
+      // 停止动画
+      if (this.currentTween) {
+        this.currentTween.stop();
+        this.currentTween = null;
+        prevCircle.setScale(1);
+      }
+
+      // 更新视觉状态
+      if (!isSolved) {
+        prevCircle.setTexture("easy-circle");
+        prevCircle.setTint(0xff5555);
+      } else {
+        prevCircle.setTexture("easy-circle");
+        prevCircle.clearTint();
+
+        if (this.levelIcons[oldIdx]) {
+          this.levelIcons[oldIdx].setTexture("easy-unlock");
+        }
+      }
+    }
+
+    // 2. 更新索引
+    this.currentActiveIndex =
+      this.savedProgress.gameState.currentTask.currentActiveIndex || 0;
+    const nextIdx = this.currentActiveIndex;
+
+    // 3. 更新数据库进度
+    if (nextIdx < this.levelCircles.length) {
+      const nextId = this.problemIds[nextIdx];
+
+      await this.updateProgress({
+        gameState: {
+          ...this.savedProgress.gameState,
+          currentTask: {
+            taskType: "code_problem",
+            taskId: nextId,
+            status: "in_progress",
+            attempts: 0,
+            timer: 0,
+            currentActiveIndex: nextIdx,
+          },
+        },
+      });
+
+      // 设置下一个关卡为当前活动状态
+      const nextCircle = this.levelCircles[nextIdx];
+      if (nextCircle) {
+        nextCircle.clearTint();
+        nextCircle.setTexture("easy-circle-current");
+        this.startActiveTween(nextCircle, nextId);
+      }
+    } else {
+      await this.updateProgress({
+        gameState: {
+          ...this.savedProgress.gameState,
+          currentTask: {
+            taskType: "none",
+            status: "completed",
+            currentActiveIndex: nextIdx,
+          },
+        },
+      });
+      this.showSuccessUI();
+    }
+  }
+
+  private startActiveTween(circle: Phaser.GameObjects.Image, objectId: string) {
+    this.currentTween = this.tweens.add({
+      targets: circle,
+      scale: 1.08,
+      duration: 800,
+      yoyo: true,
+      repeat: -1,
+    });
+
+    circle.setInteractive({ useHandCursor: true });
+    circle.off("pointerdown");
+    circle.on("pointerdown", async () => {
+      AudioManager.getInstance().playSound("click");
+      await this.handleOpenTask(objectId);
+    });
+  }
+
+  private async handleOpenTask(taskId: string) {
+    const targetTaskId = "69582fb37538b18589a46564";
+    const existingTask = this.savedProgress?.gameState?.currentTask;
+    const isSameTask = existingTask?.taskId === targetTaskId;
+
+    await this.updateProgress({
+      gameState: {
+        ...this.savedProgress?.gameState,
+        currentScene: "EasyLevelScene",
+        eventFlags: {
+          ...this.savedProgress?.gameState?.eventFlags,
+          policeStoppedPlayer: true,
+        },
+        currentTask: isSameTask
+          ? { ...existingTask }
+          : {
+              taskType: "code_problem",
+              taskId: targetTaskId,
+              status: "in_progress",
+              attempts: 0,
+              timer: 0,
+              currentActiveIndex: this.currentActiveIndex,
+            },
+      },
+    });
+
+    AudioManager.getInstance().stopMusic();
+    EventBus.emit("ui-open-problem", taskId);
+  }
+
+  private async updateProgress(payload: Partial<IGameProgress>) {
+    if (!this.savedProgress) return;
+    try {
+      const response = await fetch("/api/game-progress", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: this.savedProgress.userId, ...payload }),
+      });
+      const updatedData = await response.json();
+      this.savedProgress = updatedData;
+    } catch (e) {
+      console.error("Database Save Error:", e);
+    }
+  }
+
+  private async getBatchSolveStatus(userId: string): Promise<boolean[]> {
+    const checkPromises = this.problemIds.map((id) =>
+      checkExistingSolveRecord(userId, id)
+    );
+    const results = await Promise.all(checkPromises);
+    return results.map((record) => record?.data !== null);
+  }
+
+  private showSuccessUI() {
+    const { width, height } = this.scale;
+    const overlay = this.add.graphics();
+    overlay.fillStyle(0x000000, 0.7).fillRect(0, 0, width, height);
+
+    this.add
+      .text(width / 2, height / 2 - 120, "SECTOR CLEAR!", {
+        fontFamily: '"Press Start 2P", monospace',
+        fontSize: "40px",
+        color: "#00ff00",
+      })
+      .setOrigin(0.5);
+
+    const menuBtn = this.add
+      .text(width / 2, height / 2 + 20, "MAIN MENU", {
+        fontSize: "20px",
+        fontFamily: '"Press Start 2P", monospace',
+        backgroundColor: "#333333",
+        padding: { x: 20, y: 10 },
+      })
+      .setOrigin(0.5)
+      .setInteractive({ useHandCursor: true });
+
+    menuBtn.on("pointerdown", () => {
+      AudioManager.getInstance().playSound("click");
+      this.scene.start("MainMenuScene");
+    });
+  }
+}

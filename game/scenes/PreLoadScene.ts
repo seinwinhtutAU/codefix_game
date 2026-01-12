@@ -15,7 +15,7 @@ export default class PreloadScene extends Phaser.Scene {
   }
 
   preload() {
-    EventBus.on("start-scene", (data: IGameProgress) => {
+    EventBus.on("start-scene-progress", (data: IGameProgress) => {
       this.savedProgress = data;
     });
 
@@ -89,10 +89,15 @@ export default class PreloadScene extends Phaser.Scene {
       }
 
       console.log(
-        "Phaser saveProgress: ",
+        "PreloadScene: ",
         JSON.stringify(this.savedProgress, null, 2)
       );
+
       this.scene.start("MainMenuScene", this.savedProgress);
+    });
+
+    this.events.on("shutdown", () => {
+      EventBus.off("start-scene-progress");
     });
   }
 }

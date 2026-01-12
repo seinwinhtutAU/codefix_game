@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import { AnimatePresence } from "framer-motion";
 import { EventBus } from "@/game/events";
 import { GameNotificationProps } from "@/game/components/GameNotification";
+import AudioManager from "@/game/AudioManager";
 
 const PhaserGame = dynamic(() => import("@/game/components/PhaserGame"), {
   ssr: false,
@@ -117,7 +118,10 @@ export default function GamePage() {
           <div className="absolute inset-0 z-[150]">
             <ProblemOverlay
               problemId={activeProblemId}
-              onClose={() => setActiveProblemId(null)}
+              onClose={() => {
+                setActiveProblemId(null);
+                EventBus.emit("ui-close-problem");
+              }}
             />
           </div>
         )}

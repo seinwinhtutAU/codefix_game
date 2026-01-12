@@ -307,6 +307,8 @@ export interface IGameProgress {
       status: "none" | "in_progress" | "completed";
       attempts?: number;
       timer?: number;
+      currentActiveIndex?: number;
+      highestHintLevelUsed?: "none" | "small" | "medium" | "big";
     };
   };
 }
@@ -317,6 +319,8 @@ export interface CurrentTask {
   status?: "none" | "in_progress" | "completed";
   attempts?: number;
   timer?: number;
+  currentActiveIndex?: number;
+  highestHintLevelUsed?: "none" | "small" | "medium" | "big";
 }
 
 // ============================================================================

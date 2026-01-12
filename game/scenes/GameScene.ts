@@ -2,17 +2,20 @@
 import Phaser from "phaser";
 import { EventBus } from "../events";
 import { IGameProgress } from "@/lib/types";
+import { initGameAudioEvents } from "../GameAudioController";
+import GameProgressController from "../GameProgressController";
+import AudioManager from "../AudioManager";
 
 export default class GameScene extends Phaser.Scene {
   // Use a static property or registry to keep data alive across scenes
   protected savedProgress!: IGameProgress;
+  private static audioEventsInitialized = false;
 
   constructor(key: string) {
     super(key);
   }
 
   init(data?: IGameProgress) {
-    // If data was passed via this.scene.start('Key', data), capture it
     if (data) {
       this.savedProgress = data;
     }
@@ -24,6 +27,14 @@ export default class GameScene extends Phaser.Scene {
       EventBus.emit("ui-scene", this.scene.key);
     });
 
+    const gameProgressController = GameProgressController.getInstance();
+    gameProgressController.init();
+
+    if (!GameScene.audioEventsInitialized) {
+      initGameAudioEvents();
+      GameScene.audioEventsInitialized = true;
+    }
+
     EventBus.emit("ui-scene", this.scene.key);
 
     // 2. Setup standard listeners
@@ -31,11 +42,6 @@ export default class GameScene extends Phaser.Scene {
   }
 
   protected setupUIListeners() {
-    // Handle the initial data load from React
-    EventBus.on("start-scene", (data: IGameProgress) => {
-      this.savedProgress = data;
-    });
-
     EventBus.on("ui-toggle-pause", (shouldPause: boolean) => {
       if (shouldPause) {
         this.scene.pause();
@@ -64,7 +70,7 @@ export default class GameScene extends Phaser.Scene {
       EventBus.off("ui-toggle-pause");
       EventBus.off("ui-action");
       EventBus.off("ui-toggle-mute");
-      EventBus.off("start-scene");
+      EventBus.off("start-scene-progress");
     });
   }
 }

@@ -21,7 +21,7 @@ export default function PhaserGame({ onBooted }: { onBooted: () => void }) {
         gameRef.current = game;
 
         game.events.once("ready", () => {
-          EventBus.emit("start-scene", progress);
+          EventBus.emit("start-scene-progress", progress);
           onBooted();
         });
       }

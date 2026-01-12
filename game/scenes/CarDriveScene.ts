@@ -4,6 +4,7 @@ import DialogBox from "../ui/DialogBox";
 import { IGameProgress, CurrentTask } from "@/lib/types";
 import GameScene from "./GameScene";
 import { EventBus } from "@/game/events";
+import { checkExistingSolveRecord } from "@/services";
 
 export default class CarDriveScene extends GameScene {
   // --- ASSETS ---
@@ -31,6 +32,7 @@ export default class CarDriveScene extends GameScene {
   private eventTriggered: boolean = false;
   private hasReachedOffice: boolean = false;
   private sirenSound!: Phaser.Sound.BaseSound;
+  private isSolved: boolean = false;
 
   constructor() {
     super("CarDriveScene");
@@ -62,9 +64,25 @@ export default class CarDriveScene extends GameScene {
         // Update the local scene's reference so 'this.savedProgress' is always fresh
         this.savedProgress = updatedProgress;
 
-        // Optional: If the UI update says the task is completed,
         // you might want to trigger the success animation immediately.
-        if (updatedProgress.gameState.currentTask.status === "completed") {
+        const problemId = updatedProgress.gameState.currentTask.taskId;
+        if (!problemId)
+          return console.error(
+            "taskId is undefined in progress. (CarDriveScene - EventBus.on(problem-update-progress))"
+          );
+
+        const solveRecord = await this.checkPointSolved(
+          updatedProgress.userId,
+          problemId
+        );
+
+        // if (updatedProgress.gameState.currentTask.status === "completed") {
+        //   this.handlePoliceSuccess();
+        // }
+
+        this.isSolved = !!solveRecord;
+
+        if (this.isSolved) {
           this.handlePoliceSuccess();
         }
       }
@@ -81,10 +99,6 @@ export default class CarDriveScene extends GameScene {
     EventBus.on(
       "problem-solved",
       async (data: { currentTask: CurrentTask }) => {
-        console.log(
-          "problem-solved(CurrentTask) in CardriveScene: ",
-          JSON.stringify(data.currentTask, null, 2)
-        );
         await this.updateProgress({
           gameState: {
             ...this.savedProgress?.gameState,
@@ -94,6 +108,7 @@ export default class CarDriveScene extends GameScene {
               status: data.currentTask.status ?? "none",
               attempts: data.currentTask.attempts,
               timer: data.currentTask.timer,
+              highestHintLevelUsed: data.currentTask.highestHintLevelUsed,
             },
           },
         });
@@ -102,6 +117,11 @@ export default class CarDriveScene extends GameScene {
 
     EventBus.on("resume-after-solve", () => {
       this.handlePoliceSuccess();
+    });
+
+    AudioManager.getInstance().playMusic("bgm", {
+      loop: true,
+      volume: 0.15,
     });
   }
 
@@ -120,6 +140,11 @@ export default class CarDriveScene extends GameScene {
       const bg = this.add.image(index * 2000, 0, name).setOrigin(0, 0);
       this.worldContainer.add(bg);
     });
+  }
+
+  private async checkPointSolved(userId: string, problemId: string) {
+    const response = await checkExistingSolveRecord(userId, problemId);
+    return response?.data;
   }
 
   private setupCars() {
@@ -154,7 +179,7 @@ export default class CarDriveScene extends GameScene {
 
       if (eventFlags.policeStoppedPlayer) {
         this.isDriving = false;
-        if (currentTask.status === "completed") {
+        if (this.isSolved) {
           this.handlePoliceSuccess();
         } else {
           this.setupPoliceStandby();
@@ -162,11 +187,6 @@ export default class CarDriveScene extends GameScene {
         return;
       }
     }
-
-    AudioManager.getInstance().playMusic("drive-bgm", {
-      loop: true,
-      volume: 0.15,
-    });
   }
 
   update() {
@@ -267,7 +287,7 @@ export default class CarDriveScene extends GameScene {
         ease: "Power2",
         onComplete: () => {
           this.isDriving = true;
-          AudioManager.getInstance().playMusic("drive-bgm", {
+          AudioManager.getInstance().playMusic("bgm", {
             loop: true,
             volume: 0.15,
           });
@@ -367,7 +387,7 @@ export default class CarDriveScene extends GameScene {
       };
 
       console.log(
-        "Update Progress: ",
+        "CarDriveScene after click solved button: ",
         JSON.stringify(updatedProgress, null, 2)
       );
 
@@ -388,6 +408,8 @@ export default class CarDriveScene extends GameScene {
                 status: "in_progress",
                 attempts: 0,
                 timer: 0,
+                currentActiveIndex: 0,
+                highestHintLevelUsed: "none",
               },
         },
       });

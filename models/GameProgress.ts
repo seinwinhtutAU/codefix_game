@@ -10,6 +10,8 @@ export interface CurrentTask {
   status: "none" | "in_progress" | "completed";
   attempts?: number;
   timer?: number;
+  currentActiveIndex: number; // start from 0
+  highestHintLevelUsed: "none" | "small" | "medium" | "big";
 }
 
 export interface GameState {
@@ -51,7 +53,16 @@ const currentTaskSchema = new Schema<CurrentTask>(
     },
     timer: {
       type: Number,
-      default: 15,
+      default: 0,
+    },
+    currentActiveIndex: {
+      type: Number,
+      default: 0,
+    },
+    highestHintLevelUsed: {
+      type: String,
+      enum: ["none", "small", "medium", "big"],
+      default: "none",
     },
   },
   { _id: false }

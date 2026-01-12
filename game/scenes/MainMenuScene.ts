@@ -9,15 +9,12 @@ export default class MainMenuScene extends GameScene {
 
   create() {
     super.create();
-    // Initialize Audio
-    AudioManager.getInstance().init(this.game);
-    AudioManager.getInstance().playMusic("menu-bgm", {
-      loop: true,
-      volume: 0.15,
-    });
 
     this.cameras.main.fadeIn(1000, 0, 0, 0);
     const { width, height } = this.cameras.main;
+
+    AudioManager.getInstance().init(this.game);
+    AudioManager.getInstance().playMusic("bgm", { loop: true, volume: 0.15 });
 
     // Title
     this.add
@@ -28,10 +25,8 @@ export default class MainMenuScene extends GameScene {
       })
       .setOrigin(0.5);
 
-    console.log(
-      "MainMenu saveProgress: ",
-      JSON.stringify(this.savedProgress, null, 2)
-    );
+    console.log("MainMenuScene: ", JSON.stringify(this.savedProgress, null, 2));
+
     // 2. LOGIC: Determine button text based on event flags
     const isIntroDone =
       this.savedProgress?.gameState?.eventFlags?.introCompleted;
@@ -91,14 +86,32 @@ export default class MainMenuScene extends GameScene {
         if (confirmReset) {
           try {
             // 2. Call the DELETE method we added to the API
-            const response = await fetch(
+            const progressResponse = await fetch(
               `/api/game-progress?userId=${this.savedProgress.userId}`,
               {
                 method: "DELETE",
               }
             );
 
-            if (response.ok) {
+            const userCodeResponse = await fetch(
+              `/api/code/${this.savedProgress.userId}`,
+              {
+                method: "DELETE",
+              }
+            );
+
+            const recordResponse = await fetch(
+              `/api/solve-record?userId=${this.savedProgress.userId}`,
+              {
+                method: "DELETE",
+              }
+            );
+
+            if (
+              progressResponse.ok &&
+              userCodeResponse.ok &&
+              recordResponse.ok
+            ) {
               EventBus.emit("ui-reset-start");
 
               // 3. Reset local memory and restart the engine

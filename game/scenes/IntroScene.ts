@@ -4,6 +4,8 @@ import AudioManager from "../AudioManager";
 import DialogBox from "../ui/DialogBox";
 import GameScene from "./GameScene";
 import { EventBus } from "../events";
+import { IGameProgress } from "@/lib/types";
+import { progress } from "framer-motion";
 
 type WASDKeys = {
   W: Phaser.Input.Keyboard.Key;
@@ -35,14 +37,14 @@ export default class IntroScene extends GameScene {
     // 1. Initialize GameScene (Sets up EventBus listeners for mute/pause/audio)
     super.create();
 
-    // 2. CHECK IF ALREADY COMPLETED
-    if (this.savedProgress?.gameState?.eventFlags?.introCompleted) {
-      this.scene.start("CarDriveScene", this.savedProgress);
-      return;
-    }
-
     AudioManager.getInstance().init(this.game);
     AudioManager.getInstance().playMusic("bgm", { loop: true, volume: 0.15 });
+
+    // 2. CHECK IF ALREADY COMPLETED
+    if (this.savedProgress?.gameState?.eventFlags?.introCompleted) {
+      this.scene.start("CarDriveScene");
+      return;
+    }
 
     this.cameras.main.fadeIn(1000, 0, 0, 0);
 
@@ -151,35 +153,7 @@ export default class IntroScene extends GameScene {
   private async completeIntro() {
     if (!this.savedProgress) return;
 
-    const updatedPayload = {
-      userId: this.savedProgress.userId,
-      lastLocation: "/game",
-      gameState: {
-        currentScene: "CarDriveScene",
-        eventFlags: {
-          ...this.savedProgress.gameState?.eventFlags,
-          introCompleted: true,
-        },
-        currentTask: {
-          ...this.savedProgress.gameState?.currentTask,
-          taskType: "none",
-          status: "none",
-        },
-      },
-    };
-
-    try {
-      const response = await fetch("/api/game-progress", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(updatedPayload),
-      });
-
-      const newProgress = await response.json();
-      this.savedProgress = newProgress;
-    } catch (e) {
-      console.error("Failed to save intro progress:", e);
-    }
+    this.emitCarScene(this.savedProgress);
 
     // Transition Logic
     AudioManager.getInstance().stopMusic();
@@ -190,5 +164,33 @@ export default class IntroScene extends GameScene {
         this.scene.start("CarDriveScene", this.savedProgress);
       }
     );
+  }
+
+  private emitCarScene(progress: IGameProgress) {
+    const updatedProgress: IGameProgress = {
+      ...progress,
+      lastLocation: "/game",
+      gameState: {
+        ...progress.gameState,
+        currentScene: "CarDriveScene",
+        eventFlags: {
+          ...progress.gameState.eventFlags,
+          introCompleted: true,
+        },
+        currentTask: {
+          ...progress.gameState.currentTask,
+          taskType: "none",
+          status: "none",
+          taskId: undefined,
+          attempts: 0,
+          timer: 0,
+          currentActiveIndex: 0,
+          highestHintLevelUsed: "none",
+        },
+      },
+    };
+
+    EventBus.emit("progress-updated", updatedProgress);
+    this.savedProgress = updatedProgress;
   }
 }

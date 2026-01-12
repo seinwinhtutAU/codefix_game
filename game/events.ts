@@ -6,6 +6,7 @@ import { CurrentTask, IGameProgress } from "@/lib/types";
 type Events = {
   "ui-reset-start": void;
   "ui-open-problem": string;
+  "ui-close-problem": void;
   "show-notification": GameNotificationProps;
   "hide-notification": void;
   "play-ui-sound": string;
@@ -14,10 +15,11 @@ type Events = {
   "ui-toggle-mute": boolean;
   "ui-scene": string;
   "request-current-scene": void;
-  "start-scene": IGameProgress;
+  "start-scene-progress": IGameProgress;
   "problem-solved": { currentTask: CurrentTask };
   "problem-update-progress": IGameProgress;
-  "resume-after-solve": void;
+  "resume-after-solve": IGameProgress;
+  "progress-updated": IGameProgress;
 };
 
 export const EventBus = mitt<Events>();

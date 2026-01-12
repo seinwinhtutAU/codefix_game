@@ -125,10 +125,12 @@ export function useUserCodeManager() {
 
   const recordHintUsage = useCallback(
     (hintId: string, hintLevel: "small" | "medium" | "big") => {
-      setHintUsages((prev) => [
-        ...prev,
-        { hintId, hintLevel, usedAt: new Date() },
-      ]);
+      setHintUsages((prev) => {
+        const alreadyUsed = prev.some((h) => h.hintLevel === hintLevel);
+        if (alreadyUsed) return prev;
+
+        return [...prev, { hintId, hintLevel, usedAt: new Date() }];
+      });
     },
     []
   );

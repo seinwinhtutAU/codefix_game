@@ -16,6 +16,8 @@ interface GameProgressRequest {
       status: "none" | "in_progress" | "completed";
       attempts: number;
       timer: number;
+      currentActiveIndex: number;
+      highestHintLevelUsed: "none" | "small" | "medium" | "big";
     };
   };
 }
@@ -34,6 +36,8 @@ const DEFAULT_GAME_STATE = {
       status: "none",
       attempts: 0,
       timer: 0,
+      currentActiveIndex: 0,
+      highestHintLevelUsed: "none",
     },
   },
 };
