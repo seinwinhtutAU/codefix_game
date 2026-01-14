@@ -5,7 +5,6 @@ import dynamic from "next/dynamic";
 import { AnimatePresence } from "framer-motion";
 import { EventBus } from "@/game/events";
 import { GameNotificationProps } from "@/game/components/GameNotification";
-import AudioManager from "@/game/AudioManager";
 
 const PhaserGame = dynamic(() => import("@/game/components/PhaserGame"), {
   ssr: false,

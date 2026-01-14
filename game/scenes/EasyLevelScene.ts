@@ -40,7 +40,6 @@ export default class EasyLevelScene extends GameScene {
   private solvedPoints: SolvedPointStatus[] = [];
   private maxAttempt = 5;
   private easylevelCompleted = false;
-  private listenResum = false;
 
   constructor() {
     super("EasyLevelScene");
@@ -54,7 +53,7 @@ export default class EasyLevelScene extends GameScene {
     this.load.image("easy-unlock", "/easy/unlock.png");
   }
 
-  async create() {
+  create() {
     super.create();
     console.log(
       "Before EasyLevelScene: ",
@@ -63,10 +62,10 @@ export default class EasyLevelScene extends GameScene {
 
     this.initAudio();
     this.initSolvedPoints();
-    this.drawMapAndPoints();
-    await this.updateAllSolvePoint();
+    this.drawMapAndPoints(); // Moved before updatePointUI
     this.updatePointUI();
     this.setUpListener();
+    this.updateAllSolvePoint();
     this.handleProgressResume(this.savedProgress);
 
     console.log(
@@ -84,23 +83,20 @@ export default class EasyLevelScene extends GameScene {
     const completedIndex = index - 1;
     const userId = progress.userId;
 
-    const problemId = this.problemIds[completedIndex];
+    const solveRecord = await this.checkPointSolved(
+      userId,
+      this.problemIds[completedIndex]
+    );
 
-    if (problemId) {
-      const solveRecord = await this.checkPointSolved(userId, problemId);
-      const attempts = solveRecord?.attempt ?? 0;
-      const isSolved = !!solveRecord;
-      this.updateSolvedPoint(completedIndex, attempts, isSolved);
-    }
+    const attempts = solveRecord?.attempt ?? 0;
+    const isSolved = solveRecord ? true : false;
+
+    this.updateSolvedPoint(completedIndex, attempts, isSolved);
 
     // this.updateAllSolvePoint();
 
     const currentUpdated = this.updateCurrentPointIndex(completedIndex);
-    if (
-      this.listenResum &&
-      currentUpdated &&
-      this.currentPointIndex < this.mapPoints.length
-    ) {
+    if (currentUpdated && this.currentPointIndex < this.mapPoints.length) {
       this.emitTaskStarted(progress);
     }
 
@@ -115,7 +111,7 @@ export default class EasyLevelScene extends GameScene {
         confirmLabel: "NEXT",
         onConfirm: () => {
           EventBus.emit("hide-notification");
-          this.scene.start("MiddleLevelScene", this.savedProgress);
+          this.scene.start("MiddleLevelScene");
         },
       });
     }
@@ -129,10 +125,7 @@ export default class EasyLevelScene extends GameScene {
   }
 
   private setUpListener() {
-    EventBus.on("resume-after-solve", (progress) => {
-      this.listenResum = true;
-      this.handleProgressResume(progress);
-    });
+    EventBus.on("resume-after-solve", this.handleProgressResume);
 
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       EventBus.off("resume-after-solve", this.handleProgressResume);
@@ -146,7 +139,15 @@ export default class EasyLevelScene extends GameScene {
   }
 
   private drawMapAndPoints() {
-    if (this.mapPoints.length > 0) return;
+    // Clear existing points if they exist
+    if (this.mapPoints.length > 0) {
+      this.mapPoints.forEach((point) => {
+        if (point) {
+          point.destroy();
+        }
+      });
+      this.mapPoints = [];
+    }
 
     this.add.image(0, 0, "easy-map").setOrigin(0, 0);
 
@@ -173,6 +174,12 @@ export default class EasyLevelScene extends GameScene {
 
   private updatePointUI() {
     this.mapPoints.forEach((point, index) => {
+      // Add null check to prevent the error
+      if (!point || !point.setTint || !point.disableInteractive) {
+        console.warn(`Point at index ${index} is not properly initialized`);
+        return;
+      }
+
       const state = this.getPointState(index);
 
       point.disableInteractive();
@@ -223,7 +230,6 @@ export default class EasyLevelScene extends GameScene {
   }
 
   private emitTaskStarted(progress: IGameProgress) {
-    console.log("emitTaskStarted");
     EventBus.emit("progress-updated", {
       ...progress,
       gameState: {
@@ -251,7 +257,7 @@ export default class EasyLevelScene extends GameScene {
         },
         currentTask: {
           taskType: "none",
-          taskId: undefined,
+          taskId: "none",
           status: "none",
           attempts: 0,
           timer: 0,
@@ -276,20 +282,17 @@ export default class EasyLevelScene extends GameScene {
     };
   }
 
-  private async updateAllSolvePoint() {
+  private updateAllSolvePoint() {
     const userId = this.savedProgress.userId;
-
-    await Promise.all(
-      this.problemIds.map(async (id, index) => {
-        if (!id) return;
-
-        const solveRecord = await this.checkPointSolved(userId, id);
-        this.solvedPoints[index] = {
-          attempts: solveRecord?.attempt ?? 0,
-          isSolved: !!solveRecord,
-        };
-      })
-    );
+    this.problemIds.forEach(async (id, index) => {
+      const solveRecord = await this.checkPointSolved(userId, id);
+      const attempts = solveRecord?.attempt ?? 0;
+      const isSolved = solveRecord ? true : false;
+      this.solvedPoints[index] = {
+        attempts,
+        isSolved,
+      };
+    });
   }
 
   private checkLevelCompleted(): boolean {
