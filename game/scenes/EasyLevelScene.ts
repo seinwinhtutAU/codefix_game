@@ -84,15 +84,14 @@ export default class EasyLevelScene extends GameScene {
     const completedIndex = index - 1;
     const userId = progress.userId;
 
-    const solveRecord = await this.checkPointSolved(
-      userId,
-      this.problemIds[completedIndex]
-    );
+    const problemId = this.problemIds[completedIndex];
 
-    const attempts = solveRecord?.attempt ?? 0;
-    const isSolved = solveRecord ? true : false;
-
-    this.updateSolvedPoint(completedIndex, attempts, isSolved);
+    if (problemId) {
+      const solveRecord = await this.checkPointSolved(userId, problemId);
+      const attempts = solveRecord?.attempt ?? 0;
+      const isSolved = !!solveRecord;
+      this.updateSolvedPoint(completedIndex, attempts, isSolved);
+    }
 
     // this.updateAllSolvePoint();
 
@@ -282,6 +281,8 @@ export default class EasyLevelScene extends GameScene {
 
     await Promise.all(
       this.problemIds.map(async (id, index) => {
+        if (!id) return;
+
         const solveRecord = await this.checkPointSolved(userId, id);
         this.solvedPoints[index] = {
           attempts: solveRecord?.attempt ?? 0,
