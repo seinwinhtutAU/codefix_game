@@ -309,6 +309,7 @@ export interface IGameProgress {
       timer?: number;
       currentActiveIndex?: number;
       highestHintLevelUsed?: "none" | "small" | "medium" | "big";
+      hintUsages?: HintUsage[];
     };
   };
 }
@@ -321,6 +322,7 @@ export interface CurrentTask {
   timer?: number;
   currentActiveIndex?: number;
   highestHintLevelUsed?: "none" | "small" | "medium" | "big";
+  hintUsages?: HintUsage[];
 }
 
 // ============================================================================

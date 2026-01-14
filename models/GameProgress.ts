@@ -1,5 +1,5 @@
 import mongoose, { Schema, Types, Model } from "mongoose";
-
+import { HintUsage, hintUsageSchema } from "./ProblemSolveRecord";
 /* =====================================================
    Interfaces
 ===================================================== */
@@ -11,7 +11,8 @@ export interface CurrentTask {
   attempts?: number;
   timer?: number;
   currentActiveIndex: number; // start from 0
-  highestHintLevelUsed: "none" | "small" | "medium" | "big";
+  highestHintLevelUsed?: "none" | "small" | "medium" | "big";
+  hintUsages?: HintUsage[];
 }
 
 export interface GameState {
@@ -63,6 +64,10 @@ const currentTaskSchema = new Schema<CurrentTask>(
       type: String,
       enum: ["none", "small", "medium", "big"],
       default: "none",
+    },
+    hintUsages: {
+      type: [hintUsageSchema],
+      default: [],
     },
   },
   { _id: false }

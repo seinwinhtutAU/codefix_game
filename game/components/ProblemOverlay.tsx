@@ -38,13 +38,11 @@ import {
 } from "@/services";
 import { EventBus } from "@/game/events";
 import {
-  CurrentTask,
   IGameProgress,
   ProblemSolveRecord,
   SolveRecordRequest,
 } from "@/lib/types";
 import { getPlayerProgress } from "@/services/game";
-import AudioManager from "../AudioManager";
 import { HintUsage } from "@/lib/types";
 
 interface ProblemOverlayProps {
@@ -185,6 +183,7 @@ export function ProblemOverlay({ problemId, onClose }: ProblemOverlayProps) {
 
   const {
     hintUsages,
+    setHintUsages,
     findContentInUserCodeFiles,
     getCurrentFileContent,
     getOriginalFileContent,
@@ -196,7 +195,7 @@ export function ProblemOverlay({ problemId, onClose }: ProblemOverlayProps) {
   } = useUserCodeManager();
 
   // --- TIMER LOGIC ---
-  const timeLimited = 10;
+  const timeLimited = 20;
   const { totalTimeSpent, timeLeft, isTimeUp, resetTimer, setIsSolving } =
     useSolvingTimer(0, hasCompleted, problem, timeLimited);
 
@@ -283,6 +282,10 @@ export function ProblemOverlay({ problemId, onClose }: ProblemOverlayProps) {
         if (result) {
           setHasCompleted(result.hasCompleted);
           setIsSolving(!result.hasCompleted);
+
+          if (progress?.gameState?.currentTask?.hintUsages) {
+            setHintUsages(progress.gameState.currentTask.hintUsages);
+          }
         }
       });
     }
@@ -382,6 +385,13 @@ export function ProblemOverlay({ problemId, onClose }: ProblemOverlayProps) {
 
   // update progress after hints used
   useEffect(() => {
+    if (
+      JSON.stringify(hintUsages) ===
+      JSON.stringify(progress?.gameState?.currentTask?.hintUsages)
+    ) {
+      return;
+    }
+
     setProgress((prev) => {
       if (!prev?.gameState?.currentTask) return prev;
 
@@ -392,6 +402,7 @@ export function ProblemOverlay({ problemId, onClose }: ProblemOverlayProps) {
           currentTask: {
             ...prev.gameState.currentTask,
             highestHintLevelUsed: getHighestHintLevelUsed(hintUsages),
+            hintUsages: hintUsages,
           },
         },
       };
@@ -411,6 +422,7 @@ export function ProblemOverlay({ problemId, onClose }: ProblemOverlayProps) {
       timer: progress?.gameState.currentTask.timer,
       currentActiveIndex: nextIndex,
       highestHintLevelUsed: getHighestHintLevelUsed(hintUsages),
+      hintUsages: hintUsages,
     };
 
     let currentScene;

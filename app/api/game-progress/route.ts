@@ -1,8 +1,12 @@
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/db";
 import GameProgressModel from "@/models/GameProgress";
+import { HintUsage } from "@/models/ProblemSolveRecord";
+import mongoose from "mongoose";
 
 export const dynamic = "force-dynamic";
+
+type IncomingHint = Omit<HintUsage, "hintId">;
 
 interface GameProgressRequest {
   userId: string;
@@ -18,6 +22,7 @@ interface GameProgressRequest {
       timer: number;
       currentActiveIndex: number;
       highestHintLevelUsed: "none" | "small" | "medium" | "big";
+      hintUsages: IncomingHint[];
     };
   };
 }
@@ -38,6 +43,7 @@ const DEFAULT_GAME_STATE = {
       timer: 0,
       currentActiveIndex: 0,
       highestHintLevelUsed: "none",
+      hintUsages: [],
     },
   },
 };
@@ -89,14 +95,28 @@ export async function POST(req: Request) {
       );
     }
 
+    const hintUsages = body.gameState.currentTask.hintUsages;
+    const processedHintUsages: HintUsage[] = (hintUsages || []).map((hint) => ({
+      ...hint,
+      hintId: new mongoose.Types.ObjectId(),
+      usedAt: hint.usedAt ? new Date(hint.usedAt) : new Date(),
+    }));
+
+    const updateData = {
+      lastLocation,
+      gameState: {
+        ...gameState,
+        currentTask: {
+          ...gameState.currentTask,
+          hintUsages: processedHintUsages, // Use processed hints
+        },
+      },
+      updatedAt: new Date(),
+    };
+
     const updatedProgress = await GameProgressModel.findOneAndUpdate(
       { userId },
-      {
-        lastLocation,
-        gameState,
-        updatedAt: new Date(),
-      },
-      // upsert: create if doesn't exist; new: return the updated doc
+      updateData,
       { upsert: true, new: true, runValidators: true }
     );
 

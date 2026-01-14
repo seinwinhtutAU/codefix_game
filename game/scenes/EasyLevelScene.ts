@@ -235,6 +235,7 @@ export default class EasyLevelScene extends GameScene {
           status: "in_progress",
           attempts: 0,
           highestHintLevelUsed: "none",
+          hintUsages: [],
         },
       },
     });
@@ -257,6 +258,7 @@ export default class EasyLevelScene extends GameScene {
           timer: 0,
           currentActiveIndex: 0,
           highestHintLevelUsed: "none",
+          hintUsages: [],
         },
       },
     });

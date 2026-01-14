@@ -17,7 +17,7 @@ export interface IProblemSolveRecord {
   attempt: number;
 }
 
-const hintUsageSchema = new mongoose.Schema<HintUsage>(
+export const hintUsageSchema = new mongoose.Schema<HintUsage>(
   {
     hintId: { type: mongoose.Schema.Types.ObjectId, required: true },
     hintLevel: {

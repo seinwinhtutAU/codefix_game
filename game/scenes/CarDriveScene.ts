@@ -109,13 +109,28 @@ export default class CarDriveScene extends GameScene {
               attempts: data.currentTask.attempts,
               timer: data.currentTask.timer,
               highestHintLevelUsed: data.currentTask.highestHintLevelUsed,
+              hintUsages: data.currentTask.hintUsages,
             },
           },
         });
       }
     );
 
-    EventBus.on("resume-after-solve", () => {
+    EventBus.on("resume-after-solve", async () => {
+      await this.updateProgress({
+        gameState: {
+          ...this.savedProgress?.gameState,
+          currentTask: {
+            taskType: "none",
+            taskId: undefined,
+            status: "none",
+            attempts: 0,
+            timer: 0,
+            highestHintLevelUsed: "none",
+            hintUsages: [],
+          },
+        },
+      });
       this.handlePoliceSuccess();
     });
 
@@ -410,6 +425,7 @@ export default class CarDriveScene extends GameScene {
                 timer: 0,
                 currentActiveIndex: 0,
                 highestHintLevelUsed: "none",
+                hintUsages: [],
               },
         },
       });

@@ -105,14 +105,6 @@ export default function HintsPanel({
     }
   };
 
-  const calculatePoints = (): number => {
-    if (usedHintLevels.has("big")) return 50;
-    if (usedHintLevels.has("medium")) return 70;
-    if (usedHintLevels.has("small")) return 90;
-    return 100;
-  };
-
-  const getCurrentPoints = () => calculatePoints();
   const getHighestUsedLevel = (): HintLevel | "none" => {
     if (usedHintLevels.has("big")) return "big";
     if (usedHintLevels.has("medium")) return "medium";
@@ -186,15 +178,6 @@ export default function HintsPanel({
         </div>
 
         <div className="flex items-center gap-2">
-          {/* 分数显示 */}
-          <div className="flex items-center gap-2 px-3 py-1.5 bg-yellow-900/20 rounded-lg border border-yellow-700/40">
-            <Sparkles size={14} className="text-yellow-400" />
-            <span className="text-sm font-bold text-yellow-100">
-              {getCurrentPoints()}
-              <span className="text-xs text-yellow-300/70">/100</span>
-            </span>
-          </div>
-
           <button
             onClick={handleClose}
             className="p-1.5 hover:bg-yellow-900/20 rounded-lg text-yellow-400 hover:text-yellow-300"
