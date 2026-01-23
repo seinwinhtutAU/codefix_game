@@ -15,6 +15,11 @@ export interface CurrentTask {
   hintUsages?: HintUsage[];
 }
 
+export interface BugCount {
+  problemId: Types.ObjectId;
+  bugCount: number;
+}
+
 export interface GameState {
   currentScene: string;
   eventFlags: Record<string, boolean>;
@@ -25,12 +30,28 @@ export interface IGameProgress {
   userId: Types.ObjectId;
   lastLocation: string;
   gameState: GameState;
+  bugCounts: BugCount[];
   updatedAt: Date;
 }
 
 /* =====================================================
    Sub Schemas
 ===================================================== */
+
+const bugCountSchema = new Schema<BugCount>(
+  {
+    problemId: {
+      type: Schema.Types.ObjectId,
+      ref: "Problem",
+      required: true,
+    },
+    bugCount: {
+      type: Number,
+      default: 0,
+    },
+  },
+  { _id: false },
+);
 
 const currentTaskSchema = new Schema<CurrentTask>(
   {
@@ -70,7 +91,7 @@ const currentTaskSchema = new Schema<CurrentTask>(
       default: [],
     },
   },
-  { _id: false }
+  { _id: false },
 );
 
 const gameStateSchema = new Schema<GameState>(
@@ -98,7 +119,7 @@ const gameStateSchema = new Schema<GameState>(
       default: () => ({}),
     },
   },
-  { _id: false }
+  { _id: false },
 );
 
 /* =====================================================
@@ -126,6 +147,11 @@ const gameProgressSchema = new Schema<IGameProgress>({
   gameState: {
     type: gameStateSchema,
     default: () => ({}),
+  },
+
+  bugCounts: {
+    type: [bugCountSchema],
+    default: [],
   },
 
   updatedAt: {

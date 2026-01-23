@@ -44,25 +44,39 @@ export default class PreloadScene extends Phaser.Scene {
         width / 2 - 150,
         height / 2 - 15,
         300 * value,
-        30
+        30,
       );
     });
 
     this.load.image("house-bg", "/intro/house-bg.png");
-    this.load.image("wife", "/player/idle/img.png");
+    this.load.image("wife", "/player/idle/wife.png");
     this.load.image("car", "/intro/car_1.png");
     this.load.image("police_car", "/intro/police1.png");
     this.load.image("office-bg", "/intro/office_work.png");
 
-    // City backgrounds in CarDriveScene
-    for (let i = 1; i <= 5; i++) {
-      this.load.image(`city_${i}`, `/intro/city_${i}.png`);
-    }
+    // Sun in CarDriveScene
+    this.load.image("sun", "/intro/bg/sun1.png");
+
+    // Building in CarDriveScene
+    this.load.image("building1", "/intro/building/building1.png");
+    this.load.image("building2", "/intro/building/building2.png");
+    this.load.image("building3", "/intro/building/building3.png");
+    this.load.image("building4", "/intro/building/building4.png");
+    this.load.image("building5", "/intro/building/building5.png");
+    this.load.image("car_building", "/intro/bg/building2.png");
+    this.load.image("red_light", "/intro/building/red_light.png");
+
+    // Road and background in CarDriveScene
+    this.load.image("car_bg_1", "/intro/bg/bg1_1.png");
+    this.load.image("car_bg_2", "/intro/bg/bg1_2.png");
+    this.load.image("car_bg_3", "/intro/bg/bg1_1.png");
+    this.load.image("car_bg_4", "/intro/bg/bg1_1.png");
+    this.load.image("car_cloud", "/intro/bg/cloud.png");
 
     // Player
-    this.load.image("player", "/player/idle/img.png");
-    for (let i = 0; i < 8; i++) {
-      this.load.image(`player_walk_${i}`, `/player/walk/img${i}.png`);
+    this.load.image("player", "/player/idle/stand1.png");
+    for (let i = 1; i <= 3; i++) {
+      this.load.image(`player_walk_${i}`, `/player/walk/walk_${i}.png`);
     }
 
     // Audio
@@ -72,12 +86,28 @@ export default class PreloadScene extends Phaser.Scene {
     this.load.audio("siren", "/audio/siren.mp3");
     this.load.audio("click", "/audio/click.mp3");
     this.load.audio("speech-blip", "/audio/blip.mp3");
+    this.load.audio("pop", "/audio/pop.mp3");
 
-    this.load.image("easy-map", "/easy/map.png");
-    this.load.image("easy-circle", "/easy/circle.png");
-    this.load.image("easy-circle-current", "/easy/circle_current.png");
-    this.load.image("easy-lock", "/easy/lock.png");
-    this.load.image("easy-unlock", "/easy/unlock.png");
+    // 431 * 521
+    this.load.spritesheet("player_walk", "player/walk/walk_spritesheet.png", {
+      frameWidth: 431,
+      frameHeight: 521,
+    });
+
+    this.load.image("dialog-box", "player/dialog.png");
+
+    // easylevel
+    this.load.image("easy-map", "/easy/level_map/map1.png");
+    this.load.image("easy-point-current", "/easy/level_map/point_current.png");
+    this.load.image("easy-point-lock", "/easy/level_map/point_lock.png");
+    this.load.image("easy-point-skip", "/easy/level_map/point_skip.png");
+    this.load.image("start-here", "/easy/level_map/start_here1.png");
+    for (let i = 1; i <= 10; i++) {
+      this.load.image(`easy-point-${i}`, `easy/level_map/point_${i}.png`);
+    }
+
+    // mediumlevel
+    this.load.image("medium-map", "/medium/level_map/map.png");
   }
 
   create() {
@@ -96,10 +126,11 @@ export default class PreloadScene extends Phaser.Scene {
 
       console.log(
         "PreloadScene: ",
-        JSON.stringify(this.savedProgress, null, 2)
+        JSON.stringify(this.savedProgress, null, 2),
       );
 
-      this.scene.start("MainMenuScene", this.savedProgress);
+      // this.scene.start("MainMenuScene", this.savedProgress);
+      this.scene.start("BossLevelScene", this.savedProgress);
     });
 
     this.events.on("shutdown", () => {

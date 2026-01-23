@@ -36,7 +36,7 @@ export function useProblemLoader(problemId: string, userId: string) {
 
         const { currentContents, originalContents } = extractFileContents(
           userCodeData.files,
-          problemData.problem.files
+          problemData.problem.files,
         );
 
         setFileContents(currentContents);
@@ -48,7 +48,7 @@ export function useProblemLoader(problemId: string, userId: string) {
         // Check for existing solve record
         const existingRecord = await checkExistingSolveRecord(
           userId,
-          problemId
+          problemId,
         );
 
         // Debug log to see what we're getting from the API

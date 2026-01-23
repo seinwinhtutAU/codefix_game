@@ -44,15 +44,21 @@ import {
 } from "@/lib/types";
 import { getPlayerProgress } from "@/services/game";
 import { HintUsage } from "@/lib/types";
+import { time } from "console";
 
 interface ProblemOverlayProps {
   problemId: string;
   onClose: () => void;
+  difficulty?: string;
 }
 
-export function ProblemOverlay({ problemId, onClose }: ProblemOverlayProps) {
+export function ProblemOverlay({
+  problemId,
+  onClose,
+  difficulty,
+}: ProblemOverlayProps) {
   const outputContainerRef = useRef<HTMLDivElement>(
-    null
+    null,
   ) as React.RefObject<HTMLDivElement>;
   const userId = useUserId();
 
@@ -75,7 +81,7 @@ export function ProblemOverlay({ problemId, onClose }: ProblemOverlayProps) {
         const data = await getPlayerProgress();
         console.log(
           "ProblemOverly, Initial Progress",
-          JSON.stringify(data, null, 2)
+          JSON.stringify(data, null, 2),
         );
         setProgress(data);
       } catch (err) {
@@ -117,7 +123,7 @@ export function ProblemOverlay({ problemId, onClose }: ProblemOverlayProps) {
 
     console.log(
       "ProblemOverlay, Updated Progress: ",
-      JSON.stringify(progress, null, 2)
+      JSON.stringify(progress, null, 2),
     );
 
     const updateProgress = async () => {
@@ -129,6 +135,7 @@ export function ProblemOverlay({ problemId, onClose }: ProblemOverlayProps) {
             userId: progress.userId,
             lastLocation: progress.lastLocation,
             gameState: progress.gameState,
+            bugCounts: progress.bugCounts,
           }),
         });
       } catch (e) {
@@ -148,6 +155,7 @@ export function ProblemOverlay({ problemId, onClose }: ProblemOverlayProps) {
         userId: progress.userId,
         lastLocation: progress.lastLocation,
         gameState: progress.gameState,
+        bugCounts: progress.bugCounts,
       } as IGameProgress);
     }, 500);
 
@@ -195,7 +203,45 @@ export function ProblemOverlay({ problemId, onClose }: ProblemOverlayProps) {
   } = useUserCodeManager();
 
   // --- TIMER LOGIC ---
-  const timeLimited = 20;
+
+  const [timeLimited, setTimeLimited] = useState(60);
+  const [basePoints, setBasePoints] = useState(100);
+
+  const currentBugCount = progress?.bugCounts?.find(
+    (b) => b.problemId === problemId,
+  );
+
+  const minBugs: number = 10;
+  const maxBugs: number = 20;
+  const timerIncrementPerBug: number = 120;
+  const pointIncrementPerBug: number = 10;
+  // Define constants at the top
+  const BASE_TIME_LIMIT = 60;
+  const BASE_POINTS = 100;
+
+  // Create a calculation function
+  const calculateTimeAndPoints = (bugCount: number) => {
+    const bugFactor = bugCount - minBugs;
+    const calculatedTime = bugFactor * timerIncrementPerBug + BASE_TIME_LIMIT;
+    const calculatedPoints = bugFactor * pointIncrementPerBug + BASE_POINTS;
+    return { calculatedTime, calculatedPoints };
+  };
+
+  useEffect(() => {
+    if (currentBugCount) {
+      const { calculatedTime, calculatedPoints } = calculateTimeAndPoints(
+        currentBugCount.bugCount,
+      );
+
+      setTimeLimited(calculatedTime);
+      setBasePoints(calculatedPoints);
+
+      console.log(
+        `Time Limit Updated: ${calculatedTime}s for ${currentBugCount.bugCount} bugs`,
+      );
+    }
+  }, [currentBugCount]);
+
   const { totalTimeSpent, timeLeft, isTimeUp, resetTimer, setIsSolving } =
     useSolvingTimer(0, hasCompleted, problem, timeLimited);
 
@@ -299,7 +345,7 @@ export function ProblemOverlay({ problemId, onClose }: ProblemOverlayProps) {
       problem,
       selectedFile,
       selectedFile.id,
-      newValue
+      newValue,
     );
     if (updatedProblem) setProblem(updatedProblem);
   };
@@ -332,7 +378,7 @@ export function ProblemOverlay({ problemId, onClose }: ProblemOverlayProps) {
 
         const recordResponse = await checkExistingSolveRecord(
           userId,
-          problemId
+          problemId,
         );
         if (recordResponse?.data && recordResponse.success) {
           setFinalRecord(recordResponse.data);
@@ -347,7 +393,7 @@ export function ProblemOverlay({ problemId, onClose }: ProblemOverlayProps) {
 
   const handleContinueExecution = async (
     executionId: string,
-    input: string
+    input: string,
   ) => {
     await continueExecution(executionId, input);
   };
@@ -374,13 +420,13 @@ export function ProblemOverlay({ problemId, onClose }: ProblemOverlayProps) {
       for (const usage of usages) {
         highestHintLevel = Math.max(
           highestHintLevel,
-          hintLevelMap[usage.hintLevel]
+          hintLevelMap[usage.hintLevel],
         );
       }
 
       return reverseHintLevelMap[highestHintLevel];
     },
-    []
+    [],
   );
 
   // update progress after hints used
@@ -448,6 +494,7 @@ export function ProblemOverlay({ problemId, onClose }: ProblemOverlayProps) {
           userId: updatedProgress?.userId,
           lastLocation: updatedProgress?.lastLocation,
           gameState: updatedProgress?.gameState,
+          bugCounts: updatedProgress?.bugCounts,
         }),
       });
       console.log("Database updated successfully before exit.");
@@ -468,23 +515,23 @@ export function ProblemOverlay({ problemId, onClose }: ProblemOverlayProps) {
     if (hasCompleted && finalRecord) return finalRecord.pointsEarned;
     if (attempts >= 5) return 0;
 
-    let basePoints = 100;
-
     const hintLevel = progress?.gameState.currentTask.highestHintLevelUsed;
+
+    let currentPoints = basePoints;
 
     switch (hintLevel) {
       case "small":
-        basePoints = Math.min(basePoints, 90);
+        currentPoints = Math.min(currentPoints, 90);
         break;
       case "medium":
-        basePoints = Math.min(basePoints, 70);
+        currentPoints = Math.min(currentPoints, 70);
         break;
       case "big":
-        basePoints = Math.min(basePoints, 50);
+        currentPoints = Math.min(currentPoints, 50);
         break;
     }
 
-    return Math.max(0, basePoints - attempts * 10);
+    return Math.max(0, currentPoints - attempts * 10);
   };
 
   const estimatedPoints = calculateEstimatedPoints();
@@ -494,7 +541,7 @@ export function ProblemOverlay({ problemId, onClose }: ProblemOverlayProps) {
 
     const originalContent = getOriginalFileContent(
       selectedFile,
-      originalFileContents
+      originalFileContents,
     );
     setFileContents((prev) => ({
       ...prev,
@@ -505,7 +552,7 @@ export function ProblemOverlay({ problemId, onClose }: ProblemOverlayProps) {
       problem,
       selectedFile,
       selectedFile.id,
-      originalContent
+      originalContent,
     );
     if (updatedProblem) {
       setProblem(updatedProblem);
@@ -516,7 +563,7 @@ export function ProblemOverlay({ problemId, onClose }: ProblemOverlayProps) {
     if (
       !problem ||
       !window.confirm(
-        "Are you sure you want to reset all files to their original state? This cannot be undone."
+        "Are you sure you want to reset all files to their original state? This cannot be undone.",
       )
     ) {
       return;
@@ -542,8 +589,18 @@ export function ProblemOverlay({ problemId, onClose }: ProblemOverlayProps) {
 
   if (isLoading || !problem) {
     return (
-      <div className="absolute inset-0 z-[200] flex items-center justify-center bg-gray-900/90 backdrop-blur-sm">
-        <Loader2 className="animate-spin text-blue-400" size={48} />
+      <div className="absolute inset-0 z-[200] flex flex-col items-center justify-center bg-gray-900/90 backdrop-blur-sm gap-4">
+        <Loader2 className="animate-spin text-red-500" size={64} />
+        {difficulty === "boss" && (
+          <div className="text-center animate-pulse">
+            <h2 className="text-xl font-mono text-red-500 font-bold">
+              WARNING: BOSS ENCOUNTER
+            </h2>
+            <p className="text-gray-400 font-mono text-sm mt-2">
+              Generating System Anomalies...
+            </p>
+          </div>
+        )}
       </div>
     );
   }
@@ -563,7 +620,8 @@ export function ProblemOverlay({ problemId, onClose }: ProblemOverlayProps) {
                     Attempts: ${attempts} 
                     Time: ${finalRecord?.timeSpent || totalTimeSpent}s 
                     Points: ${
-                      finalRecord?.pointsEarned ?? (attempts >= 5 ? 0 : 100)
+                      finalRecord?.pointsEarned ??
+                      (attempts >= 5 ? 0 : basePoints)
                     }`}
             confirmLabel="Back to Game"
             onConfirm={handleFinalExit}
@@ -618,7 +676,10 @@ export function ProblemOverlay({ problemId, onClose }: ProblemOverlayProps) {
                 timeLeft < 10 ? "text-red-500" : "text-blue-400"
               }`}
             >
-              00:{timeLeft < 10 ? `0${timeLeft}` : timeLeft}
+              {Math.floor(timeLeft / 60)
+                .toString()
+                .padStart(2, "0")}
+              :{(timeLeft % 60).toString().padStart(2, "0")}
             </span>
           </div>
         </div>
@@ -689,13 +750,13 @@ export function ProblemOverlay({ problemId, onClose }: ProblemOverlayProps) {
                   selectedFile,
                   problem,
                   fileContents,
-                  (n) => findContentInUserCodeFiles(problem, n)
+                  (n) => findContentInUserCodeFiles(problem, n),
                 ),
-                getOriginalFileContent(selectedFile, originalFileContents)
+                getOriginalFileContent(selectedFile, originalFileContents),
               )}
               isAnyFileModified={isAnyFileModified(
                 fileContents,
-                originalFileContents
+                originalFileContents,
               )}
               onResetCurrentFile={() => resetCurrentFile}
               onResetAllFiles={() => handleResetAllFiles}
@@ -712,7 +773,7 @@ export function ProblemOverlay({ problemId, onClose }: ProblemOverlayProps) {
                   selectedFile,
                   problem,
                   fileContents,
-                  (n) => findContentInUserCodeFiles(problem, n)
+                  (n) => findContentInUserCodeFiles(problem, n),
                 )}
                 onChange={handleCodeChange}
                 options={{

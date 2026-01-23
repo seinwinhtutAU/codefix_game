@@ -21,6 +21,10 @@ export default class IntroScene extends GameScene {
   private car!: Phaser.GameObjects.Image;
   private nextButton!: Phaser.GameObjects.Text;
 
+  // --- SHADOWS ---
+  private wifeShadow!: Phaser.GameObjects.Graphics;
+  private carShadow!: Phaser.GameObjects.Graphics;
+
   // --- CONTROLS ---
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
   private wasd!: WASDKeys;
@@ -55,13 +59,27 @@ export default class IntroScene extends GameScene {
 
     this.add.image(0, 0, "house-bg").setOrigin(0, 0);
 
-    this.car = this.add.image(400, 670, "car");
+    this.carShadow = this.add.graphics();
+    this.carShadow.fillStyle(0x000000, 0.3);
+    this.carShadow.fillEllipse(0, 0, 220, 40);
+    this.car = this.add.image(400, 630, "car");
     this.car.setDisplaySize(260, 130);
+    this.carShadow.setPosition(this.car.x, this.car.y + 55);
 
-    this.player = new Player(this, 750, 670).setFlipX(true);
+    this.player = new Player(this, 750, 630);
 
-    this.wife = this.add.image(1000, 660, "wife");
-    this.wife.setDisplaySize(256, 256);
+    this.wifeShadow = this.add.graphics();
+    this.wifeShadow.fillStyle(0x000000, 0.3);
+    this.wifeShadow.fillEllipse(0, 0, 70, 20);
+    this.wife = this.add.image(950, 615, "wife");
+    this.wife.setDisplaySize(116, 160).setFlipX(true);
+    this.wifeShadow.setPosition(this.wife.x, this.wife.y + 80);
+
+    this.carShadow.setDepth(1);
+    this.wifeShadow.setDepth(1);
+    this.car.setDepth(2);
+    this.wife.setDepth(2);
+    // this.player.setDepth(2);
 
     this.dialogBox = new DialogBox(this);
 
@@ -116,15 +134,15 @@ export default class IntroScene extends GameScene {
   private runIntroSequence() {
     this.dialogBox.show(
       this.wife.x,
-      this.wife.y - 180,
-      "Don't forget your code!"
+      this.wife.y - 120,
+      "Don't forget your code!",
     );
 
     this.time.delayedCall(3000, () => {
       this.dialogBox.show(
         this.player.x,
-        this.player.y - 180,
-        "I won't, honey!"
+        this.player.y - 120,
+        "I won't, honey!",
       );
 
       this.time.delayedCall(2000, () => {
@@ -138,10 +156,10 @@ export default class IntroScene extends GameScene {
     this.canMove = false;
     this.nextButton.setVisible(false);
 
-    this.dialogBox.show(this.player.x, this.player.y - 180, "Bye bye!");
+    this.dialogBox.show(this.player.x, this.player.y - 120, "Bye bye!");
 
     this.time.delayedCall(2000, () => {
-      this.dialogBox.show(this.wife.x, this.wife.y - 180, "Good luck!");
+      this.dialogBox.show(this.wife.x, this.wife.y - 120, "Good luck!");
 
       this.time.delayedCall(2000, () => {
         this.dialogBox.hide();
@@ -162,7 +180,7 @@ export default class IntroScene extends GameScene {
       Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE,
       () => {
         this.scene.start("CarDriveScene", this.savedProgress);
-      }
+      },
     );
   }
 
@@ -186,8 +204,10 @@ export default class IntroScene extends GameScene {
           timer: 0,
           currentActiveIndex: 0,
           highestHintLevelUsed: "none",
+          hintUsages: [],
         },
       },
+      bugCounts: [],
     };
 
     EventBus.emit("progress-updated", updatedProgress);

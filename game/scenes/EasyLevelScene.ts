@@ -14,67 +14,146 @@ export default class EasyLevelScene extends GameScene {
     "69582fb37538b18589a46564",
     "695c13b389e02a7e13dbe5ca",
     "695e95e4c887fa19a718db13",
-    // "69582fb37538b18589a46564",
-    // "69582fb37538b18589a46564",
-    // "69582fb37538b18589a46564",
-    // "69582fb37538b18589a46564",
-    // "695c13b389e02a7e13dbe5ca",
-    // "695c13b389e02a7e13dbe5ca",
+    "69582fb37538b18589a46564",
+    "69582fb37538b18589a46564",
+    "69582fb37538b18589a46564",
+    "69582fb37538b18589a46564",
+    "695c13b389e02a7e13dbe5ca",
+    "695c13b389e02a7e13dbe5ca",
+    "695c13b389e02a7e13dbe5ca",
   ];
 
   private roadPoints = [
-    { x: 230, y: 640 },
-    { x: 130, y: 550 },
-    { x: 140, y: 380 },
-    // { x: 250, y: 300 },
-    // { x: 450, y: 400 },
-    // { x: 680, y: 450 },
-    // { x: 920, y: 400 },
-    // { x: 1100, y: 300 },
-    // { x: 1230, y: 450 },
-    // { x: 1150, y: 640 },
+    { x: 225, y: 300 },
+    { x: 255, y: 400 },
+    { x: 255, y: 550 },
+    { x: 366, y: 640 },
+    { x: 550, y: 640 },
+    { x: 740, y: 640 },
+    { x: 885, y: 550 },
+    { x: 885, y: 400 },
+    { x: 980, y: 315 },
+    { x: 1100, y: 315 },
   ];
 
   private currentPointIndex = 0;
   private mapPoints: Phaser.GameObjects.Image[] = [];
   private solvedPoints: SolvedPointStatus[] = [];
   private maxAttempt = 5;
-  private easylevelCompleted = false;
+  private easyLevelCompleted = false;
+  private startHereSign!: Phaser.GameObjects.Image;
+  private startHereTween?: Phaser.Tweens.Tween;
+  private roadProgressGraphics!: Phaser.GameObjects.Graphics;
 
   constructor() {
     super("EasyLevelScene");
   }
-
-  preload() {
-    this.load.image("easy-map", "/easy/map.png");
-    this.load.image("easy-circle", "/easy/circle.png");
-    this.load.image("easy-circle-current", "/easy/circle_current.png");
-    this.load.image("easy-lock", "/easy/lock.png");
-    this.load.image("easy-unlock", "/easy/unlock.png");
-  }
-
-  create() {
+  async create() {
+    if (this.savedProgress?.gameState?.eventFlags?.easyLevelCompleted) {
+      this.scene.start("HomeScene", this.savedProgress);
+      return;
+    }
     super.create();
-    console.log(
-      "Before EasyLevelScene: ",
-      JSON.stringify(this.savedProgress, null, 2)
-    );
 
     this.initAudio();
+    this.createParticle();
     this.initSolvedPoints();
-    this.drawMapAndPoints(); // Moved before updatePointUI
-    this.updatePointUI();
-    this.setUpListener();
-    this.updateAllSolvePoint();
-    this.handleProgressResume(this.savedProgress);
+    this.drawMapAndPoints();
+    this.drawStartHere();
+    this.startHereSign = this.add
+      .image(0, 0, "start-here")
+      .setDisplaySize(59, 100)
+      .setDepth(10)
+      .setVisible(false);
+    await this.updateAllSolvePoint();
 
-    console.log(
-      "After EasyLevelScene: ",
-      JSON.stringify(this.savedProgress, null, 2)
-    );
+    if (this.checkLevelCompleted()) {
+      this.handleLevelTransition();
+    }
+
+    this.setUpListener();
+
+    this.input.on("pointerdown", (pointer: Phaser.Input.Pointer) => {
+      console.log(
+        `{ x: ${Math.round(pointer.x)}, y: ${Math.round(pointer.y)} },`,
+      );
+    });
   }
 
   update() {}
+
+  private createParticle() {
+    const graphics = this.make.graphics({ x: 0, y: 0 });
+    graphics.fillStyle(0xffffff, 1);
+    graphics.fillCircle(8, 8, 8);
+    graphics.generateTexture("glow-dot", 16, 16);
+    graphics.destroy();
+  }
+
+  private triggerSolveParticle(x: number, y: number) {
+    // Create the emitter using the texture we just generated
+    const emitter = this.add.particles(x, y, "glow-dot", {
+      speed: { min: 50, max: 200 },
+      scale: { start: 0.8, end: 0 },
+      alpha: { start: 1, end: 0 },
+      lifespan: 1000,
+      gravityY: 150, // Particles fall down like confetti
+      frequency: -1, // Do not emit continuously
+      blendMode: "ADD",
+      tint: [0xffff00, 0xff8800, 0xffffff], // Randomly picks Gold, Orange, or White
+    });
+
+    emitter.setDepth(20); // Ensure it's above the road and points
+
+    // Burst 20 particles at once
+    emitter.explode(20);
+
+    // Automatically clean up the emitter after 1.2 seconds
+    this.time.delayedCall(1200, () => {
+      emitter.destroy();
+    });
+  }
+
+  private drawRoadProgress() {
+    // 1. Initialize or clear the graphics object
+    if (!this.roadProgressGraphics) {
+      this.roadProgressGraphics = this.add.graphics();
+      this.roadProgressGraphics.setDepth(1); // Above map, below points
+    }
+    this.roadProgressGraphics.clear();
+
+    // 2. We only draw if we have at least one solved point
+    if (this.currentPointIndex === 0) return;
+
+    // 3. Set the style for the "Glow"
+    // Outer glow (thicker, lower alpha)
+    this.roadProgressGraphics.lineStyle(15, 0xffcc00, 0.3);
+    this.drawPathSegments();
+
+    // Inner core (thinner, higher alpha)
+    this.roadProgressGraphics.lineStyle(7, 0xffff00, 0.8);
+    this.drawPathSegments();
+  }
+
+  private drawPathSegments() {
+    this.roadProgressGraphics.beginPath();
+
+    this.roadProgressGraphics.moveTo(
+      this.roadPoints[0].x,
+      this.roadPoints[0].y,
+    );
+
+    for (let i = 1; i <= this.currentPointIndex; i++) {
+      if (i < this.roadPoints.length) {
+        this.roadProgressGraphics.lineTo(
+          this.roadPoints[i].x,
+          this.roadPoints[i].y,
+        );
+      }
+    }
+
+    this.roadProgressGraphics.strokePath();
+  }
 
   private handleProgressResume = async (progress: IGameProgress) => {
     const { currentTask } = progress.gameState;
@@ -85,7 +164,7 @@ export default class EasyLevelScene extends GameScene {
 
     const solveRecord = await this.checkPointSolved(
       userId,
-      this.problemIds[completedIndex]
+      this.problemIds[completedIndex],
     );
 
     const attempts = solveRecord?.attempt ?? 0;
@@ -93,27 +172,13 @@ export default class EasyLevelScene extends GameScene {
 
     this.updateSolvedPoint(completedIndex, attempts, isSolved);
 
-    // this.updateAllSolvePoint();
-
     const currentUpdated = this.updateCurrentPointIndex(completedIndex);
     if (currentUpdated && this.currentPointIndex < this.mapPoints.length) {
       this.emitTaskStarted(progress);
     }
 
-    if (!this.easylevelCompleted && this.checkLevelCompleted()) {
-      this.easylevelCompleted = true;
-
-      this.emitLevelCompleted(progress);
-      EventBus.emit("show-notification", {
-        type: "LEVEL_UP",
-        title: "Level Up!",
-        message: "New challenges unlocked.",
-        confirmLabel: "NEXT",
-        onConfirm: () => {
-          EventBus.emit("hide-notification");
-          this.scene.start("MiddleLevelScene");
-        },
-      });
+    if (!this.easyLevelCompleted && this.checkLevelCompleted()) {
+      this.handleLevelTransition();
     }
 
     this.updatePointUI();
@@ -153,16 +218,88 @@ export default class EasyLevelScene extends GameScene {
 
     this.roadPoints.forEach((value, index) => {
       const point = this.add
-        .image(value.x, value.y, "easy-circle")
-        .setDisplaySize(100, 70);
+        .image(value.x, value.y, "easy-point-lock")
+        .setDisplaySize(100, 100)
+        .setDepth(2);
 
       point.on("pointerdown", () => {
-        if (index !== this.currentPointIndex) return;
-
-        EventBus.emit("ui-open-problem", this.problemIds[index]);
+        if (index === this.currentPointIndex) {
+          EventBus.emit("ui-open-problem", {
+            problemId: this.problemIds[index],
+            difficulty: "easy",
+          });
+        } else if (index > this.currentPointIndex) {
+          // Shakes the point to show it's locked
+          this.tweens.add({
+            targets: point,
+            x: value.x + 5,
+            duration: 50,
+            yoyo: true,
+            repeat: 2,
+          });
+        }
       });
 
       this.mapPoints.push(point);
+    });
+  }
+
+  private drawStartHere() {
+    this.startHereSign = this.add
+      .image(0, 0, "start-here")
+      .setDisplaySize(43, 70)
+      .setDepth(100)
+      .setVisible(false);
+
+    const currentPos = this.roadPoints[this.currentPointIndex];
+    const targetX = currentPos.x - 3;
+    const targetY = currentPos.y - 32;
+    this.animateStartHere(targetX, targetY);
+  }
+
+  private animateStartHere(targetX: number, targetY: number) {
+    this.startHereTween?.stop();
+
+    this.startHereTween = this.tweens.add({
+      targets: this.startHereSign,
+      x: targetX,
+      y: targetY,
+      duration: 1000,
+      ease: "Power2.out",
+      onComplete: () => {
+        this.tweens.add({
+          targets: this.startHereSign,
+          y: targetY - 10,
+          duration: 800,
+          yoyo: true,
+          repeat: -1,
+          ease: "Sine.easeInOut",
+        });
+      },
+    });
+  }
+
+  private animateCurrentPoint(point: Phaser.GameObjects.Image) {
+    this.tweens.add({
+      targets: point,
+      scale: 0.85,
+      duration: 800,
+      yoyo: true,
+      repeat: -1,
+      ease: "Sine.easeInOut",
+    });
+  }
+
+  private animateSolvedPoint(point: Phaser.GameObjects.Image) {
+    this.tweens.add({
+      targets: point,
+      scale: { from: 0.6, to: 0.8 },
+      angle: { from: -20, to: 0 },
+      duration: 600,
+      ease: "Back.easeOut",
+      onStart: () => {
+        this.triggerSolveParticle(point.x, point.y);
+      },
     });
   }
 
@@ -174,31 +311,53 @@ export default class EasyLevelScene extends GameScene {
 
   private updatePointUI() {
     this.mapPoints.forEach((point, index) => {
-      // Add null check to prevent the error
       if (!point || !point.setTint || !point.disableInteractive) {
         console.warn(`Point at index ${index} is not properly initialized`);
         return;
       }
 
       const state = this.getPointState(index);
-
+      this.tweens.killTweensOf(point);
+      // point.setScale(1);
+      point.setAlpha(1);
+      point.clearTint();
       point.disableInteractive();
 
       switch (state) {
         case "solved":
-          point.setTint(0x00ff00);
+          point.setTexture(`easy-point-${index + 1}`);
+          this.animateSolvedPoint(point);
           break;
         case "skipped":
-          point.setTint(0xff0000);
+          point.setTexture(`easy-point-skip`);
           break;
         case "current":
-          point.setTint(0xffff00);
+          // point.setTint(0xffff00);
+          point.setTexture(`easy-point-current`);
           point.setInteractive({ useHandCursor: true });
+          this.animateCurrentPoint(point);
           break;
         default:
-          point.setTint(0x999999);
+          point.setTexture(`easy-point-lock`);
+          point.setInteractive({ useHandCursor: true });
+          point.setTint(0xdddddd);
       }
     });
+
+    this.drawRoadProgress();
+
+    const currentPos = this.roadPoints[this.currentPointIndex];
+    if (currentPos && this.startHereSign) {
+      const targetX = currentPos.x - 3;
+      const targetY = currentPos.y - 32;
+      this.startHereSign.setPosition(targetX, targetY);
+      this.startHereSign.setDisplaySize(43, 70);
+      this.startHereSign.setVisible(true);
+
+      this.animateStartHere(targetX, targetY);
+    } else {
+      this.startHereSign?.setVisible(false);
+    }
   }
 
   private getPointState(index: number) {
@@ -243,6 +402,7 @@ export default class EasyLevelScene extends GameScene {
           hintUsages: [],
         },
       },
+      bugCounts: [],
     });
   }
 
@@ -250,14 +410,14 @@ export default class EasyLevelScene extends GameScene {
     EventBus.emit("progress-updated", {
       ...progress,
       gameState: {
-        currentScene: "MediumLevelScene",
+        currentScene: "HomeScene",
         eventFlags: {
           ...progress.gameState.eventFlags,
           easyLevelCompleted: true,
         },
         currentTask: {
           taskType: "none",
-          taskId: "none",
+          taskId: undefined,
           status: "none",
           attempts: 0,
           timer: 0,
@@ -266,13 +426,14 @@ export default class EasyLevelScene extends GameScene {
           hintUsages: [],
         },
       },
+      bugCounts: [],
     });
   }
 
   private updateSolvedPoint(
     index: number,
     attempts: number,
-    isSolved: boolean
+    isSolved: boolean,
   ) {
     if (index < 0 || index >= this.mapPoints.length) return;
 
@@ -282,16 +443,47 @@ export default class EasyLevelScene extends GameScene {
     };
   }
 
-  private updateAllSolvePoint() {
+  private async updateAllSolvePoint() {
     const userId = this.savedProgress.userId;
-    this.problemIds.forEach(async (id, index) => {
+
+    // 1. Map all IDs to a list of promises
+    const promises = this.problemIds.map(async (id, index) => {
       const solveRecord = await this.checkPointSolved(userId, id);
       const attempts = solveRecord?.attempt ?? 0;
-      const isSolved = solveRecord ? true : false;
-      this.solvedPoints[index] = {
-        attempts,
-        isSolved,
-      };
+      const isSolved = !!solveRecord;
+
+      this.solvedPoints[index] = { attempts, isSolved };
+    });
+
+    await Promise.all(promises);
+
+    this.calculateCurrentIndex();
+
+    this.updatePointUI();
+  }
+
+  private calculateCurrentIndex() {
+    const nextIncomplete = this.solvedPoints.findIndex((p) => !p.isSolved);
+
+    this.currentPointIndex =
+      nextIncomplete === -1 ? this.roadPoints.length : nextIncomplete;
+  }
+
+  private handleLevelTransition() {
+    if (this.easyLevelCompleted) return;
+    this.easyLevelCompleted = true;
+
+    EventBus.emit("show-notification", {
+      type: "LEVEL_UP",
+      title: "Level Up!",
+      message: "New challenges unlocked.",
+      confirmLabel: "NEXT",
+      onConfirm: () => {
+        EventBus.emit("hide-notification");
+        // Use the helper to ensure progress is saved before switching
+        this.emitLevelCompleted(this.savedProgress);
+        this.scene.start("EasyToHomeTransitionScene", this.savedProgress);
+      },
     });
   }
 

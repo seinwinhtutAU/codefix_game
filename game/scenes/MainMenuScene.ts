@@ -50,7 +50,21 @@ export default class MainMenuScene extends GameScene {
         // Brand new player or intro not finished
         this.scene.start("IntroScene", this.savedProgress ?? undefined);
       } else {
-        if (this.savedProgress?.gameState?.eventFlags?.officeCompleted) {
+        if (this.savedProgress?.gameState?.eventFlags?.bossLevelCompleted) {
+          console.log("Redirecting to EndingScene");
+        } else if (
+          this.savedProgress?.gameState?.eventFlags?.playgroundCompleted
+        ) {
+          this.scene.start("MediumLevelScene", this.savedProgress);
+        } else if (
+          this.savedProgress?.gameState?.eventFlags?.mediumIntroCompleted
+        ) {
+          this.scene.start("PlayGroundScene", this.savedProgress);
+        } else if (
+          this.savedProgress?.gameState?.eventFlags?.easyLevelCompleted
+        ) {
+          this.scene.start("HomeScene", this.savedProgress);
+        } else if (this.savedProgress?.gameState?.eventFlags?.officeCompleted) {
           this.scene.start("EasyLevelScene", this.savedProgress);
         } else if (this.savedProgress?.gameState?.eventFlags?.arrivedAtOffice) {
           this.scene.start("OfficeScene", this.savedProgress);
@@ -80,7 +94,7 @@ export default class MainMenuScene extends GameScene {
       resetText.on("pointerdown", async () => {
         // 1. Confirm with the user
         const confirmReset = window.confirm(
-          "Are you sure? This will delete all progress!"
+          "Are you sure? This will delete all progress!",
         );
 
         if (confirmReset) {
@@ -90,21 +104,21 @@ export default class MainMenuScene extends GameScene {
               `/api/game-progress?userId=${this.savedProgress.userId}`,
               {
                 method: "DELETE",
-              }
+              },
             );
 
             const userCodeResponse = await fetch(
               `/api/code/${this.savedProgress.userId}`,
               {
                 method: "DELETE",
-              }
+              },
             );
 
             const recordResponse = await fetch(
               `/api/solve-record?userId=${this.savedProgress.userId}`,
               {
                 method: "DELETE",
-              }
+              },
             );
 
             if (

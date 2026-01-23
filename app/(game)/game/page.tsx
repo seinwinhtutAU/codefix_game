@@ -41,6 +41,7 @@ export default function GamePage() {
   const [isGameLoaded, setIsGameLoaded] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
   const [activeProblemId, setActiveProblemId] = useState<string | null>(null);
+  const [difficulty, setDifficulty] = useState<string | null>(null);
   const [notification, setNotification] =
     useState<GameNotificationProps | null>(null);
 
@@ -53,8 +54,12 @@ export default function GamePage() {
     };
 
     // --- PROBLEM OVERLAY LOGIC ---
-    const handleOpenProblem = (id: string) => {
-      setActiveProblemId(id);
+    const handleOpenProblem = (data: {
+      problemId: string;
+      difficulty: string;
+    }) => {
+      setActiveProblemId(data.problemId);
+      setDifficulty(data.difficulty);
     };
 
     // --- NOTIFICATION LOGIC ---
@@ -121,6 +126,7 @@ export default function GamePage() {
                 setActiveProblemId(null);
                 EventBus.emit("ui-close-problem");
               }}
+              difficulty={difficulty || undefined}
             />
           </div>
         )}

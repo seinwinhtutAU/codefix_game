@@ -11,6 +11,9 @@ export default class CarDriveScene extends GameScene {
   private car!: Phaser.GameObjects.Sprite;
   private worldContainer!: Phaser.GameObjects.Container;
   private policeCar!: Phaser.GameObjects.Sprite;
+  private clouds: Phaser.GameObjects.Image[] = [];
+  private dustEmitter!: Phaser.GameObjects.Particles.ParticleEmitter;
+  private shadow!: Phaser.GameObjects.Image;
 
   // --- UI ---
   private dialogBox!: DialogBox;
@@ -24,8 +27,8 @@ export default class CarDriveScene extends GameScene {
   private readonly SCREEN_WIDTH = 1376;
   private readonly SCREEN_HEIGHT = 768;
   private scrollSpeed: number = 10;
-  private readonly OFFICE_X_TARGET = -6500;
-  private readonly POLICE_TRIGGER_X = -2666;
+  private readonly OFFICE_X_TARGET = -5500;
+  private readonly POLICE_TRIGGER_X = -2900;
 
   // --- GAME STATE ---
   private isDriving: boolean = true;
@@ -42,6 +45,20 @@ export default class CarDriveScene extends GameScene {
 
   create() {
     super.create();
+
+    const graphics = this.make.graphics({ x: 0, y: 0 });
+    graphics.fillStyle(0xffffff, 1);
+    graphics.fillCircle(8, 8, 8);
+    graphics.generateTexture("dust", 16, 16);
+    graphics.destroy();
+
+    // Create a soft, blurred-looking oval for the shadow
+    const shadowGraphics = this.make.graphics({ x: 0, y: 0 });
+    shadowGraphics.fillStyle(0x000000, 0.3);
+    shadowGraphics.fillEllipse(120, 40, 240, 80);
+    shadowGraphics.generateTexture("car_shadow", 240, 80);
+    shadowGraphics.destroy();
+
     AudioManager.getInstance().init(this.game);
     this.sirenSound = this.sound.add("siren", { volume: 0.3, loop: true });
 
@@ -64,16 +81,20 @@ export default class CarDriveScene extends GameScene {
         // Update the local scene's reference so 'this.savedProgress' is always fresh
         this.savedProgress = updatedProgress;
 
+        const realProblemId = updatedProgress.gameState.currentTask.taskId;
+
+        if (!realProblemId || realProblemId === "boss_temp_id") return;
+
         // you might want to trigger the success animation immediately.
-        const problemId = updatedProgress.gameState.currentTask.taskId;
-        if (!problemId)
-          return console.error(
-            "taskId is undefined in progress. (CarDriveScene - EventBus.on(problem-update-progress))"
-          );
+        // const problemId = updatedProgress.gameState.currentTask.taskId;
+        // if (!problemId)
+        //   return console.error(
+        //     "taskId is undefined in progress. (CarDriveScene - EventBus.on(problem-update-progress))"
+        //   );
 
         const solveRecord = await this.checkPointSolved(
           updatedProgress.userId,
-          problemId
+          realProblemId
         );
 
         // if (updatedProgress.gameState.currentTask.status === "completed") {
@@ -143,18 +164,69 @@ export default class CarDriveScene extends GameScene {
   private setupWorld() {
     this.worldContainer = this.add.container(0, 0);
 
-    // If already stopped by police, teleport the background to the stop point
     if (this.savedProgress?.gameState?.eventFlags?.policeStoppedPlayer) {
       this.worldContainer.x = this.POLICE_TRIGGER_X;
       this.eventTriggered = true;
-      this.isDriving = false; // Freeze movement immediately
+      this.isDriving = false;
     }
 
-    const bgNames = ["city_1", "city_2", "city_3", "city_4", "city_5"];
+    const bgNames = ["car_bg_1", "car_bg_2", "car_bg_3", "car_bg_4"];
     bgNames.forEach((name, index) => {
-      const bg = this.add.image(index * 2000, 0, name).setOrigin(0, 0);
+      const bg = this.add
+        .image(index * 2100, 0, name)
+        .setDisplaySize(2186, 768)
+        .setOrigin(0, 0);
       this.worldContainer.add(bg);
     });
+
+    this.addClouds();
+
+    const building = this.add.image(0, 30, "car_building").setOrigin(0, 0);
+    this.worldContainer.add(building);
+
+    this.addSun();
+
+    const red_light = this.add.image(3200, 480, "red_light");
+    this.worldContainer.add(red_light);
+  }
+
+  private addSun() {
+    const sun = this.add.image(400, 120, "sun").setDisplaySize(150, 160);
+    this.worldContainer.add(sun);
+
+    this.tweens.add({
+      targets: sun,
+      scale: sun.scaleX * 1.1,
+      duration: 2500,
+      yoyo: true,
+      repeat: -1,
+      ease: "Sine.easeInOut",
+    });
+  }
+
+  private addClouds() {
+    const cloudCount = 10;
+    for (let i = 0; i < cloudCount; i++) {
+      const x = Phaser.Math.Between(0, 6500);
+      const y = Phaser.Math.Between(50, 200);
+
+      const cloud = this.add.image(x, y, "car_cloud");
+
+      const scale = Phaser.Math.FloatBetween(0.5, 1);
+      cloud.setScale(scale);
+
+      const depthAlpha = Phaser.Math.Linear(0.4, 0.7, (scale - 0.5) / 0.5);
+      cloud.setAlpha(depthAlpha);
+
+      if (scale < 0.7) {
+        cloud.setTint(0xeeeeff);
+      }
+
+      cloud.setData("driftSpeed", scale * 0.4);
+
+      this.worldContainer.add(cloud);
+      this.clouds.push(cloud);
+    }
   }
 
   private async checkPointSolved(userId: string, problemId: string) {
@@ -163,23 +235,68 @@ export default class CarDriveScene extends GameScene {
   }
 
   private setupCars() {
-    this.car = this.add.sprite(400, 670, "car");
+    const roadY = 635;
+
+    const shadowYOffset = 55;
+
+    this.car = this.add.sprite(400, roadY, "car");
     this.car.setDisplaySize(260, 130);
+    this.car.setDepth(100);
+
+    this.shadow = this.add.image(
+      this.car.x,
+      roadY + shadowYOffset,
+      "car_shadow"
+    );
+    this.shadow.setAlpha(0.5);
+    this.shadow.setDepth(99);
+
+    const particles = this.add.particles(
+      this.car.x - 140,
+      this.car.y + 15,
+      "dust",
+      {
+        scale: { start: 0.4, end: 3.0 },
+        x: { min: -10, max: 10 },
+        y: { min: -5, max: 5 },
+        alpha: { start: 0.4, end: 0 },
+        lifespan: 1000,
+        speed: { min: 30, max: 100 },
+        angle: { min: 140, max: 240 },
+        gravityY: -40,
+        blendMode: "NORMAL",
+        tint: 0xcccccc,
+        frequency: 30,
+        emitting: false,
+      }
+    );
+
+    this.dustEmitter = particles;
+
     this.tweens.add({
-      targets: this.car,
-      y: 671,
+      targets: this.shadow,
+      scaleX: 1.01,
+      alpha: 0.6,
       duration: 100,
       yoyo: true,
       repeat: -1,
-      ease: "Sine.easeInOut",
     });
 
-    // Determine police car starting position based on flag
+    // Player car bounce
+    this.tweens.add({
+      targets: this.car,
+      y: roadY - 1, // subtle vibration
+      duration: 100,
+      yoyo: true,
+      repeat: -1,
+    });
+
     const isStopped =
       this.savedProgress?.gameState?.eventFlags?.policeStoppedPlayer;
     const policeInitialX = isStopped ? 100 : -300;
 
-    this.policeCar = this.add.sprite(policeInitialX, 670, "police_car");
+    // Use the SAME roadY here
+    this.policeCar = this.add.sprite(policeInitialX, roadY, "police_car");
     this.policeCar.setDisplaySize(260, 130);
   }
 
@@ -205,26 +322,41 @@ export default class CarDriveScene extends GameScene {
   }
 
   update() {
-    if (!this.isDriving) return;
+    if (this.isDriving) {
+      const isMoving = this.cursors.right.isDown || this.keyD.isDown;
+      if (isMoving) {
+        this.worldContainer.x -= this.scrollSpeed;
+        if (!this.dustEmitter.emitting) {
+          this.dustEmitter.start();
+        }
 
-    if (this.cursors.right.isDown || this.keyD.isDown) {
-      this.worldContainer.x -= this.scrollSpeed;
+        if (
+          !this.eventTriggered &&
+          this.worldContainer.x <= this.POLICE_TRIGGER_X
+        ) {
+          this.triggerPoliceEvent();
+        }
 
-      // Check for Police Trigger
-      const triggerWorldX = 2000 + 2000 / 3;
-      const currentTriggerScreenX = triggerWorldX + this.worldContainer.x;
-      if (!this.eventTriggered && currentTriggerScreenX < 400) {
-        this.triggerPoliceEvent();
-      }
-
-      // Check for Office Arrival
-      if (
-        !this.hasReachedOffice &&
-        this.worldContainer.x <= this.OFFICE_X_TARGET
-      ) {
-        this.handleArrivalAtOffice();
+        // Check for Office Arrival
+        if (
+          !this.hasReachedOffice &&
+          this.worldContainer.x <= this.OFFICE_X_TARGET
+        ) {
+          this.handleArrivalAtOffice();
+        }
+      } else {
+        this.dustEmitter.stop();
       }
     }
+
+    this.clouds.forEach((cloud) => {
+      const speed = cloud.getData("driftSpeed");
+      cloud.x -= speed;
+
+      if (cloud.x < -200) {
+        cloud.x = 6500;
+      }
+    });
   }
 
   private async handleArrivalAtOffice() {
@@ -283,8 +415,9 @@ export default class CarDriveScene extends GameScene {
   private handlePoliceSuccess() {
     this.isDriving = false;
     this.eventTriggered = true;
-    this.car.setPosition(400, 670);
-    this.policeCar.setPosition(100, 670);
+    const roadY = 635;
+    this.car.setPosition(400, roadY);
+    this.policeCar.setPosition(100, roadY);
     this.solveButtonContainer.setVisible(false);
 
     this.dialogBox.show(
@@ -314,8 +447,8 @@ export default class CarDriveScene extends GameScene {
   private setupPoliceStandby() {
     this.isDriving = false;
     this.eventTriggered = true;
-    this.car.setPosition(400, 670);
-    this.policeCar.setPosition(100, 670);
+    this.car.setPosition(400, 630);
+    this.policeCar.setPosition(100, 630);
     this.showSolveButton();
   }
 
@@ -406,6 +539,8 @@ export default class CarDriveScene extends GameScene {
         JSON.stringify(updatedProgress, null, 2)
       );
 
+      const bossPlaceholderId = "boss_temp_id";
+
       // We initialize the task here in the DB before opening the UI
       await this.updateProgress({
         gameState: {
@@ -431,7 +566,15 @@ export default class CarDriveScene extends GameScene {
       });
 
       // Open the overlay
-      EventBus.emit("ui-open-problem", "69582fb37538b18589a46564");
+      EventBus.emit("ui-open-problem", {
+        problemId: "69582fb37538b18589a46564",
+        difficulty: "easy",
+      });
+
+      // EventBus.emit("ui-open-problem", {
+      //   problemId: bossPlaceholderId,
+      //   difficulty: "boss",
+      // });
     });
 
     this.solveButtonContainer.add([bg, text, hitArea]);

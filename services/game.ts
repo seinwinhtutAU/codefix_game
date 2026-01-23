@@ -1,4 +1,5 @@
-import { IGameProgress } from "@/lib/types";
+import { CreateProblemRequest, IGameProgress } from "@/lib/types";
+import { ProblemResponse } from "./problem";
 
 export async function getPlayerProgress() {
   const userJson = localStorage.getItem("user");
@@ -27,4 +28,43 @@ export async function saveGameProgress(progress: IGameProgress): Promise<void> {
   }
 
   return response.json();
+}
+
+export async function generateRandomProblem(
+  difficulty: string,
+  bug_num: number,
+): Promise<string> {
+  const response = await fetch(
+    `http://localhost:8000/api/generate-problem?difficulty=${difficulty}&bug_num=${bug_num}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+    },
+  );
+
+  if (!response.ok) {
+    const error = await response.json();
+    console.error("Failed to generate random problem:", error);
+    throw new Error(error.detail || "Failed to generate random problem");
+  }
+
+  const data: { success: boolean; problem: CreateProblemRequest } =
+    await response.json();
+
+  const problemResponse = await fetch("/api/problems", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data.problem),
+  });
+
+  if (!problemResponse.ok) {
+    const error = await problemResponse.json();
+    console.error("Failed to save random problem:", error);
+    throw new Error(error.error || "Failed to save random problem");
+  }
+
+  console.log("Problem generated and saved successfully!");
+
+  const problemData: ProblemResponse = await problemResponse.json();
+  return problemData.problem._id;
 }

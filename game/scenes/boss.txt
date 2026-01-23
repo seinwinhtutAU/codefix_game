@@ -1,0 +1,239 @@
+import DialogBox from "../ui/DialogBox";
+import GameScene from "./GameScene";
+import AudioManager from "../AudioManager";
+
+export default class BossLevelScene extends GameScene {
+  private dialogBox!: DialogBox;
+  private warningSign!: Phaser.GameObjects.Image;
+  private redOverlay!: Phaser.GameObjects.Graphics;
+  private isMeltdownActive: boolean = false;
+
+  // --- Boss UI Elements ---
+  private inputBarContainer!: Phaser.GameObjects.Container;
+  private moduleNodes: Phaser.GameObjects.Arc[] = [];
+  private statsText!: Phaser.GameObjects.Text;
+  private infoPanel!: Phaser.GameObjects.Text;
+
+  // --- Game State ---
+  private currentChallengeIndex: number = 0;
+  private totalChallenges: number = 5;
+  private totalPoints: number = 0;
+
+  constructor() {
+    super("BossLevelScene");
+  }
+
+  preload() {
+    this.load.image("boss-level-bg", "/boss/bg.png");
+    this.load.image("warning", "/boss/warning.png");
+    this.load.audio("warning-alarm", "/boss/warning-alarm.mp3");
+  }
+
+  create() {
+    super.create();
+    this.add.image(0, 0, "boss-level-bg").setOrigin(0, 0).setDepth(-1);
+
+    this.setupEmergencyUI();
+    this.createStatusBoard();
+    this.createInputUI(); // Prepare but keep hidden
+
+    this.dialogBox = new DialogBox(this);
+    this.dialogBox.setDepth(100);
+
+    this.triggerMeltdownSequence();
+  }
+
+  private setupEmergencyUI(): void {
+    this.redOverlay = this.add.graphics().setDepth(40);
+    this.redOverlay
+      .fillStyle(0xff0000, 0.4)
+      .fillRect(0, 0, 1376, 768)
+      .setAlpha(0);
+    this.warningSign = this.add
+      .image(688, 384, "warning")
+      .setScale(0.6)
+      .setAlpha(0)
+      .setDepth(50);
+  }
+
+  private createStatusBoard(): void {
+    const boardBg = this.add.graphics().setDepth(60);
+    boardBg.fillStyle(0x000000, 0.7).fillRoundedRect(438, 20, 500, 100, 20);
+    boardBg.lineStyle(2, 0x00ffff, 1).strokeRoundedRect(438, 20, 500, 100, 20);
+
+    for (let i = 0; i < this.totalChallenges; i++) {
+      const node = this.add.circle(538 + i * 75, 55, 12, 0x333333).setDepth(61);
+      node.setStrokeStyle(2, 0x00ffff);
+      this.moduleNodes.push(node);
+      if (i < this.totalChallenges - 1) {
+        this.add
+          .line(0, 0, 550 + i * 75, 55, 601 + i * 75, 55, 0x00ffff)
+          .setOrigin(0)
+          .setDepth(60);
+      }
+    }
+
+    this.statsText = this.add
+      .text(688, 95, "SCORE: 0000", {
+        fontFamily: '"Press Start 2P", monospace',
+        fontSize: "12px",
+        color: "#00ffff",
+      })
+      .setOrigin(0.5)
+      .setDepth(61);
+  }
+
+  private createInputUI(): void {
+    this.inputBarContainer = this.add
+      .container(688, 400)
+      .setDepth(70)
+      .setVisible(false);
+
+    const bg = this.add.graphics();
+    bg.fillStyle(0x111111, 0.9).lineStyle(3, 0x00ffff, 1);
+    bg.fillRoundedRect(-250, -100, 500, 250, 20).strokeRoundedRect(
+      -250,
+      -100,
+      500,
+      250,
+      20
+    );
+
+    const label = this.add
+      .text(0, -60, "ENTER BUG COUNT (MIN 10):", {
+        fontFamily: '"Press Start 2P"',
+        fontSize: "14px",
+        color: "#ffffff",
+      })
+      .setOrigin(0.5);
+
+    // Placeholder for Input (In a real app, use an HTML overlay, here we simulate)
+    const inputField = this.add
+      .text(0, 0, "10", {
+        fontFamily: '"Press Start 2P"',
+        fontSize: "32px",
+        color: "#00ffff",
+        backgroundColor: "#222",
+      })
+      .setOrigin(0.5)
+      .setPadding(10)
+      .setInteractive();
+
+    this.infoPanel = this.add
+      .text(0, 70, "EST. SCORE: 2000 | TIME: 150s", {
+        fontFamily: "monospace",
+        fontSize: "16px",
+        color: "#aaaaaa",
+        align: "center",
+      })
+      .setOrigin(0.5);
+
+    const okBtn = this.add
+      .text(0, 120, "[ OK ]", {
+        fontFamily: '"Press Start 2P"',
+        fontSize: "20px",
+        color: "#00ff00",
+      })
+      .setOrigin(0.5)
+      .setInteractive();
+
+    this.inputBarContainer.add([bg, label, inputField, this.infoPanel, okBtn]);
+
+    // Logic for Manual Input (Simple Simulation)
+    let currentInput = 10;
+    this.input.keyboard?.on("keydown", (event: KeyboardEvent) => {
+      if (!this.inputBarContainer.visible) return;
+      if (event.key >= "0" && event.key <= "9") {
+        const val = parseInt(inputField.text + event.key);
+        if (val <= 99) {
+          currentInput = val;
+          inputField.setText(val.toString());
+          this.updateEstimates(val);
+        }
+      } else if (event.key === "Backspace") {
+        const str = inputField.text.slice(0, -1);
+        currentInput = str === "" ? 0 : parseInt(str);
+        inputField.setText(str === "" ? "0" : str);
+        this.updateEstimates(currentInput);
+      }
+    });
+
+    okBtn.on("pointerdown", () => {
+      if (currentInput < 10) {
+        this.cameras.main.shake(200, 0.005);
+        label.setColor("#ff0000");
+        this.time.delayedCall(500, () => label.setColor("#ffffff"));
+      } else {
+        this.startBossChallenge(currentInput);
+      }
+    });
+  }
+
+  private updateEstimates(bugs: number): void {
+    const score = bugs * 200;
+    const time = bugs * 15;
+    this.infoPanel.setText(
+      `EST. SCORE: +${score}\nEST. TIMER: ${time}s\n(Calculation: Bugs x 200pts / Bugs x 15s)`
+    );
+  }
+
+  private triggerMeltdownSequence(): void {
+    this.isMeltdownActive = true;
+    this.cameras.main.shake(3000, 0.01);
+    this.tweens.add({
+      targets: this.redOverlay,
+      alpha: 0.6,
+      duration: 2000,
+      ease: "Cubic.easeInOut",
+    });
+
+    this.tweens.add({
+      targets: this.warningSign,
+      alpha: 1,
+      scale: 0.8,
+      duration: 2500,
+      ease: "Back.easeOut",
+      onComplete: () => {
+        this.isMeltdownActive = false;
+        this.time.delayedCall(1000, () => this.startBossNarrative());
+      },
+    });
+
+    AudioManager.getInstance().playSound("warning-alarm", { volume: 0.2 });
+  }
+
+  private startBossNarrative(): void {
+    this.dialogBox.show(
+      250,
+      600,
+      "The core is exposed! Type in the bug density you can handle. At least 10 bugs are needed to stabilize!"
+    );
+
+    this.time.delayedCall(5000, () => {
+      this.dialogBox.hide();
+
+      // FIX: Fade out warning sign before showing input
+      this.tweens.add({
+        targets: this.warningSign,
+        alpha: 0,
+        duration: 500,
+        onComplete: () => {
+          this.inputBarContainer.setVisible(true);
+        },
+      });
+    });
+  }
+
+  private startBossChallenge(bugs: number): void {
+    this.inputBarContainer.setVisible(false);
+    this.moduleNodes[this.currentChallengeIndex].setFillStyle(0x00ffff);
+    console.log(`Starting Challenge with ${bugs} bugs. Good luck!`);
+    // EventBus.emit("ui-open-problem", { bugs });
+  }
+
+  update() {
+    if (this.isMeltdownActive) {
+      this.warningSign.x = 688 + Phaser.Math.Between(-2, 2);
+    }
+  }
+}

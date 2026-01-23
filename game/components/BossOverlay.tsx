@@ -1,0 +1,838 @@
+"use client";
+
+import { useCallback, useEffect, useRef, useState } from "react";
+import { AnimatePresence } from "framer-motion";
+import Editor from "@monaco-editor/react";
+import {
+  Loader2,
+  Files,
+  Terminal,
+  Play,
+  Lightbulb,
+  Upload,
+  X,
+  Timer,
+  Sparkle,
+} from "lucide-react";
+import {
+  ProblemDescription,
+  FileExplorer,
+  HintsPanel,
+  OutputPanel,
+  Toolbar,
+  TestCasePanel,
+} from "@/app/components/problems";
+import { GameNotification } from "@/game/components/GameNotification";
+import {
+  useUserId,
+  useProblemLoader,
+  useUserCodeManager,
+  useSolvingTimer,
+  useExecutor,
+  useUIState,
+} from "@/hooks";
+import {
+  checkExistingSolveRecord,
+  saveSolveRecord,
+  saveUserCode,
+} from "@/services";
+import { EventBus } from "@/game/events";
+import {
+  IGameProgress,
+  ProblemSolveRecord,
+  SolveRecordRequest,
+} from "@/lib/types";
+import { getPlayerProgress } from "@/services/game";
+import { HintUsage } from "@/lib/types";
+
+interface ProblemOverlayProps {
+  problemId: string;
+  onClose: () => void;
+}
+
+export function ProblemOverlay({ problemId, onClose }: ProblemOverlayProps) {
+  const outputContainerRef = useRef<HTMLDivElement>(
+    null
+  ) as React.RefObject<HTMLDivElement>;
+  const userId = useUserId();
+
+  // --- UI STATES ---
+  const [showSuccessPopup, setShowSuccessPopup] = useState(false);
+  const [showGameOver, setShowGameOver] = useState(false);
+
+  // --- DATA STATES ---
+  const [finalRecord, setFinalRecord] = useState<ProblemSolveRecord>();
+  const [progress, setProgress] = useState<IGameProgress>();
+
+  // ✅ DERIVED STATE: Single Source of Truth
+  // We read directly from the progress object. If it updates, this recalculates.
+  const attempts = progress?.gameState?.currentTask?.attempts ?? 0;
+
+  // --- 1. INITIAL LOAD ---
+  useEffect(() => {
+    const fetchProgress = async () => {
+      try {
+        const data = await getPlayerProgress();
+        console.log(
+          "ProblemOverly, Initial Progress",
+          JSON.stringify(data, null, 2)
+        );
+        setProgress(data);
+      } catch (err) {
+        console.error("Failed to load progress:", err);
+      }
+    };
+
+    fetchProgress();
+  }, []);
+
+  // --- 2. PROGRESS MODIFIERS ---
+  const incrementAttemptsInProgress = () => {
+    console.log("Run incrementAttemptsInProgress");
+    setProgress((prev) => {
+      if (!prev?.gameState?.currentTask) return prev;
+
+      const currentAttempts = prev.gameState.currentTask.attempts ?? 0;
+
+      // Logic: If currently 4 (becoming 5), reset to 0? Or keep at 5?
+      // Based on your previous code logic (resetting if >=5):
+      const newAttempts = currentAttempts + 1 > 5 ? 0 : currentAttempts + 1;
+
+      return {
+        ...prev,
+        gameState: {
+          ...prev.gameState,
+          currentTask: {
+            ...prev.gameState.currentTask,
+            attempts: newAttempts,
+          },
+        },
+      };
+    });
+  };
+
+  // --- 3. DATABASE SYNC ---
+  useEffect(() => {
+    if (!progress) return;
+
+    console.log(
+      "ProblemOverlay, Updated Progress: ",
+      JSON.stringify(progress, null, 2)
+    );
+
+    const updateProgress = async () => {
+      try {
+        await fetch("/api/game-progress", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            userId: progress.userId,
+            lastLocation: progress.lastLocation,
+            gameState: progress.gameState,
+          }),
+        });
+      } catch (e) {
+        console.error("Database Save Error:", e);
+      }
+    };
+
+    const timeoutId = setTimeout(updateProgress, 500); // Debounce slightly
+    return () => clearTimeout(timeoutId);
+  }, [progress]);
+
+  useEffect(() => {
+    if (!progress) return;
+
+    const timeoutId = setTimeout(() => {
+      EventBus.emit("problem-update-progress", {
+        userId: progress.userId,
+        lastLocation: progress.lastLocation,
+        gameState: progress.gameState,
+      } as IGameProgress);
+    }, 500);
+
+    return () => clearTimeout(timeoutId);
+  }, [progress]);
+
+  // --- HOOKS & UI HELPERS ---
+  const {
+    showProblem,
+    showExplorer,
+    setShowExplorer,
+    showHints,
+    setShowHints,
+    showTestCases,
+    setShowTestCases,
+    showOutput,
+    setShowOutput,
+  } = useUIState();
+
+  const {
+    problem,
+    setProblem,
+    selectedFile,
+    setSelectedFile,
+    fileContents,
+    setFileContents,
+    originalFileContents,
+    isLoading,
+    hasCompleted,
+    setHasCompleted,
+    loadProblemData,
+  } = useProblemLoader(problemId, userId);
+
+  const {
+    hintUsages,
+    setHintUsages,
+    findContentInUserCodeFiles,
+    getCurrentFileContent,
+    getOriginalFileContent,
+    updateUserCodeFiles,
+    resetAllFiles,
+    recordHintUsage,
+    isCurrentFileModified,
+    isAnyFileModified,
+  } = useUserCodeManager();
+
+  // --- TIMER LOGIC ---
+  const timeLimited = 20;
+  const { totalTimeSpent, timeLeft, isTimeUp, resetTimer, setIsSolving } =
+    useSolvingTimer(0, hasCompleted, problem, timeLimited);
+
+  const level = problem ? problem.difficulty : "no level";
+
+  const {
+    isSubmitting,
+    isContinuing,
+    executionResult,
+    runNormalCode,
+    runTestCode,
+    continueExecution,
+  } = useExecutor({
+    problem,
+    fileContents,
+    userId,
+    hintUsages,
+    timerTimeSpent: totalTimeSpent,
+    hasCompleted,
+    setHasCompleted,
+    level,
+    attempt: attempts,
+    timeLimited: timeLimited,
+  });
+
+  const [isSaving, setIsSaving] = useState(false);
+  const [isTestRunning, setIsTestRunning] = useState(false);
+
+  // Panel dimensions
+  const [fileExplorerWidth, setFileExplorerWidth] = useState(200);
+  const [hintsPanelWidth, setHintsPanelWidth] = useState(300);
+  const [outputPanelWidth, setOutputPanelWidth] = useState(500);
+  const [testCasePanelHeight, setTestCasePanelHeight] = useState(288);
+
+  // --- GAME OVER LOGIC ---
+  useEffect(() => {
+    if (isTimeUp && !hasCompleted) {
+      incrementAttemptsInProgress(); // This updates 'progress', which updates 'attempts', which triggers DB save
+      setShowGameOver(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isTimeUp, hasCompleted]);
+
+  useEffect(() => {
+    if (!progress) return;
+    if (hasCompleted) return;
+
+    if (attempts === 5) {
+      console.log("Max attempts reached. Saving failed record.");
+
+      // 🔒 Prevent duplicate saves
+      if (progress.gameState.currentTask.status === "completed") return;
+
+      const failedRecord: SolveRecordRequest = {
+        userId: progress.userId,
+        problemId: problemId,
+        timeSpent: timeLimited * 5,
+        pointsEarned: 0,
+        hintUsages: hintUsages,
+        level: "easy",
+        attempt: 5,
+      };
+      saveSolveRecord(failedRecord);
+    }
+  }, [attempts]);
+
+  const handleTryAgain = () => {
+    setShowGameOver(false);
+    resetTimer();
+    resetAllFileInTryAgain();
+  };
+
+  const editorWidth = () => {
+    let width = "100%";
+    if (showExplorer) width = `calc(${width} - ${fileExplorerWidth}px - 1rem)`;
+    if (showHints) width = `calc(${width} - ${hintsPanelWidth}px - 1rem)`;
+    if (showOutput) width = `calc(${width} - ${outputPanelWidth}px - 1rem)`;
+    return width;
+  };
+
+  useEffect(() => {
+    if (userId && userId !== "null") {
+      loadProblemData().then((result) => {
+        if (result) {
+          setHasCompleted(result.hasCompleted);
+          setIsSolving(!result.hasCompleted);
+
+          if (progress?.gameState?.currentTask?.hintUsages) {
+            setHintUsages(progress.gameState.currentTask.hintUsages);
+          }
+        }
+      });
+    }
+  }, [problemId, userId, loadProblemData, setHasCompleted, setIsSolving]);
+
+  const handleCodeChange = (value: string | undefined) => {
+    if (!selectedFile || !problem || isTimeUp) return;
+    const newValue = value ?? "";
+    setFileContents((prev) => ({ ...prev, [selectedFile.id]: newValue }));
+    const updatedProblem = updateUserCodeFiles(
+      problem,
+      selectedFile,
+      selectedFile.id,
+      newValue
+    );
+    if (updatedProblem) setProblem(updatedProblem);
+  };
+
+  const handleSaveCode = async () => {
+    if (!problem || !userId || userId === "null" || isSaving) return;
+    setIsSaving(true);
+    try {
+      await saveUserCode(userId, problem);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleSubmitCode = async () => {
+    if (hasCompleted || isTimeUp) return;
+    setIsTestRunning(true);
+    try {
+      const result = await runTestCode();
+      const totalTests = result?.totalTests;
+
+      if (
+        totalTests !== undefined &&
+        result?.passedTests === totalTests &&
+        totalTests > 0
+      ) {
+        setHasCompleted(true);
+        setIsSolving(false);
+        handleSaveCode();
+
+        const recordResponse = await checkExistingSolveRecord(
+          userId,
+          problemId
+        );
+        if (recordResponse?.data && recordResponse.success) {
+          setFinalRecord(recordResponse.data);
+        }
+
+        setShowSuccessPopup(true);
+      }
+    } finally {
+      setIsTestRunning(false);
+    }
+  };
+
+  const handleContinueExecution = async (
+    executionId: string,
+    input: string
+  ) => {
+    await continueExecution(executionId, input);
+  };
+
+  const hintLevelMap = {
+    none: 0,
+    small: 1,
+    medium: 2,
+    big: 3,
+  } as const;
+
+  type HintLevel = keyof typeof hintLevelMap;
+
+  const reverseHintLevelMap: Record<number, HintLevel> = {
+    0: "none",
+    1: "small",
+    2: "medium",
+    3: "big",
+  };
+
+  const getHighestHintLevelUsed = useCallback(
+    (usages: HintUsage[]): HintLevel => {
+      let highestHintLevel = 0;
+      for (const usage of usages) {
+        highestHintLevel = Math.max(
+          highestHintLevel,
+          hintLevelMap[usage.hintLevel]
+        );
+      }
+
+      return reverseHintLevelMap[highestHintLevel];
+    },
+    []
+  );
+
+  // update progress after hints used
+  useEffect(() => {
+    if (
+      JSON.stringify(hintUsages) ===
+      JSON.stringify(progress?.gameState?.currentTask?.hintUsages)
+    ) {
+      return;
+    }
+
+    setProgress((prev) => {
+      if (!prev?.gameState?.currentTask) return prev;
+
+      return {
+        ...prev,
+        gameState: {
+          ...prev.gameState,
+          currentTask: {
+            ...prev.gameState.currentTask,
+            highestHintLevelUsed: getHighestHintLevelUsed(hintUsages),
+            hintUsages: hintUsages,
+          },
+        },
+      };
+    });
+  }, [hintUsages, getHighestHintLevelUsed]);
+
+  const handleFinalExit = async () => {
+    const currentIndex =
+      progress?.gameState.currentTask.currentActiveIndex ?? 0;
+    const nextIndex = currentIndex + 1;
+
+    const updatedTask: IGameProgress["gameState"]["currentTask"] = {
+      taskType: progress?.gameState.currentTask.taskType || "code_problem",
+      taskId: progress?.gameState.currentTask.taskId,
+      status: hasCompleted ? "completed" : "in_progress",
+      attempts: attempts,
+      timer: progress?.gameState.currentTask.timer,
+      currentActiveIndex: nextIndex,
+      highestHintLevelUsed: getHighestHintLevelUsed(hintUsages),
+      hintUsages: hintUsages,
+    };
+
+    let currentScene;
+    EventBus.on("ui-scene", (scene) => {
+      currentScene = scene;
+    });
+
+    // 3. Prepare the full Progress object
+    const updatedProgress: IGameProgress = {
+      ...progress,
+      gameState: {
+        currentScene: progress?.gameState.currentScene || currentScene,
+        eventFlags: progress?.gameState.eventFlags || {},
+        currentTask: updatedTask,
+      },
+    } as IGameProgress;
+
+    try {
+      await fetch("/api/game-progress", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: updatedProgress?.userId,
+          lastLocation: updatedProgress?.lastLocation,
+          gameState: updatedProgress?.gameState,
+        }),
+      });
+      console.log("Database updated successfully before exit.");
+    } catch (e) {
+      console.error("Failed to persist progress to DB on exit:", e);
+    }
+
+    if (hasCompleted) {
+      EventBus.emit("problem-solved", { currentTask: updatedTask });
+    }
+    // Always trigger resume to unpause the game
+    EventBus.emit("resume-after-solve", updatedProgress);
+    EventBus.emit("ui-close-problem");
+    onClose();
+  };
+
+  const calculateEstimatedPoints = () => {
+    if (hasCompleted && finalRecord) return finalRecord.pointsEarned;
+    if (attempts >= 5) return 0;
+
+    let basePoints = 100;
+
+    const hintLevel = progress?.gameState.currentTask.highestHintLevelUsed;
+
+    switch (hintLevel) {
+      case "small":
+        basePoints = Math.min(basePoints, 90);
+        break;
+      case "medium":
+        basePoints = Math.min(basePoints, 70);
+        break;
+      case "big":
+        basePoints = Math.min(basePoints, 50);
+        break;
+    }
+
+    return Math.max(0, basePoints - attempts * 10);
+  };
+
+  const estimatedPoints = calculateEstimatedPoints();
+
+  const resetCurrentFile = () => {
+    if (!selectedFile || !problem) return;
+
+    const originalContent = getOriginalFileContent(
+      selectedFile,
+      originalFileContents
+    );
+    setFileContents((prev) => ({
+      ...prev,
+      [selectedFile.id]: originalContent,
+    }));
+
+    const updatedProblem = updateUserCodeFiles(
+      problem,
+      selectedFile,
+      selectedFile.id,
+      originalContent
+    );
+    if (updatedProblem) {
+      setProblem(updatedProblem);
+    }
+  };
+
+  const handleResetAllFiles = async () => {
+    if (
+      !problem ||
+      !window.confirm(
+        "Are you sure you want to reset all files to their original state? This cannot be undone."
+      )
+    ) {
+      return;
+    }
+
+    setFileContents(originalFileContents);
+    const updatedProblem = resetAllFiles(problem, originalFileContents);
+    if (updatedProblem) {
+      setProblem(updatedProblem);
+    }
+  };
+
+  const resetAllFileInTryAgain = async () => {
+    if (!problem) return;
+
+    setFileContents(originalFileContents);
+
+    const updatedProblem = resetAllFiles(problem, originalFileContents);
+    if (updatedProblem) {
+      setProblem(updatedProblem);
+    }
+  };
+
+  if (isLoading || !problem) {
+    return (
+      <div className="absolute inset-0 z-[200] flex items-center justify-center bg-gray-900/90 backdrop-blur-sm">
+        <Loader2 className="animate-spin text-blue-400" size={48} />
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className="absolute inset-0 z-[150] bg-gray-900 flex flex-col p-4 animate-in fade-in zoom-in duration-200 overflow-hidden"
+      onKeyDown={(e) => e.stopPropagation()}
+    >
+      <AnimatePresence>
+        {/* SUCCESS NOTIFICATION */}
+        {showSuccessPopup && (
+          <GameNotification
+            type="SUCCESS"
+            title="Great Job!"
+            message={`You have solved problem successfully.
+                    Attempts: ${attempts} 
+                    Time: ${finalRecord?.timeSpent || totalTimeSpent}s 
+                    Points: ${
+                      finalRecord?.pointsEarned ?? (attempts >= 5 ? 0 : 100)
+                    }`}
+            confirmLabel="Back to Game"
+            onConfirm={handleFinalExit}
+          />
+        )}
+
+        {/* GAME OVER NOTIFICATION */}
+        {showGameOver && (
+          <GameNotification
+            type="GAMEOVER"
+            title="Game Over!"
+            message={
+              attempts >= 5
+                ? "You have reached the maximum of 5 attempts. Proceeding to the next problem."
+                : `Time Expired! Please Try agan! Attempt ${attempts}/5.`
+            }
+            confirmLabel={attempts >= 5 ? "Back to Game" : "Try Again"}
+            // Logic: If attempts < 5, try again. If >= 5, final exit.
+            onConfirm={attempts >= 5 ? handleFinalExit : handleTryAgain}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Header with Timer */}
+      <div className="flex items-center justify-between mb-4 bg-gray-800 p-3 rounded-lg border border-gray-700">
+        <div className="flex items-center gap-6">
+          <button
+            onClick={onClose}
+            className="p-2 hover:bg-gray-700 rounded-full text-gray-400 hover:text-white transition-colors"
+          >
+            <X size={24} />
+          </button>
+
+          <h2 className="text-xl font-mono text-white tracking-tight underline decoration-blue-500">
+            SECURE_TERMINAL // {problem.title}
+          </h2>
+
+          {/* TIMER */}
+          <div
+            className={`flex items-center gap-2 px-3 py-1 rounded bg-black/40 border ${
+              timeLeft < 10
+                ? "border-red-500 animate-pulse"
+                : "border-blue-500/30"
+            }`}
+          >
+            <Timer
+              size={18}
+              className={timeLeft < 10 ? "text-red-500" : "text-blue-400"}
+            />
+            <span
+              className={`font-mono text-xl ${
+                timeLeft < 10 ? "text-red-500" : "text-blue-400"
+              }`}
+            >
+              00:{timeLeft < 10 ? `0${timeLeft}` : timeLeft}
+            </span>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-6">
+          {/* ESTIMATED REWARD */}
+          <div className="flex flex-col items-end border-r border-gray-700 pr-6">
+            <span className="text-[10px] font-mono text-gray-500 uppercase tracking-widest">
+              Est. Reward
+            </span>
+            <div className="flex items-center gap-1">
+              <Sparkle size={14} className="text-yellow-400" />
+              <span className="text-xl font-mono font-bold text-yellow-400">
+                {estimatedPoints}
+              </span>
+            </div>
+          </div>
+
+          {/* SECURITY TRACE (ATTEMPTS) */}
+          <div className="flex flex-col items-end">
+            <span className="text-[10px] font-mono text-gray-500 uppercase tracking-widest">
+              Security Trace
+            </span>
+            <span
+              className={`font-mono text-xl font-bold ${
+                attempts >= 4 ? "text-red-500" : "text-gray-300"
+              }`}
+            >
+              {attempts}/5
+            </span>
+          </div>
+
+          <span className="text-xs font-mono text-blue-400 border border-blue-400/30 px-3 py-1 rounded bg-blue-400/5 uppercase tracking-widest">
+            {hasCompleted ? "DECRYPTED" : "ENCRYPTED"}
+          </span>
+        </div>
+      </div>
+
+      <div className="flex-1 flex flex-col min-h-0">
+        <ProblemDescription
+          problem={problem}
+          isOpen={showProblem}
+          totalTimeSpent={totalTimeSpent}
+          userId={userId}
+          hasCompleted={hasCompleted}
+        />
+
+        <div className="flex flex-1 gap-4 mt-4 min-h-0 overflow-hidden">
+          <FileExplorer
+            files={problem.files}
+            isOpen={showExplorer}
+            selectedFileId={selectedFile?.id}
+            onSelectFile={setSelectedFile}
+            onResize={setFileExplorerWidth}
+            defaultWidth={200}
+          />
+
+          <div
+            className="flex flex-col min-w-0 rounded-lg border border-gray-700 bg-gray-800 overflow-hidden shadow-2xl relative"
+            style={{ width: editorWidth() }}
+          >
+            <Toolbar
+              selectedFile={selectedFile!}
+              hasCompleted={hasCompleted}
+              isCurrentFileModified={isCurrentFileModified(
+                selectedFile,
+                getCurrentFileContent(
+                  selectedFile,
+                  problem,
+                  fileContents,
+                  (n) => findContentInUserCodeFiles(problem, n)
+                ),
+                getOriginalFileContent(selectedFile, originalFileContents)
+              )}
+              isAnyFileModified={isAnyFileModified(
+                fileContents,
+                originalFileContents
+              )}
+              onResetCurrentFile={() => resetCurrentFile}
+              onResetAllFiles={() => handleResetAllFiles}
+              onSaveCode={handleSaveCode}
+              isSaving={isSaving}
+            />
+
+            <div className="flex-1 relative">
+              <Editor
+                height="100%"
+                language="python"
+                theme="vs-dark"
+                value={getCurrentFileContent(
+                  selectedFile,
+                  problem,
+                  fileContents,
+                  (n) => findContentInUserCodeFiles(problem, n)
+                )}
+                onChange={handleCodeChange}
+                options={{
+                  minimap: { enabled: false },
+                  readOnly: hasCompleted || isTimeUp,
+                  fontSize: 14,
+                }}
+              />
+
+              <div className="absolute bottom-4 right-4 flex gap-2 z-10">
+                <button
+                  onClick={runNormalCode}
+                  disabled={
+                    isSubmitting || hasCompleted || isContinuing || isTimeUp
+                  }
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 shadow-lg"
+                >
+                  {isSubmitting ? (
+                    <Loader2 className="animate-spin" size={16} />
+                  ) : (
+                    <Play size={16} />
+                  )}{" "}
+                  Run
+                </button>
+                <button
+                  onClick={handleSubmitCode}
+                  disabled={isTestRunning || hasCompleted || isTimeUp}
+                  className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 shadow-lg"
+                >
+                  {isTestRunning ? (
+                    <Loader2 className="animate-spin" size={16} />
+                  ) : (
+                    <Upload size={16} />
+                  )}{" "}
+                  {hasCompleted ? "Verified" : "Decrypt"}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {showHints && problem.hints && (
+            <HintsPanel
+              hints={problem.hints}
+              isVisible={showHints}
+              onHintUsed={recordHintUsage}
+              onClose={() => setShowHints(false)}
+              onResize={setHintsPanelWidth}
+              defaultWidth={300}
+            />
+          )}
+          {showOutput && (
+            <OutputPanel
+              executionResult={executionResult}
+              isVisible={showOutput}
+              isSubmitting={isSubmitting}
+              isContinuing={isContinuing}
+              onClose={() => setShowOutput(false)}
+              containerRef={outputContainerRef}
+              onResize={setOutputPanelWidth}
+              defaultWidth={outputPanelWidth}
+              onContinueExecution={handleContinueExecution}
+            />
+          )}
+        </div>
+
+        {showTestCases && (
+          <div className="mt-4 flex-shrink-0">
+            <TestCasePanel
+              executionResult={executionResult}
+              isVisible={showTestCases}
+              isSubmitting={isTestRunning || isSubmitting}
+              onResize={setTestCasePanelHeight}
+              onClose={() => setShowTestCases(false)}
+            />
+          </div>
+        )}
+      </div>
+
+      <div className="fixed left-8 top-1/2 -translate-y-1/2 flex flex-col gap-4">
+        <button
+          onClick={() => setShowExplorer(!showExplorer)}
+          className={`p-3 rounded-lg border transition-all ${
+            showExplorer
+              ? "bg-blue-600 border-blue-400"
+              : "bg-gray-800 border-gray-700 hover:bg-gray-700"
+          }`}
+        >
+          <Files size={20} />
+        </button>
+        <button
+          onClick={() => setShowHints(!showHints)}
+          className={`p-3 rounded-lg border transition-all ${
+            showHints
+              ? "bg-yellow-600 border-yellow-400"
+              : "bg-gray-800 border-gray-700 hover:bg-gray-700"
+          }`}
+        >
+          <Lightbulb size={20} />
+        </button>
+        <button
+          onClick={() => setShowTestCases(!showTestCases)}
+          className={`p-3 rounded-lg border transition-all ${
+            showTestCases
+              ? "bg-blue-600 border-blue-400"
+              : "bg-gray-800 border-gray-700 hover:bg-gray-700"
+          }`}
+        >
+          <Terminal size={20} />
+        </button>
+        <button
+          onClick={() => setShowOutput(!showOutput)}
+          className={`p-3 rounded-lg border transition-all ${
+            showOutput
+              ? "bg-green-600 border-green-400"
+              : "bg-gray-800 border-gray-700 hover:bg-gray-700"
+          }`}
+        >
+          <div className="w-4 h-4 rounded-full bg-white animate-pulse" />
+        </button>
+      </div>
+    </div>
+  );
+}

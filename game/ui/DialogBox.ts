@@ -1,4 +1,3 @@
-// src/game/ui/DialogBox.ts
 import Phaser from "phaser";
 import AudioManager from "../AudioManager";
 
@@ -7,19 +6,19 @@ export default class DialogBox extends Phaser.GameObjects.Container {
   private textObject: Phaser.GameObjects.Text;
   private typingEvent: Phaser.Time.TimerEvent | null = null;
 
-  // Configuration for look and feel
-  private readonly PADDING = 20;
+  private readonly PADDING = 24;
   private readonly MAX_WIDTH = 350;
 
   constructor(scene: Phaser.Scene) {
     super(scene, 0, 0);
 
+    // Graphics for the bubble and shadow
     this.boxGraphics = scene.add.graphics();
 
     this.textObject = scene.add
       .text(0, 0, "", {
-        fontFamily: '"Press Start 2P", "Courier", monospace',
-        fontSize: "18px", // Slightly smaller to fit more text adaptively
+        fontFamily: '"Press Start 2P", monospace',
+        fontSize: "12px",
         color: "#000000",
         align: "center",
         wordWrap: { width: this.MAX_WIDTH - this.PADDING * 2 },
@@ -34,53 +33,69 @@ export default class DialogBox extends Phaser.GameObjects.Container {
   public show(x: number, y: number, message: string) {
     if (this.typingEvent) {
       this.typingEvent.remove();
-      this.typingEvent = null;
     }
 
     this.setPosition(x, y);
     this.setVisible(true);
+    this.setScale(0); // Start small for pop-in effect
 
-    // 1. Set the full text temporarily to measure the final size
+    // Pop-in Animation
+    this.scene.tweens.add({
+      targets: this,
+      scale: 1,
+      duration: 300,
+      ease: "Back.easeOut", // Gives it a "bouncy" feel
+    });
+
     this.textObject.setText(message);
+    const boxWidth = this.textObject.width + this.PADDING * 2;
+    const boxHeight = this.textObject.height + this.PADDING * 2;
 
-    // 2. Calculate adaptive dimensions based on text bounds
-    const textWidth = this.textObject.width;
-    const textHeight = this.textObject.height;
-
-    const boxWidth = textWidth + this.PADDING * 2;
-    const boxHeight = textHeight + this.PADDING * 2;
-
-    // 3. Draw the Adaptive Box
-    this.boxGraphics.clear();
-    this.boxGraphics.fillStyle(0xffffff, 1);
-    this.boxGraphics.lineStyle(3, 0x000000, 1);
-
-    // Draw centered around (0,0)
-    this.boxGraphics.fillRoundedRect(
-      -(boxWidth / 2),
-      -(boxHeight / 2),
-      boxWidth,
-      boxHeight,
-      15
-    );
-    this.boxGraphics.strokeRoundedRect(
-      -(boxWidth / 2),
-      -(boxHeight / 2),
-      boxWidth,
-      boxHeight,
-      15
-    );
-
-    // 4. Start the typewriter effect
+    this.drawBubble(boxWidth, boxHeight);
     this.typewriteText(message);
   }
 
-  public hide() {
-    this.setVisible(false);
-    if (this.typingEvent) {
-      this.typingEvent.remove();
-      this.typingEvent = null;
-    }
+  private drawBubble(width: number, height: number) {
+    const graphics = this.boxGraphics;
+    graphics.clear();
+
+    const x = -(width / 2);
+    const y = -(height / 2);
+    const cornerRadius = 20; // Soft but not overly round
+    const tailSize = 12; // Smaller tail to match thinner border
+    const borderWidth = 2; // Reduced from 6 to 2 for a cleaner look
+
+    // 1. Soft Shadow
+    graphics.fillStyle(0x000000, 0.1);
+    graphics.fillRoundedRect(x + 3, y + 3, width, height, cornerRadius);
+
+    // 2. Main Bubble
+    graphics.lineStyle(borderWidth, 0x000000, 1);
+    graphics.fillStyle(0xffffff, 1);
+
+    graphics.fillRoundedRect(x, y, width, height, cornerRadius);
+    graphics.strokeRoundedRect(x, y, width, height, cornerRadius);
+
+    // 3. The Tail
+    graphics.beginPath();
+    graphics.moveTo(-tailSize, height / 2 - 1);
+    graphics.lineTo(0, height / 2 + tailSize);
+    graphics.lineTo(tailSize, height / 2 - 1);
+
+    // Fill first, then stroke to keep the point sharp
+    graphics.fillPath();
+    graphics.strokePath();
+
+    // 4. Refined Seam Fix
+    // This hides the border segment where the tail meets the box
+    // We use a slightly thicker white line to ensure full coverage
+    graphics.lineStyle(borderWidth + 1, 0xffffff, 1);
+    graphics.lineBetween(
+      -tailSize + borderWidth,
+      height / 2 - 1,
+      tailSize - borderWidth,
+      height / 2 - 1
+    );
   }
 
   private typewriteText(message: string) {
@@ -103,6 +118,16 @@ export default class DialogBox extends Phaser.GameObjects.Container {
         }
       },
       repeat: words.length - 1,
+    });
+  }
+
+  public hide() {
+    this.scene.tweens.add({
+      targets: this,
+      scale: 0,
+      duration: 200,
+      ease: "Back.easeIn",
+      onComplete: () => this.setVisible(false),
     });
   }
 }

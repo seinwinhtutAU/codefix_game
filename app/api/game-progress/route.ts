@@ -25,6 +25,10 @@ interface GameProgressRequest {
       hintUsages: IncomingHint[];
     };
   };
+  bugCounts?: {
+    problemId: string;
+    bugCount: number;
+  }[];
 }
 
 // 2. CLEANUP: Define default state here to keep the GET function clean
@@ -46,6 +50,7 @@ const DEFAULT_GAME_STATE = {
       hintUsages: [],
     },
   },
+  bugCounts: [],
 };
 
 export async function GET(req: Request) {
@@ -58,7 +63,7 @@ export async function GET(req: Request) {
     if (!userId) {
       return NextResponse.json(
         { error: "User ID is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -86,12 +91,12 @@ export async function POST(req: Request) {
 
     // Type the incoming JSON as our specific interface
     const body: GameProgressRequest = await req.json();
-    const { userId, lastLocation, gameState } = body;
+    const { userId, lastLocation, gameState, bugCounts } = body;
 
     if (!userId) {
       return NextResponse.json(
         { error: "User ID is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -111,13 +116,19 @@ export async function POST(req: Request) {
           hintUsages: processedHintUsages, // Use processed hints
         },
       },
+      bugCounts: bugCounts
+        ? bugCounts.map((bug) => ({
+            problemId: new mongoose.Types.ObjectId(bug.problemId),
+            bugCount: bug.bugCount,
+          }))
+        : [],
       updatedAt: new Date(),
     };
 
     const updatedProgress = await GameProgressModel.findOneAndUpdate(
       { userId },
       updateData,
-      { upsert: true, new: true, runValidators: true }
+      { upsert: true, new: true, runValidators: true },
     );
 
     return NextResponse.json(updatedProgress);
@@ -139,7 +150,7 @@ export async function DELETE(req: Request) {
     if (!userId) {
       return NextResponse.json(
         { error: "User ID is required to delete progress" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -150,7 +161,7 @@ export async function DELETE(req: Request) {
     if (!deletedProgress) {
       return NextResponse.json(
         { error: "No progress found for this user" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 

@@ -312,6 +312,10 @@ export interface IGameProgress {
       hintUsages?: HintUsage[];
     };
   };
+  bugCounts?: {
+    problemId: string;
+    bugCount: number;
+  }[];
 }
 
 export interface CurrentTask {
@@ -324,6 +328,10 @@ export interface CurrentTask {
   highestHintLevelUsed?: "none" | "small" | "medium" | "big";
   hintUsages?: HintUsage[];
 }
+
+// ============================================================================
+// Generate Code and Hint
+// ============================================================================
 
 // ============================================================================
 // Type Aliases for Better Semantics
