@@ -11,29 +11,29 @@ export interface SolvedPointStatus {
 
 export default class EasyLevelScene extends GameScene {
   private problemIds: string[] = [
-    "69582fb37538b18589a46564",
-    "695c13b389e02a7e13dbe5ca",
-    "695e95e4c887fa19a718db13",
-    "69582fb37538b18589a46564",
-    "69582fb37538b18589a46564",
-    "69582fb37538b18589a46564",
-    "69582fb37538b18589a46564",
-    "695c13b389e02a7e13dbe5ca",
-    "695c13b389e02a7e13dbe5ca",
-    "695c13b389e02a7e13dbe5ca",
+    "697401975f4942a9208dc6a6",
+    "697401ad5f4942a9208dc6bc",
+    "697401dc5f4942a9208dc707",
+    // "69582fb37538b18589a46564",
+    // "69582fb37538b18589a46564",
+    // "69582fb37538b18589a46564",
+    // "69582fb37538b18589a46564",
+    // "695c13b389e02a7e13dbe5ca",
+    // "695c13b389e02a7e13dbe5ca",
+    // "695c13b389e02a7e13dbe5ca",
   ];
 
   private roadPoints = [
     { x: 225, y: 300 },
     { x: 255, y: 400 },
     { x: 255, y: 550 },
-    { x: 366, y: 640 },
-    { x: 550, y: 640 },
-    { x: 740, y: 640 },
-    { x: 885, y: 550 },
-    { x: 885, y: 400 },
-    { x: 980, y: 315 },
-    { x: 1100, y: 315 },
+    // { x: 366, y: 640 },
+    // { x: 550, y: 640 },
+    // { x: 740, y: 640 },
+    // { x: 885, y: 550 },
+    // { x: 885, y: 400 },
+    // { x: 980, y: 315 },
+    // { x: 1100, y: 315 },
   ];
 
   private currentPointIndex = 0;

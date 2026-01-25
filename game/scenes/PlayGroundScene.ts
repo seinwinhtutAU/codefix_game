@@ -4,6 +4,7 @@ import DialogBox from "../ui/DialogBox";
 import AudioManager from "../AudioManager";
 import { EventBus } from "@/game/events";
 import { IGameProgress } from "@/lib/types";
+import Button from "../ui/Button";
 
 export default class PlayGroundScene extends GameScene {
   // --- ASSETS ---
@@ -28,7 +29,7 @@ export default class PlayGroundScene extends GameScene {
   // --- STATE ---
   private isMoving: boolean = true;
 
-  private nextButton!: Phaser.GameObjects.Container;
+  private nextButton!: Button;
 
   constructor() {
     super("PlayGroundScene");
@@ -67,46 +68,23 @@ export default class PlayGroundScene extends GameScene {
   private createNextButton() {
     const { width, height } = this.scale;
 
-    // Create a container at the bottom right
-    this.nextButton = this.add.container(width - 150, height - 80);
-    this.nextButton.setAlpha(0).setVisible(false).setDepth(1000);
+    this.nextButton = new Button(this, {
+      x: width - 150,
+      y: height - 80,
+      text: "NEXT >",
+      color: 0x2ecc71,
+      onClick: async () => {
+        this.nextButton.setEnabled(false);
 
-    // Button Background
-    const bg = this.add.graphics();
-    bg.fillStyle(0x000000, 0.8);
-    bg.lineStyle(2, 0xffffff, 1);
-    bg.fillRoundedRect(-100, -25, 200, 50, 10);
-    bg.strokeRoundedRect(-100, -25, 200, 50, 10);
+        AudioManager.getInstance().playSound("click", { volume: 0.5 });
 
-    // Button Text
-    const text = this.add
-      .text(0, 0, "NEXT >", {
-        fontFamily: '"Press Start 2P", monospace',
-        fontSize: "18px",
-        color: "#ffffff",
-      })
-      .setOrigin(0.5);
+        await this.savePlaygroundCompletion();
 
-    this.nextButton.add([bg, text]);
-
-    // Interactivity
-    const hitArea = new Phaser.Geom.Rectangle(-100, -25, 200, 50);
-    this.nextButton.setInteractive(hitArea, Phaser.Geom.Rectangle.Contains);
-    this.nextButton.on("pointerover", () => text.setColor("#ffff00"));
-    this.nextButton.on("pointerout", () => text.setColor("#ffffff"));
-
-    this.nextButton.on("pointerdown", async () => {
-      AudioManager.getInstance().playSound("click", { volume: 0.5 });
-
-      // Prevent double clicks
-      this.nextButton.disableInteractive();
-
-      // 1. Update Progress
-      await this.savePlaygroundCompletion();
-
-      // 2. Transition
-      this.transitionToMediumLevel();
+        this.transitionToMediumLevel();
+      },
     });
+
+    this.nextButton.setAlpha(0).setVisible(false).setDepth(1000);
   }
 
   private generateProceduralAssets() {
@@ -278,19 +256,59 @@ export default class PlayGroundScene extends GameScene {
     this.isMoving = false;
     this.dustEmitter.stop();
 
-    this.dialogBox.show(
-      this.car.x,
-      this.car.y - 150,
-      "I've arrived at the park! The system seems broken...",
-    );
+    const cam = this.cameras.main;
 
-    this.nextButton.setVisible(true);
+    cam.flash(600, 180, 60, 60);
+    cam.zoomTo(1.08, 600, "Power2", true);
+    this.cameras.main.shake(1200, 0.004);
+
     this.tweens.add({
-      targets: this.nextButton,
-      alpha: 1,
-      y: this.scale.height - 100,
-      duration: 500,
-      ease: "Power2",
+      targets: cam,
+      scrollX: { from: -6, to: 6 },
+      scrollY: { from: -3, to: 3 },
+      duration: 1000,
+      yoyo: true,
+      ease: "Sine.easeInOut",
+      onComplete: () => {
+        cam.scrollX = 0;
+        cam.scrollY = 0;
+      },
+    });
+
+    this.time.delayedCall(700, () => {
+      cam.zoomTo(1, 800, "Sine.easeOut", true);
+    });
+
+    this.time.delayedCall(2500, () => {
+      this.dialogBox.show(
+        this.car.x,
+        this.car.y - 150,
+        "Wait... something is wrong in the amuesement park!",
+      );
+      this.time.delayedCall(2000, () => {
+        this.dialogBox.show(
+          this.car.x,
+          this.car.y - 150,
+          "The park’s system is broken.",
+        );
+
+        this.time.delayedCall(2500, () => {
+          this.dialogBox.show(
+            this.car.x,
+            this.car.y - 150,
+            "We need to fix it so we can play in the park.",
+          );
+
+          this.nextButton.setVisible(true);
+          this.tweens.add({
+            targets: this.nextButton,
+            alpha: 1,
+            y: this.scale.height - 100,
+            duration: 500,
+            ease: "Power2",
+          });
+        });
+      });
     });
   }
 

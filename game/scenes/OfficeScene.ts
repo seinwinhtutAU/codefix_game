@@ -1,23 +1,21 @@
 import Phaser from "phaser";
 import GameScene from "./GameScene";
 import DialogBox from "../ui/DialogBox";
+import Button from "../ui/Button"; // Import your custom Button class
 import AudioManager from "../AudioManager";
 
 export default class OfficeScene extends GameScene {
   private dialogBox!: DialogBox;
-  private nextButton!: Phaser.GameObjects.Text;
+  private nextButton!: Button; // Changed type to Button
   private bg!: Phaser.GameObjects.Image;
 
   constructor() {
     super("OfficeScene");
   }
 
-  preload() {}
-
   create() {
     super.create();
 
-    // Check if level is already completed if you want to skip
     if (this.savedProgress?.gameState?.eventFlags?.officeCompleted) {
       this.scene.start("EasyLevelScene", this.savedProgress);
       return;
@@ -35,20 +33,18 @@ export default class OfficeScene extends GameScene {
 
     this.dialogBox = new DialogBox(this);
 
-    this.nextButton = this.add
-      .text(width - 200, height - 100, "Next >", {
-        // Changed text to be more thematic
-        fontSize: "24px",
-        fontFamily: '"Press Start 2P", monospace',
-        color: "#ffffffff",
-        backgroundColor: "#000000",
-        padding: { x: 20, y: 10 },
-      })
-      .setInteractive({ useHandCursor: true })
-      .setVisible(false)
-      .on("pointerdown", () => {
-        this.completeOffice(); // Call the save logic here
-      });
+    // --- Standardized Button Implementation ---
+    this.nextButton = new Button(this, {
+      x: width - 150,
+      y: height - 100,
+      text: "NEXT >",
+      color: 0x2ecc71, // Consistent green theme
+      onClick: () => {
+        this.completeOffice();
+      },
+    });
+
+    this.nextButton.setVisible(false).setAlpha(0);
 
     this.cameras.main.fadeIn(1000, 0, 0, 0);
 
@@ -60,47 +56,58 @@ export default class OfficeScene extends GameScene {
   private runOfficeSequence() {
     const { width, height } = this.scale;
 
+    const dialogWidth = width / 2 + 250;
+    const dialogHeight = height / 2 - 200;
+
     this.dialogBox.show(
-      width / 2,
-      height / 2 - 150,
-      "Ugh, another bug in the production branch..."
+      dialogWidth,
+      dialogHeight,
+      "Almost done... Just a few more lines and I can finally head home to the kids.",
     );
 
     this.time.delayedCall(3500, () => {
       this.dialogBox.show(
-        width / 2,
-        height / 2 - 150,
-        "Wait... these logic errors look like they were planted here on purpose."
+        dialogWidth,
+        dialogHeight,
+        "Wait... what happened? The bug report just exploded. These aren't just simple errors...",
       );
 
       this.time.delayedCall(4000, () => {
         this.dialogBox.show(
-          width / 2,
-          height / 2 - 150,
-          "Time to dive into the source code and clean this mess up."
+          dialogWidth,
+          dialogHeight,
+          "This is bad😥. There are too many tasks to fix here. I might be late unless I solve them fast...",
         );
 
-        this.time.delayedCall(3000, () => {
-          this.dialogBox.hide();
-          this.nextButton.setVisible(true);
-          this.tweens.add({
-            targets: this.nextButton,
-            scale: { from: 0.8, to: 1 },
-            duration: 200,
-            ease: "Back.out",
-          });
+        // Show and animate the button after the final dialogue
+        this.nextButton.setVisible(true);
+        this.tweens.add({
+          targets: this.nextButton,
+          alpha: 1,
+          duration: 500,
+          onComplete: () => {
+            // Pulse effect to urge the player to click
+            this.tweens.add({
+              targets: this.nextButton,
+              scale: 1.05,
+              duration: 800,
+              yoyo: true,
+              repeat: -1,
+              ease: "Sine.easeInOut",
+            });
+          },
         });
       });
     });
   }
 
-  // --- SAVE PROGRESS TO DATABASE ---
   private async completeOffice() {
-    this.nextButton.disableInteractive();
+    // Standardized way to disable click through the Button class
+    this.nextButton.setEnabled(false);
+
     AudioManager.getInstance().playSound("click", { volume: 0.5 });
 
     if (!this.savedProgress) {
-      // Fallback if no progress object exists
       this.handleTransition();
       return;
     }
@@ -118,11 +125,6 @@ export default class OfficeScene extends GameScene {
       },
     };
 
-    console.log(
-      "OfficeScene saving payload: ",
-      JSON.stringify(updatedPayload, null, 2)
-    );
-
     try {
       const response = await fetch("/api/game-progress", {
         method: "POST",
@@ -131,7 +133,7 @@ export default class OfficeScene extends GameScene {
       });
 
       const newProgress = await response.json();
-      this.savedProgress = newProgress; // Update local memory
+      this.savedProgress = newProgress;
     } catch (e) {
       console.error("Failed to save office progress:", e);
     }
@@ -145,9 +147,8 @@ export default class OfficeScene extends GameScene {
       Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE,
       () => {
         AudioManager.getInstance().stopMusic();
-        // Pass the updated progress to the next scene
         this.scene.start("EasyLevelScene", this.savedProgress ?? undefined);
-      }
+      },
     );
   }
 }

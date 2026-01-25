@@ -17,29 +17,29 @@ interface PathPoint {
 
 export default class MediumLevelScene extends GameScene {
   private problemIds: string[] = [
-    "69582fb37538b18589a46564",
-    "695c13b389e02a7e13dbe5ca",
-    "695e95e4c887fa19a718db13",
-    "69582fb37538b18589a46564",
-    "69582fb37538b18589a46564",
-    "69582fb37538b18589a46564",
-    "69582fb37538b18589a46564",
-    "695c13b389e02a7e13dbe5ca",
-    "695c13b389e02a7e13dbe5ca",
-    "695c13b389e02a7e13dbe5ca",
+    "697401975f4942a9208dc6a6",
+    "697401ad5f4942a9208dc6bc",
+    "697401dc5f4942a9208dc707",
+    // "69582fb37538b18589a46564",
+    // "69582fb37538b18589a46564",
+    // "69582fb37538b18589a46564",
+    // "69582fb37538b18589a46564",
+    // "695c13b389e02a7e13dbe5ca",
+    // "695c13b389e02a7e13dbe5ca",
+    // "695c13b389e02a7e13dbe5ca",
   ];
 
   private roadPoints = [
     { x: 154, y: 353 },
     { x: 415, y: 172 },
     { x: 650, y: 172 },
-    { x: 865, y: 172 },
-    { x: 1032, y: 334 },
-    { x: 835, y: 334 },
-    { x: 482, y: 385 },
-    { x: 482, y: 570 },
-    { x: 700, y: 625 },
-    { x: 980, y: 625 },
+    // { x: 865, y: 172 },
+    // { x: 1032, y: 334 },
+    // { x: 835, y: 334 },
+    // { x: 482, y: 385 },
+    // { x: 482, y: 570 },
+    // { x: 700, y: 625 },
+    // { x: 980, y: 625 },
   ];
 
   private pathPoints: PathPoint[] = [
@@ -582,7 +582,7 @@ export default class MediumLevelScene extends GameScene {
         EventBus.emit("hide-notification");
         // Use the helper to ensure progress is saved before switching
         this.emitLevelCompleted(this.savedProgress);
-        this.scene.start("BossLevelScene", this.savedProgress);
+        this.scene.start("MediumTransitionScene", this.savedProgress);
       },
     });
   }

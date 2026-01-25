@@ -49,10 +49,10 @@ export default class PreloadScene extends Phaser.Scene {
     });
 
     this.load.image("house-bg", "/intro/house-bg.png");
-    this.load.image("wife", "/player/idle/wife.png");
+    this.load.image("wife", "/player/idle/wife1.png");
     this.load.image("car", "/intro/car_1.png");
     this.load.image("police_car", "/intro/police1.png");
-    this.load.image("office-bg", "/intro/office_work.png");
+    this.load.image("office-bg", "/intro/office_bg.png");
 
     // Sun in CarDriveScene
     this.load.image("sun", "/intro/bg/sun1.png");
@@ -74,7 +74,7 @@ export default class PreloadScene extends Phaser.Scene {
     this.load.image("car_cloud", "/intro/bg/cloud.png");
 
     // Player
-    this.load.image("player", "/player/idle/stand1.png");
+    this.load.image("player_idle", "/player/idle/stand2.png");
     for (let i = 1; i <= 3; i++) {
       this.load.image(`player_walk_${i}`, `/player/walk/walk_${i}.png`);
     }
@@ -87,17 +87,23 @@ export default class PreloadScene extends Phaser.Scene {
     this.load.audio("click", "/audio/click.mp3");
     this.load.audio("speech-blip", "/audio/blip.mp3");
     this.load.audio("pop", "/audio/pop.mp3");
+    this.load.audio("warning", "/audio/warning.mp3");
 
     // 431 * 521
-    this.load.spritesheet("player_walk", "player/walk/walk_spritesheet.png", {
-      frameWidth: 431,
-      frameHeight: 521,
+    // this.load.spritesheet("player_walk", "player/walk/walk_spritesheet1.png", {
+    //   frameWidth: 431,
+    //   frameHeight: 521,
+    // });
+    // 431 * 521
+    this.load.spritesheet("player_walk", "player/walk/walk_spritesheet1.png", {
+      frameWidth: 438,
+      frameHeight: 505,
     });
 
     this.load.image("dialog-box", "player/dialog.png");
 
     // easylevel
-    this.load.image("easy-map", "/easy/level_map/map1.png");
+    this.load.image("easy-map", "/easy/level_map/easy_map.png");
     this.load.image("easy-point-current", "/easy/level_map/point_current.png");
     this.load.image("easy-point-lock", "/easy/level_map/point_lock.png");
     this.load.image("easy-point-skip", "/easy/level_map/point_skip.png");
@@ -108,6 +114,12 @@ export default class PreloadScene extends Phaser.Scene {
 
     // mediumlevel
     this.load.image("medium-map", "/medium/level_map/map.png");
+    this.load.image("medium_home", "/medium/home1.png");
+
+    // bosslevel
+    this.load.image("boss-bg", "/boss/boss_bg.png");
+    this.load.image("warning-bg", "/boss/warning_bg1.png");
+    this.load.image("boss-warning", "/boss/warning1.png");
   }
 
   create() {
@@ -129,8 +141,8 @@ export default class PreloadScene extends Phaser.Scene {
         JSON.stringify(this.savedProgress, null, 2),
       );
 
-      // this.scene.start("MainMenuScene", this.savedProgress);
-      this.scene.start("BossLevelScene", this.savedProgress);
+      this.scene.start("MainMenuScene", this.savedProgress);
+      // this.scene.start("BossLevelScene", this.savedProgress);
     });
 
     this.events.on("shutdown", () => {

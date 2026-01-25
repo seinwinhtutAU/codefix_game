@@ -25,7 +25,7 @@ export default class EasyToHomeTransitionScene extends GameScene {
 
     // 2. Add Text
     const text = this.add
-      .text(this.scale.width / 2, 300, "Work is done. Heading home...", {
+      .text(this.scale.width / 2, 300, "Work is done 😁. Heading home... 🏠", {
         fontFamily: '"Press Start 2P", monospace',
         fontSize: "28px",
         color: "#ffffff",
@@ -43,7 +43,7 @@ export default class EasyToHomeTransitionScene extends GameScene {
       510,
       this.scale.width,
       4,
-      0xffffff
+      0xffffff,
     );
     groundLine.setAlpha(0.3); // Make it a bit subtle/transparent
 

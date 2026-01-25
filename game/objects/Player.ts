@@ -60,7 +60,7 @@ export default class Player extends Phaser.GameObjects.Sprite {
           start: 1,
           end: 3,
         }),
-        frameRate: 6,
+        frameRate: 7,
         repeat: -1,
       });
     }
@@ -78,7 +78,7 @@ export default class Player extends Phaser.GameObjects.Sprite {
   move(
     cursors: Phaser.Types.Input.Keyboard.CursorKeys,
     wasd: WASDKeys,
-    delta: number
+    delta: number,
   ) {
     const moveAmount = (this.speed * delta) / 1000;
 

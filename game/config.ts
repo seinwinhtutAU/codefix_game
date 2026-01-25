@@ -11,6 +11,8 @@ import PlayGroundScene from "./scenes/PlayGroundScene";
 import HomeScene from "./scenes/HomeScene";
 import EasyToHomeTransitionScene from "./scenes/EasyToHomeTransitionScene";
 import BossLevelScene from "./scenes/BossLevelScene";
+import WarningScene from "./scenes/WarningScene";
+import MediumTransitionScene from "./scenes/MediumTransitionScene";
 
 export const phaserConfig: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
@@ -31,17 +33,19 @@ export const phaserConfig: Phaser.Types.Core.GameConfig = {
       debug: false,
     },
   },
-  // scene: [
-  //   PreloadScene,
-  //   MainMenuScene,
-  //   IntroScene,
-  //   CarDriveScene,
-  //   OfficeScene,
-  //   EasyLevelScene,
-  //   EasyToHomeTransitionScene,
-  //   HomeScene,
-  //   PlayGroundScene,
-  //   MediumLevelScene,
-  // ],
-  scene: [PreloadScene, BossLevelScene],
+  scene: [
+    PreloadScene,
+    MainMenuScene,
+    IntroScene,
+    CarDriveScene,
+    OfficeScene,
+    EasyLevelScene,
+    EasyToHomeTransitionScene,
+    HomeScene,
+    PlayGroundScene,
+    MediumLevelScene,
+    MediumTransitionScene,
+    WarningScene,
+    BossLevelScene,
+  ],
 };

@@ -53,6 +53,14 @@ export default class MainMenuScene extends GameScene {
         if (this.savedProgress?.gameState?.eventFlags?.bossLevelCompleted) {
           console.log("Redirecting to EndingScene");
         } else if (
+          this.savedProgress?.gameState?.eventFlags?.warningCompleted
+        ) {
+          this.scene.start("BossLevelScene", this.savedProgress);
+        } else if (
+          this.savedProgress?.gameState?.eventFlags?.mediumLevelCompleted
+        ) {
+          this.scene.start("WarningScene", this.savedProgress);
+        } else if (
           this.savedProgress?.gameState?.eventFlags?.playgroundCompleted
         ) {
           this.scene.start("MediumLevelScene", this.savedProgress);

@@ -14,9 +14,9 @@ export interface BugCount {
 
 export default class BossLevelScene extends GameScene {
   private problemIds: string[] = [
-    "69582fb37538b18589a46564",
-    "695c13b389e02a7e13dbe5ca",
-    "695e95e4c887fa19a718db13",
+    "697401975f4942a9208dc6a6",
+    "697401ad5f4942a9208dc6bc",
+    "697401dc5f4942a9208dc707",
     // "69582fb37538b18589a46564",
     // "69582fb37538b18589a46564",
   ];
@@ -87,10 +87,6 @@ export default class BossLevelScene extends GameScene {
   // --- Mock functions to be implemented later ---
   private getProblemId(): string[] {
     return this.problemIds;
-  }
-
-  private async generateBossProblem() {
-    
   }
 
   private createBugCountInput() {
@@ -336,7 +332,7 @@ export default class BossLevelScene extends GameScene {
     console.log(`Battle Started! Bugs: ${bugs}, Time: ${time}s`);
     EventBus.emit("ui-open-problem", {
       problemId: this.problemIds[this.currentPointIndex],
-      difficulty: "medium",
+      difficulty: "boss",
     });
   }
 

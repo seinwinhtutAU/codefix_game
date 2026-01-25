@@ -1,12 +1,10 @@
-import { checkExistingSolveRecord, fetchProblemsByLevel } from "@/services";
+import { checkExistingSolveRecord } from "@/services";
 import AudioManager from "../AudioManager";
 import GameScene from "./GameScene";
-import { IGameProgress, Problem, ProblemSolveRecord } from "@/lib/types";
+import { IGameProgress, ProblemSolveRecord } from "@/lib/types";
 import { GameObjects } from "phaser";
-import InputField from "../ui/InputField";
 import Button from "../ui/Button";
 import { EventBus } from "../events";
-import { generateRandomProblem } from "@/services/game";
 
 export interface BugCount {
   problemId: string;
@@ -14,27 +12,32 @@ export interface BugCount {
 }
 
 export default class BossLevelScene extends GameScene {
-  private problemIds: string[] = [];
+  private problemIds: string[] = [
+    "697401975f4942a9208dc6a6",
+    "697401ad5f4942a9208dc6bc",
+    "697401dc5f4942a9208dc707",
+    "697401975f4942a9208dc6a6",
+    "697401975f4942a9208dc6a6",
+  ];
+
+  private selectionButtons: Button[] = [];
+  private selectionContainer!: Phaser.GameObjects.Container;
 
   private pointsPos = [
-    { x: 300, y: 300 },
-    { x: 400, y: 300 },
-    { x: 500, y: 300 },
-    // { x: 600, y: 300 },
-    // { x: 700, y: 300 },
+    { x: 490, y: 100 },
+    { x: 590, y: 100 },
+    { x: 690, y: 100 },
+    { x: 790, y: 100 },
+    { x: 890, y: 100 },
   ];
 
   private solvedRecords: ProblemSolveRecord[] = [];
-  private points: GameObjects.Arc[] = [];
+  private points: GameObjects.Shape[] = [];
   private bossLevelCompleted: boolean = false;
   private currentPointIndex: number = 0;
   private bugCounts: BugCount[] = [];
-  private generatedProblemId: string | null = null;
 
   private maxAttempt: number = 5;
-  private bugNumInput!: InputField;
-  private submitButton!: Button;
-  // current bug input
   private currentBugCount: number = 0;
   private notificationText!: Phaser.GameObjects.Text;
   private infoPanelContainer!: Phaser.GameObjects.Container;
@@ -44,25 +47,24 @@ export default class BossLevelScene extends GameScene {
   private baseTimer: number = 60;
   private timerIncrementPerBug: number = 120;
   private pointIncrementPerBug: number = 10;
+  private progressGraphics!: Phaser.GameObjects.Graphics;
 
   constructor() {
     super("BossLevelScene");
   }
 
-  preload() {
-    this.load.image("boss-bg", "/boss/bg.png");
-    this.load.audio("warning", "/audio/warning.mp3");
-  }
-
   async create() {
+    if (this.savedProgress?.gameState?.eventFlags?.bossLevelCompleted) {
+      this.scene.start("MainMenuScene", this.savedProgress);
+      return;
+    }
+
     super.create();
 
     this.initAudio();
     this.add.image(0, 0, "boss-bg").setOrigin(0, 0);
+    this.createNotificationText();
     this.drawPoints();
-
-    this.problemIds = await this.getAllProblemIds();
-
     this.solvedRecords = await this.getAllSolvedRecord();
     this.updateCurrentPointIndex(this.savedProgress);
     this.getAllBugCounts();
@@ -71,11 +73,8 @@ export default class BossLevelScene extends GameScene {
       this.createBugCountInput();
     } else {
       this.showChallengeInfo(this.currentBugCount, this.currentPointIndex);
-      this.createNotificationText();
     }
 
-    console.log("BossLevelScene problemIds: ", this.problemIds);
-    console.log("BossLevelScene solve records: ", this.solvedRecords);
     console.log("BossLevelScene bug counts: ", this.bugCounts);
     console.log("BossLevelScene Current Point Index: ", this.currentPointIndex);
     console.log("BossLevelScene currentBugCount: ", this.currentBugCount);
@@ -86,20 +85,104 @@ export default class BossLevelScene extends GameScene {
     }
   }
 
-  private async generateBossProblem(
-    bugCount: number,
-    difficulty: string,
-  ): Promise<string> {
-    const problemId = await generateRandomProblem(difficulty, bugCount);
-
-    return problemId;
+  // --- Mock functions to be implemented later ---
+  private getProblemId(): string[] {
+    return this.problemIds;
   }
 
   private createBugCountInput() {
-    this.createInputField();
-    this.createSubmitButton();
+    this.createSelectionMenu();
     this.createNotificationText();
-    this.bugNumInput.show();
+  }
+
+  private createSelectionMenu() {
+    const xCenter = 1376 / 2;
+    const yCenter = 768 / 2 + 50; // Shifted down to avoid overlapping the nodes
+
+    const options = [
+      { bugs: 15, bonus: 0, color: 0x7df9ff, label: "STABLE_CORE" }, // Mint Blue
+      { bugs: 20, bonus: 20, color: 0xffff00, label: "CRITICAL_GLITCH" }, // Electric Yellow
+      { bugs: 25, bonus: 30, color: 0xff71ce, label: "SYSTEM_BREACH" }, // Neon Pink
+    ];
+
+    this.selectionContainer = this.add.container(0, 0).setDepth(150);
+
+    // 1. Terminal Box for the Selection
+    const bg = this.add.graphics();
+    bg.fillStyle(0x1a0f2e, 0.9); // Deep Purple
+    bg.lineStyle(3, 0x7df9ff, 1); // Mint border
+    bg.fillRoundedRect(xCenter - 300, yCenter - 150, 600, 300, 20);
+    bg.strokeRoundedRect(xCenter - 300, yCenter - 150, 600, 300, 20);
+    this.selectionContainer.add(bg);
+
+    // 2. Header Text
+    const header = this.add
+      .text(xCenter, yCenter - 110, "> CHOOSE_CHALLENGE", {
+        fontFamily: "monospace",
+        fontSize: "20px",
+        color: "#7df9ff",
+        fontStyle: "bold",
+      })
+      .setOrigin(0.5);
+    this.selectionContainer.add(header);
+
+    // Pick higher bugs for more points.
+    const recommendation = this.add
+      .text(
+        xCenter,
+        yCenter - 70,
+        "> Recommend to pick higher bugs for more points",
+        {
+          fontFamily: "monospace",
+          fontSize: "16px",
+          color: "#ff71ce",
+          fontStyle: "bold",
+        },
+      )
+      .setOrigin(0.5);
+    this.selectionContainer.add(recommendation);
+
+    options.forEach((opt, index) => {
+      const xPos = xCenter + (index - 1) * 180;
+
+      // 3. Selection Button
+      const btn = new Button(this, {
+        x: xPos,
+        y: yCenter + 20,
+        width: 150,
+        height: 50,
+        text: `${opt.bugs} BUGS`,
+        color: opt.color,
+        textStyle: {
+          color: "#000000", // Set to black for high contrast on bright buttons
+        },
+        onClick: () => this.confirmBugCount(opt.bugs),
+      });
+
+      // 4. Difficulty Label (Top of button)
+      const diffLabel = this.add
+        .text(xPos, yCenter - 25, opt.label, {
+          fontFamily: "monospace",
+          fontSize: "12px",
+          color: "#ffffff",
+          fontStyle: "bold",
+        })
+        .setOrigin(0.5);
+
+      // 5. Bonus Text (Bottom of button)
+      const bonusText = opt.bonus > 0 ? `+${opt.bonus} POINTS` : "BASE POINTS";
+      const desc = this.add
+        .text(xPos, yCenter + 65, bonusText, {
+          fontFamily: "monospace",
+          fontSize: "14px",
+          color: opt.bonus > 0 ? "#ffff00" : "#7df9ff",
+          fontStyle: "bold",
+        })
+        .setOrigin(0.5);
+
+      this.selectionButtons.push(btn);
+      this.selectionContainer.add([btn, diffLabel, desc]);
+    });
   }
 
   private handleProgressResume = async (progress: IGameProgress) => {
@@ -114,8 +197,11 @@ export default class BossLevelScene extends GameScene {
 
     console.log("solvedRecords in handleProgressResume: ", this.solvedRecords);
     this.currentBugCount = 0;
-    this.bugNumInput.show();
-    this.submitButton.setVisible(true);
+    if (this.selectionContainer) {
+      this.selectionContainer.setVisible(true);
+    } else {
+      this.createBugCountInput();
+    }
     this.infoPanelContainer.destroy();
     this.emitTaskStarted(progress);
     if (this.checkLevelCompleted()) {
@@ -138,88 +224,46 @@ export default class BossLevelScene extends GameScene {
     });
   }
 
-  private createInputField() {
-    this.bugNumInput = new InputField(this, {
-      x: 688,
-      y: 450,
-      width: 500,
-      height: 40,
-      maxLength: 10,
-      placeholder: "Type number of bugs here...",
-    });
-  }
-
-  private createSubmitButton() {
-    this.submitButton = new Button(this, {
-      x: 1000,
-      y: 450,
-      width: 100,
-      height: 40,
-      text: "Ok",
-      color: 0x28a745,
-      onClick: () => {
-        const inputVal = this.bugNumInput.getValue();
-        console.log("Submitted bug count:", inputVal);
-        this.handleSubmitBugCount(inputVal);
-      },
-    });
-  }
-
   private createNotificationText() {
+    // Futuristic terminal prompt style
     this.notificationText = this.add
-      .text(688, 520, "", {
-        fontFamily: "Arial",
-        fontSize: "20px",
-        color: "#ff0000",
-        backgroundColor: "#000000cc",
-        padding: { x: 10, y: 5 },
+      .text(688, 150, "", {
+        fontFamily: "monospace",
+        fontSize: "18px",
+        color: "#00ff00", // Classic Terminal Green
+        backgroundColor: "#001100aa",
+        padding: { x: 15, y: 8 },
       })
       .setOrigin(0.5)
       .setVisible(false)
       .setDepth(100);
+
+    // Add a simple blinking cursor effect logic
+    this.time.addEvent({
+      delay: 500,
+      callback: () => {
+        if (
+          this.notificationText.visible &&
+          this.notificationText.text.endsWith("_")
+        ) {
+          this.notificationText.text = this.notificationText.text.slice(0, -1);
+        } else if (this.notificationText.visible) {
+          this.notificationText.text += "_";
+        }
+      },
+      loop: true,
+    });
   }
 
-  private handleSubmitBugCount(value: string): void {
-    const inputVal = value.trim();
-
-    if (inputVal === "") {
-      this.showMessage("Please enter a value!");
-      return;
-    }
-
-    if (!/^\d+$/.test(inputVal)) {
-      this.showMessage("Invalid input! Numbers only.");
-      this.bugNumInput.clear();
-      return;
-    }
-
-    const amount = parseInt(inputVal, 10);
-    if (amount < this.minBugs) {
-      this.showMessage("System requires at least 10 bugs!");
-      return;
-    }
-
-    if (amount > this.maxBugs) {
-      this.showMessage("Too many bugs! Max is 20.");
-      return;
-    }
-
-    this.confirmBugCount(amount);
-  }
-
-  private async confirmBugCount(bugCount: number): Promise<void> {
-    const problemId = await this.generateBossProblem(bugCount, "boss");
-    this.generatedProblemId = problemId;
-    console.log("Generated Boss Problem ID:", problemId);
-
-    this.problemIds[this.currentPointIndex] = problemId;
-
+  private confirmBugCount(bugCount: number): void {
     this.currentBugCount = bugCount;
     this.updateBugCount(bugCount);
     this.emitBugCountSubmitted(this.savedProgress);
+
     this.notificationText.setVisible(false);
-    this.bugNumInput.hide();
-    this.submitButton.setVisible(false);
+    if (this.selectionContainer) {
+      this.selectionContainer.setVisible(false);
+    }
 
     this.showChallengeInfo(bugCount, this.currentPointIndex);
   }
@@ -256,58 +300,88 @@ export default class BossLevelScene extends GameScene {
   }
 
   private showChallengeInfo(bugCount: number, index: number) {
-    // 1. Calculations
     const estPoints =
       (bugCount - this.minBugs) * this.pointIncrementPerBug + this.basePoints;
     const timeLimit =
       (bugCount - this.minBugs) * this.timerIncrementPerBug + this.baseTimer;
-    const currentModule = index + 1;
     const timeLimitFormatted = this.formatTime(timeLimit);
+    const solveTimeFormatted = this.formatTime(
+      this.solvedRecords[index]?.timeSpent || 0,
+    );
 
-    // 2. Create Container
-    this.infoPanelContainer = this.add.container(688, 384).setDepth(200);
+    this.infoPanelContainer = this.add.container(688, 450).setDepth(200);
 
-    // 3. Background with Graphics
+    const status = this.getPointState(index);
+    let lineColor = 0x7df9ff;
+    let lineColorString = "#7df9ff";
+
+    switch (status) {
+      case "solved":
+        lineColor = 0x28a745;
+        lineColorString = "#28a745";
+        break;
+      case "skipped":
+        lineColor = 0xff4d4d;
+        lineColorString = "#ff4d4d";
+        break;
+      default:
+        lineColor = 0x7df9ff;
+        lineColorString = "#7df9ff";
+        break;
+    }
+
     const bg = this.add.graphics();
-    bg.fillStyle(0x000000, 0.9);
-    bg.lineStyle(2, 0x28a745, 1);
-    bg.fillRoundedRect(-250, -250, 500, 600, 15);
-    bg.strokeRoundedRect(-250, -250, 500, 600, 15);
+    bg.fillStyle(0x1a0f2e, 0.95);
+    bg.lineStyle(4, lineColor, 1);
 
-    // 4. Corrected Title (using fontStyle)
+    // Reduced size: from 520x620 down to 440x520
+    const pW = 440;
+    const pH = 520;
+    bg.fillRoundedRect(-pW / 2, -pH / 2, pW, pH, 30);
+    bg.strokeRoundedRect(-pW / 2, -pH / 2, pW, pH, 30);
+
+    // Adjusted Ears (slightly smaller and positioned on the new width)
+    bg.fillStyle(lineColor, 1);
+    bg.fillCircle(-pW / 2 + 60, -pH / 2, 12);
+    bg.fillCircle(pW / 2 - 60, -pH / 2, 12);
+
+    // Scanlines adjusted for smaller height
+    for (let i = -pH / 2 + 10; i < pH / 2 - 10; i += 6) {
+      bg.lineStyle(2, 0xff71ce, 0.1);
+      bg.lineBetween(-pW / 2 + 20, i, pW / 2 - 20, i);
+    }
+
     const title = this.add
-      .text(0, -170, "MISSION DETAILS", {
-        fontFamily: "Arial",
-        fontSize: "26px",
-        fontStyle: "bold", // Use fontStyle instead of fontWeight
-        color: "#28a745",
+      .text(0, -pH / 2 + 50, "(=^･ω･^=) MISSION", {
+        fontFamily: "monospace",
+        fontSize: "18px", // Slightly smaller font
+        color: lineColorString,
+        fontStyle: "bold",
       })
       .setOrigin(0.5);
 
-    // 5. Detailed Info Text
-    // Includes: Attempts, Estimated Points, and Timer
+    const content =
+      `--------------------------\n` + // Shortened lines
+      ` > NODE_ID: CHIP_0${index + 1}\n` +
+      ` > BUGS_FOUND: ${bugCount}\n` +
+      ` > POINTS: ${estPoints} XP\n` +
+      ` > TIMER: ${timeLimitFormatted}(m:s)\n` +
+      `--------------------------\n` +
+      ` ATTEMPTS: ${this.solvedRecords[index]?.attempt || 0} ATTEMPTS\n` +
+      ` STATUS: ${this.getPointState(index).toUpperCase()}\n` +
+      ` EARNED_POINTS: ${this.solvedRecords[index]?.pointsEarned || 0}\n` +
+      ` SOLVE_TIME: ${solveTimeFormatted}(m:s)\n` +
+      `--------------------------\n` +
+      ` READY TO DE-BUG?`;
+
     const details = this.add
-      .text(
-        0,
-        70,
-        `MODULE: ${currentModule} / ${this.points.length}\n\n` +
-          `BUG NUMBER: ${bugCount}\n` +
-          `EST. POINTS: ${estPoints}\n` +
-          `TIME LIMIT: ${timeLimitFormatted}(m:s)\n` +
-          `MAX ATTEMPTS: ${this.maxAttempt}\n\n` +
-          `Point earned: ${this.solvedRecords[index]?.pointsEarned || 0}\n` +
-          `Attempts made: ${this.solvedRecords[index]?.attempt || 0}\n` +
-          `time spent: ${this.solvedRecords[index]?.timeSpent || 0}s\n` +
-          `status: ${this.getPointState(index)}\n` +
-          `Click START to begin the challenge!`,
-        {
-          fontFamily: "monospace",
-          fontSize: "18px",
-          color: "#ffffff",
-          lineSpacing: 12,
-          align: "center",
-        },
-      )
+      .text(0, -10, content, {
+        // Shifted up slightly
+        fontFamily: "monospace",
+        fontSize: "15px", // Smaller font for smaller container
+        color: "#fff",
+        lineSpacing: 8,
+      })
       .setOrigin(0.5);
 
     const goNextProblem =
@@ -322,58 +396,138 @@ export default class BossLevelScene extends GameScene {
 
     const startBtn = new Button(this, {
       x: 0,
-      y: 300,
-      text: `${goNextProblem ? "NEXT" : "START"}`,
-      color: 0x28a745,
-      onClick: () => {
-        this.openProblemOverlay(bugCount, timeLimit);
-      },
+      y: pH / 2 - 70,
+      width: 180,
+      text: `${goNextProblem ? "NEXT_MISSION()" : "START_DEBUG()"}`,
+      color: 0xff71ce,
+      onClick: () => this.openProblemOverlay(bugCount, timeLimit),
     });
 
     if (seeInfo) {
-      startBtn.setText("CLOSE");
-      startBtn.on("pointerdown", () => {
-        this.infoPanelContainer.destroy();
-      });
+      startBtn.setVisible(false);
     }
 
     this.infoPanelContainer.add([bg, title, details, startBtn]);
+
+    this.infoPanelContainer.setScale(0);
+    this.tweens.add({
+      targets: this.infoPanelContainer,
+      scale: 1,
+      duration: 500,
+      ease: "Back.easeOut",
+    });
   }
 
   private openProblemOverlay(bugs: number, time: number) {
     console.log(`Battle Started! Bugs: ${bugs}, Time: ${time}s`);
     EventBus.emit("ui-open-problem", {
-      problemId:
-        this.generatedProblemId ?? this.problemIds[this.currentPointIndex],
-      difficulty: "medium",
+      problemId: this.problemIds[this.currentPointIndex],
+      difficulty: "boss",
     });
   }
 
   private showMessage(message: string) {
-    if (!this.notificationText) {
-      console.warn("Notification text not initialized yet!");
-      return;
-    }
-    this.notificationText.setText(message).setVisible(true);
+    this.notificationText
+      .setVisible(true)
+      .setText("( >_<) ERROR: ")
+      .setColor("#ff71ce") // Pink for errors
+      .setBackgroundColor("#1a0f2eaa");
 
-    // Shake the input field for visual feedback
-    this.cameras.main.shake(200, 0.01);
+    let i = 0;
+    const fullMsg = message.toUpperCase();
 
-    // Auto-hide the message after 3 seconds
-    this.time.delayedCall(3000, () => {
-      this.notificationText.setVisible(false);
+    this.time.addEvent({
+      delay: 40,
+      callback: () => {
+        this.notificationText.text += fullMsg[i];
+        i++;
+      },
+      repeat: fullMsg.length - 1,
     });
+
+    // Pop animation instead of shake
+    this.tweens.add({
+      targets: this.notificationText,
+      y: 530,
+      duration: 100,
+      yoyo: true,
+    });
+
+    this.time.delayedCall(3000, () => this.notificationText.setVisible(false));
   }
 
   private drawPoints() {
+    const lines = this.add.graphics();
+    lines.lineStyle(3, 0xff71ce, 0.3);
+    lines.setDepth(0); // Ensure background lines are at the very bottom
+
+    for (let i = 0; i < this.pointsPos.length - 1; i++) {
+      lines.lineBetween(
+        this.pointsPos[i].x,
+        this.pointsPos[i].y,
+        this.pointsPos[i + 1].x,
+        this.pointsPos[i + 1].y,
+      );
+    }
+
     this.pointsPos.forEach((pos, index) => {
-      const point = this.add.circle(pos.x, pos.y, 15, 0xff0000);
-      point.setInteractive({ useHandCursor: true });
-      point.on("pointerdown", () => {
-        this.handlePointClick(index);
-      });
-      this.points.push(point);
+      // SET DEPTH HERE ON THE CONTAINER
+      const container = this.add.container(pos.x, pos.y).setDepth(10);
+
+      const base = this.add.rectangle(0, 0, 36, 36, 0x1a0f2e);
+      base.setStrokeStyle(3, 0x7df9ff, 1);
+
+      const core = this.add.rectangle(0, 0, 18, 18, 0x7df9ff);
+
+      const label = this.add
+        .text(0, 30, `v0.${index + 1}`, {
+          fontFamily: "monospace",
+          fontSize: "11px",
+          color: "#7df9ff",
+          fontStyle: "bold",
+        })
+        .setOrigin(0.5);
+
+      container.add([base, core, label]);
+      core.setInteractive({ useHandCursor: true });
+      core.on("pointerdown", () => this.handlePointClick(index));
+      this.points.push(core);
     });
+  }
+
+  private drawRoadProgress() {
+    // 1. Initialize or clear the graphics object
+    if (!this.progressGraphics) {
+      this.progressGraphics = this.add.graphics();
+      this.progressGraphics.setDepth(5); // Above map, below points
+    }
+    this.progressGraphics.clear();
+
+    // 2. We only draw if we have at least one solved point
+    if (this.currentPointIndex === 0) return;
+
+    // 3. Set the style for the "Glow"
+    // Outer glow (thicker, lower alpha)
+    this.progressGraphics.lineStyle(15, 0x00d2ff, 0.3);
+    this.drawPathSegments();
+
+    // Inner core (thinner, higher alpha)
+    this.progressGraphics.lineStyle(7, 0x7df9ff, 0.9);
+    this.drawPathSegments();
+  }
+
+  private drawPathSegments() {
+    this.progressGraphics.beginPath();
+
+    this.progressGraphics.moveTo(this.pointsPos[0].x, this.pointsPos[0].y);
+
+    for (let i = 1; i <= this.currentPointIndex; i++) {
+      if (i < this.pointsPos.length) {
+        this.progressGraphics.lineTo(this.pointsPos[i].x, this.pointsPos[i].y);
+      }
+    }
+
+    this.progressGraphics.strokePath();
   }
 
   private handlePointClick(index: number) {
@@ -390,7 +544,8 @@ export default class BossLevelScene extends GameScene {
     const bugCount = this.bugCounts[index]?.bugCount;
 
     if (bugCount === undefined) {
-      this.showMessage("Enter bug count to start this module!");
+      if (this.selectionContainer) this.selectionContainer.setVisible(true);
+      this.showMessage("Select difficulty for this module!");
       return;
     }
 
@@ -398,27 +553,48 @@ export default class BossLevelScene extends GameScene {
   }
 
   private updatePointsUI() {
-    if (!this.solvedRecords || this.solvedRecords.length === 0) return;
+    if (!this.solvedRecords) return;
 
-    console.log("currentPointIndex in updatePointsUI:", this.currentPointIndex);
-    this.points.forEach((point, index) => {
+    this.points.forEach((core, index) => {
       const state = this.getPointState(index);
-      console.log(`Point ${index} state: ${state}`);
+
+      // Reset any existing animations
+      this.tweens.killTweensOf(core);
+      core.setScale(1);
+
       switch (state) {
         case "solved":
-          point.setFillStyle(0x00ff00); // Green for solved
+          core.setFillStyle(0x28a745); // Emerald Green
+          // Add a static glow or subtle scale up
+          core.setScale(1.1);
           break;
+
         case "current":
-          point.setFillStyle(0xffff00); // Yellow for current
+          core.setFillStyle(0xffff00); // Electric Yellow
+          // Pulse Animation
+          this.tweens.add({
+            targets: core,
+            scale: 1.4,
+            alpha: 0.7,
+            duration: 800,
+            yoyo: true,
+            repeat: -1,
+            ease: "Sine.easeInOut",
+          });
           break;
+
         case "locked":
-          point.setFillStyle(0x808080); // Gray for locked
+          core.setFillStyle(0x444444); // Dark Gray
+          core.setAlpha(0.5);
           break;
+
         case "skipped":
-          point.setFillStyle(0xff0000); // Red for skipped
+          core.setFillStyle(0xd9534f); // Danger Red
           break;
       }
     });
+
+    this.drawRoadProgress();
   }
 
   private getPointState(index: number) {
@@ -429,15 +605,12 @@ export default class BossLevelScene extends GameScene {
     console.log(
       `Getting state for point ${index}: isSolved=${isSolved}, attempts=${attempts}`,
     );
-    if (this.solvedRecords.length > 0 && attempts >= this.maxAttempt)
-      return "skipped";
-    if (this.solvedRecords.length > 0 && isSolved) return "solved";
+    if (attempts >= this.maxAttempt) return "skipped";
+    if (isSolved) return "solved";
     if (index === this.currentPointIndex) return "current";
     if (index > this.currentPointIndex) return "locked";
     return "locked";
   }
-
-  private getPointState1(index: number) {}
 
   private emitTaskStarted(progress: IGameProgress) {
     EventBus.emit("progress-updated", {
@@ -505,15 +678,13 @@ export default class BossLevelScene extends GameScene {
   }
 
   private checkLevelCompleted(): boolean {
-    if (this.problemIds.length === 0) return false;
-
     let countOfSolved = 0;
     this.solvedRecords.forEach((record) => {
       const isSolved = !!record;
       if (isSolved) countOfSolved++;
     });
 
-    if (countOfSolved === this.points.length) {
+    if (countOfSolved === this.solvedRecords.length) {
       return true;
     }
 
@@ -521,10 +692,11 @@ export default class BossLevelScene extends GameScene {
   }
 
   private async getAllSolvedRecord(): Promise<ProblemSolveRecord[]> {
+    const problemIds = this.getProblemId();
     const userId = this.savedProgress.userId;
 
     const solveRecords = await Promise.all(
-      this.problemIds.map(async (id) => {
+      problemIds.map(async (id) => {
         const record = await checkExistingSolveRecord(userId, id);
         return record?.data;
       }),
@@ -549,15 +721,6 @@ export default class BossLevelScene extends GameScene {
 
     this.currentBugCount =
       this.bugCounts[this.currentPointIndex]?.bugCount || 0;
-  }
-
-  private async getAllProblemIds(): Promise<string[]> {
-    const response = await fetchProblemsByLevel("boss");
-    const problems = response.problems;
-
-    if (!problems?.length) return [];
-
-    return problems.map((problem) => problem._id);
   }
 
   private initAudio() {

@@ -1,21 +1,19 @@
 import AudioManager from "../AudioManager";
 import GameScene from "./GameScene";
 import DialogBox from "../ui/DialogBox";
+import Button from "../ui/Button"; // Your standardized Button class
 import { EventBus } from "@/game/events";
-import { IGameProgress } from "@/lib/types";
 
 export default class HomeScene extends GameScene {
   private dialogBox!: DialogBox;
+  private nextButton!: Button;
 
   constructor() {
     super("HomeScene");
   }
 
-  preload() {
-    this.load.image("medium_home", "/medium/home.png");
-  }
-
   create() {
+    // Immediate transition if already completed
     if (this.savedProgress?.gameState?.eventFlags?.mediumIntroCompleted) {
       this.scene.start("PlayGroundScene", this.savedProgress);
       return;
@@ -25,14 +23,36 @@ export default class HomeScene extends GameScene {
     this.initAudio();
 
     // 1. Setup Background
-    this.add.image(0, 0, "medium_home").setOrigin(0, 0);
+    this.add
+      .image(0, 0, "medium_home")
+      .setDisplaySize(1376, 768)
+      .setOrigin(0, 0);
 
-    // 2. Setup UI
+    // 2. Setup UI Components
     this.dialogBox = new DialogBox(this);
 
-    // 3. Start Story
+    // 3. Setup Next Button (Bottom Right)
+    // We create it now but keep it hidden/disabled during dialogue
+    this.nextButton = new Button(this, {
+      x: 1250,
+      y: 700,
+      text: "Next >>",
+      color: 0x2ecc71, // Green
+      onClick: () => this.handleSceneComplete(),
+    });
+
+    this.nextButton.setVisible(false);
+    this.nextButton.setAlpha(0);
+
+    // 4. Start Story Sequence
     this.time.delayedCall(1000, () => {
-      this.startFamilyConversation();
+      this.startDayIntroduction();
+    });
+
+    this.input.on("pointerdown", (pointer: Phaser.Input.Pointer) => {
+      console.log(
+        `Clicked Position - X: ${Math.round(pointer.x)}, Y: ${Math.round(pointer.y)}`,
+      );
     });
   }
 
@@ -43,70 +63,61 @@ export default class HomeScene extends GameScene {
   }
 
   private startFamilyConversation() {
-    // Approximate positions based on your image
-    const motherX = 350; // Left (Pink hat)
-    const motherY = 550;
+    const motherX = 510;
+    const motherY = 430;
+    const fatherX = 620;
+    const fatherY = 320;
+    const boyX = 860;
+    const boyY = 380;
+    const girlX = 980;
+    const girlY = 450;
 
-    const fatherX = 520; // Center-Left (Black hat)
-    const fatherY = 350;
-
-    const boyX = 1000; // Center-Right (Blue cap)
-    const boyY = 450;
-
-    const girlX = 1100; // Right (Pink bow)
-    const girlY = 580;
-
-    // --- DIALOGUE SEQUENCE ---
-
-    // 1. Father (Announcing arrival)
-    this.dialogBox.show(
-      fatherX,
-      fatherY,
-      "I'm back! The city code is finally stable.",
-    );
+    this.dialogBox.show(fatherX, fatherY, "Work’s done. I’m finally home. 😌");
 
     this.time.delayedCall(3000, () => {
-      // 2. Mother (Greeting)
       this.dialogBox.show(
         motherX,
         motherY,
-        "Welcome home, dear! We missed you.",
+        "Welcome home! You look exhausted.",
       );
 
       this.time.delayedCall(3000, () => {
-        // 3. Boy (Curious)
-        this.dialogBox.show(boyX, boyY, "Dad! Did you fix the big bug?");
+        this.dialogBox.show(
+          fatherX,
+          fatherY,
+          "Yeah… but today is all about family.",
+        );
 
         this.time.delayedCall(3000, () => {
-          // 4. Father (Reassuring)
           this.dialogBox.show(
-            fatherX,
-            fatherY,
-            "Yes I did. And now, I'm all yours.",
+            boyX,
+            boyY,
+            "Does that mean we’re going out today?",
           );
 
           this.time.delayedCall(3000, () => {
-            // 5. Father (The Plan) - CHANGED TO AMUSEMENT PARK
             this.dialogBox.show(
               fatherX,
               fatherY,
-              "It's a beautiful day. Let's go to the Amusement Park!",
+              "Exactly. How about the amusement park?",
             );
 
             this.time.delayedCall(3500, () => {
-              // 6. Girl (Excitement) - CHANGED TO ROLLER COASTER
               this.dialogBox.show(
                 girlX,
                 girlY,
-                "Yay! I want to ride the roller coaster!",
+                "Yay! I want to ride the roller coaster! 🎢",
               );
 
               this.time.delayedCall(2500, () => {
-                // 7. Boy (Ready)
-                this.dialogBox.show(boyX, boyY, "Let's go right now!");
+                this.dialogBox.show(
+                  boyX,
+                  boyY,
+                  "And I want to play all the games!",
+                );
 
-                this.time.delayedCall(2000, () => {
-                  this.handleSceneComplete();
+                this.time.delayedCall(1000, () => {
+                  this.revealNextButton();
                 });
               });
             });
@@ -116,10 +127,96 @@ export default class HomeScene extends GameScene {
     });
   }
 
+  private startDayIntroduction() {
+    const bg = this.add.rectangle(
+      this.scale.width / 2,
+      60,
+      this.scale.width,
+      150,
+      0x000000,
+      0.35, // transparency
+    );
+
+    const introText = this.add
+      .text(
+        this.scale.width / 2,
+        60,
+        "A new day begins...\nAfter a long day of work, it’s finally time to relax.",
+        {
+          fontFamily: "Arial",
+          fontSize: "24px",
+          color: "#f0f0f0",
+          align: "center",
+          lineSpacing: 6,
+          wordWrap: { width: this.scale.width - 100 },
+        },
+      )
+      .setOrigin(0.5)
+      .setAlpha(0);
+
+    // Fade in
+    this.tweens.add({
+      targets: introText,
+      alpha: 1,
+      duration: 800,
+      ease: "Sine.easeOut",
+    });
+
+    this.time.delayedCall(3500, () => {
+      this.tweens.add({
+        targets: introText,
+        alpha: 0,
+        duration: 400,
+        ease: "Sine.easeIn",
+        onComplete: () => {
+          introText.setText(
+            "Today is special.\nIt’s time to spend the day together at the amusement park! 🎡",
+          );
+
+          // Fade in new text
+          this.tweens.add({
+            targets: introText,
+            alpha: 1,
+            duration: 500,
+            ease: "Sine.easeOut",
+          });
+        },
+      });
+    });
+
+    this.time.delayedCall(7000, () => {
+      this.tweens.add({
+        targets: [introText, bg],
+        alpha: 0,
+        duration: 600,
+        ease: "Sine.easeIn",
+        onComplete: () => {
+          introText.destroy();
+          bg.destroy();
+          this.startFamilyConversation();
+        },
+      });
+    });
+  }
+
+  private revealNextButton() {
+    this.nextButton.setVisible(true);
+    this.tweens.add({
+      targets: this.nextButton,
+      alpha: 1,
+      duration: 500,
+      ease: "Power2",
+    });
+  }
+
   private async handleSceneComplete() {
+    // Prevent double-clicking
+    this.nextButton.setEnabled(false);
+
     this.dialogBox.hide();
     await this.emitHomeCompleted();
 
+    // Transition effect
     this.cameras.main.fadeOut(1000, 0, 0, 0);
     this.cameras.main.once("camerafadeoutcomplete", () => {
       this.scene.start("PlayGroundScene", this.savedProgress);
