@@ -54,10 +54,10 @@ export default class BossLevelScene extends GameScene {
   }
 
   async create() {
-    if (this.savedProgress?.gameState?.eventFlags?.bossLevelCompleted) {
-      this.scene.start("MainMenuScene", this.savedProgress);
-      return;
-    }
+    // if (this.savedProgress?.gameState?.eventFlags?.bossLevelCompleted) {
+    //   this.scene.start("MainMenuScene", this.savedProgress);
+    //   return;
+    // }
 
     super.create();
 
@@ -237,22 +237,6 @@ export default class BossLevelScene extends GameScene {
       .setOrigin(0.5)
       .setVisible(false)
       .setDepth(100);
-
-    // Add a simple blinking cursor effect logic
-    this.time.addEvent({
-      delay: 500,
-      callback: () => {
-        if (
-          this.notificationText.visible &&
-          this.notificationText.text.endsWith("_")
-        ) {
-          this.notificationText.text = this.notificationText.text.slice(0, -1);
-        } else if (this.notificationText.visible) {
-          this.notificationText.text += "_";
-        }
-      },
-      loop: true,
-    });
   }
 
   private confirmBugCount(bugCount: number): void {
@@ -427,33 +411,43 @@ export default class BossLevelScene extends GameScene {
   }
 
   private showMessage(message: string) {
+    // Stop any existing timer events to prevent overlapping text
+    this.time.removeAllEvents();
+
     this.notificationText
       .setVisible(true)
-      .setText("( >_<) ERROR: ")
-      .setColor("#ff71ce") // Pink for errors
+      .setText("( >_<) ERROR: ") // Initial prefix
+      .setColor("#ff71ce")
       .setBackgroundColor("#1a0f2eaa");
 
     let i = 0;
     const fullMsg = message.toUpperCase();
 
+    // Typing effect
     this.time.addEvent({
       delay: 40,
       callback: () => {
-        this.notificationText.text += fullMsg[i];
-        i++;
+        if (fullMsg[i]) {
+          this.notificationText.text += fullMsg[i];
+          i++;
+        }
       },
       repeat: fullMsg.length - 1,
     });
 
-    // Pop animation instead of shake
+    // Pop animation
     this.tweens.add({
       targets: this.notificationText,
-      y: 530,
+      y: this.notificationText.y + 10,
       duration: 100,
       yoyo: true,
+      ease: "Sine.easeInOut",
     });
 
-    this.time.delayedCall(3000, () => this.notificationText.setVisible(false));
+    // Auto-hide after 5 seconds
+    this.time.delayedCall(5000, () => {
+      if (this.notificationText) this.notificationText.setVisible(false);
+    });
   }
 
   private drawPoints() {
@@ -490,7 +484,10 @@ export default class BossLevelScene extends GameScene {
 
       container.add([base, core, label]);
       core.setInteractive({ useHandCursor: true });
-      core.on("pointerdown", () => this.handlePointClick(index));
+      core.on("pointerdown", () => {
+        AudioManager.getInstance().playSound("click", { volume: 0.5 });
+        this.handlePointClick(index);
+      });
       this.points.push(core);
     });
   }
@@ -541,11 +538,15 @@ export default class BossLevelScene extends GameScene {
       this.infoPanelContainer.destroy();
     }
 
+    if (this.selectionContainer) {
+      this.selectionContainer.setVisible(false);
+    }
+
     const bugCount = this.bugCounts[index]?.bugCount;
 
-    if (bugCount === undefined) {
+    if (this.currentBugCount === 0 && state == "current") {
       if (this.selectionContainer) this.selectionContainer.setVisible(true);
-      this.showMessage("Select difficulty for this module!");
+      this.showMessage("Select bug numbers for this challenge!");
       return;
     }
 
@@ -664,13 +665,19 @@ export default class BossLevelScene extends GameScene {
     this.bossLevelCompleted = true;
 
     EventBus.emit("show-notification", {
-      type: "LEVEL_UP",
-      title: "All Levels Completed!",
+      type: "VICTORY",
+      title: "Victory!",
       message:
-        "Congratulations! You have successfully completed all the levels.",
+        "You’ve completed every level and mastered the challenge. Well done!",
       confirmLabel: "BACK TO MENU",
       onConfirm: () => {
         EventBus.emit("hide-notification");
+
+        if (this.savedProgress && this.savedProgress.gameState) {
+          this.savedProgress.gameState.eventFlags.bossLevelCompleted = true;
+          this.savedProgress.gameState.currentScene = "BossLevelScene";
+        }
+
         this.emitLevelCompleted(this.savedProgress);
         this.scene.start("MainMenuScene", this.savedProgress);
       },

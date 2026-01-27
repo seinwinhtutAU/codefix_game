@@ -1,4 +1,5 @@
 import Phaser from "phaser";
+import AudioManager from "../AudioManager";
 
 export interface ButtonConfig {
   x: number;
@@ -38,11 +39,11 @@ export default class Button extends Phaser.GameObjects.Container {
     const w = config.width ?? Button.DEFAULT_WIDTH;
     const h = config.height ?? Button.DEFAULT_HEIGHT;
 
-    // Background
+    // 1. Background
     this.bg = scene.add.graphics();
     this.drawButton(this.isDisabled ? Button.DISABLED_COLOR : this.baseColor);
 
-    // Text
+    // 2. Text
     this.label = scene.add
       .text(0, 0, config.text, {
         fontFamily: "Arial, sans-serif",
@@ -55,31 +56,47 @@ export default class Button extends Phaser.GameObjects.Container {
       .setOrigin(0.5);
 
     this.add([this.bg, this.label]);
-
-    // Hitbox (stable, no scaling issues)
     this.setSize(w, h);
+
+    // ---------------------------------------------------------
+    // 🔥 FIX: Define a Centered Hit Area
+    // ---------------------------------------------------------
+    // By default, setInteractive uses (0,0) as top-left.
+    // Since we draw our graphics centered at (0,0) (using -w/2),
+    // we must offset the hit area to match.
+    const hitArea = new Phaser.Geom.Rectangle(-w / 2, -h / 2, w, h);
+
+    // 2. Pass a SINGLE config object
     this.setInteractive({
-      hitArea: new Phaser.Geom.Rectangle(-w / 2, -h / 2, w, h),
+      hitArea: hitArea,
       hitAreaCallback: Phaser.Geom.Rectangle.Contains,
-      cursor: "pointer",
+      cursor: this.isDisabled ? "default" : "pointer",
     });
 
-    if (!this.isDisabled) {
-      this.setupPointerEvents();
-      this.setupKeyboardEvents();
+    // 3. Setup Events
+    // We always setup events, but we check 'isDisabled' inside them
+    this.setupPointerEvents();
+    this.setupKeyboardEvents();
+
+    // 4. Handle initial state
+    if (this.isDisabled) {
+      if (this.input) this.input.enabled = false;
     }
 
     scene.add.existing(this);
   }
 
-  // ----------------- Drawing -----------------
+  // --- Helper to play sound ---
+  private playClickSound() {
+    // Uses the existing AudioManager singleton
+    AudioManager.getInstance().playSound("click", { volume: 0.5 });
+  }
 
   private drawButton(color: number, pressed = false) {
     const w = this.config.width ?? Button.DEFAULT_WIDTH;
     const h = this.config.height ?? Button.DEFAULT_HEIGHT;
 
     this.bg.clear();
-
     this.bg.fillStyle(color, 1);
     this.bg.fillRoundedRect(-w / 2, -h / 2, w, h, 6);
 
@@ -92,11 +109,10 @@ export default class Button extends Phaser.GameObjects.Container {
     }
   }
 
-  // ----------------- Pointer Events -----------------
-
   private setupPointerEvents() {
     this.on("pointerover", () => {
       if (this.isDisabled) return;
+
       this.drawButton(
         Phaser.Display.Color.ValueToColor(this.baseColor).lighten(15).color,
       );
@@ -107,15 +123,17 @@ export default class Button extends Phaser.GameObjects.Container {
 
     this.on("pointerout", () => {
       if (this.isDisabled) return;
+
       this.drawButton(this.baseColor);
       this.bg.setScale(1);
       this.label.setScale(1);
       this.config.onHoverOut?.();
     });
 
-    // 🔥 Click happens immediately (NO DELAY)
     this.on("pointerdown", () => {
       if (this.isDisabled) return;
+
+      this.playClickSound();
 
       this.drawButton(
         Phaser.Display.Color.ValueToColor(this.baseColor).darken(20).color,
@@ -134,11 +152,22 @@ export default class Button extends Phaser.GameObjects.Container {
     });
   }
 
-  // ----------------- Keyboard -----------------
-
   private setupKeyboardEvents() {
-    const handler = () => {
+    // Clean up old listeners if they exist to prevent duplicates
+    // (Though usually this is only called once in constructor)
+    const keyEnter = this.scene.input.keyboard?.addKey("ENTER");
+    const keySpace = this.scene.input.keyboard?.addKey("SPACE");
+
+    const handler = (event: KeyboardEvent) => {
+      // Only trigger if this button is "focused" or globally if that's intended.
+      // NOTE: For a UI button, usually you only want keyboard events if it's selected.
+      // If you want GLOBAL enter/space to trigger this, keep as is.
+      // If not, you might need a focus management system.
+      // Assuming global trigger based on your snippet:
+
       if (this.isDisabled) return;
+
+      this.playClickSound();
 
       this.drawButton(
         Phaser.Display.Color.ValueToColor(this.baseColor).darken(20).color,
@@ -157,6 +186,7 @@ export default class Button extends Phaser.GameObjects.Container {
       this.config.onClick();
     };
 
+    // Using the event emitter pattern from your snippet
     this.scene.input.keyboard?.on("keydown-ENTER", handler);
     this.scene.input.keyboard?.on("keydown-SPACE", handler);
 
@@ -166,19 +196,31 @@ export default class Button extends Phaser.GameObjects.Container {
     });
   }
 
-  // ----------------- Public API -----------------
-
+  /**
+   * Enables or disables the button.
+   * FIX: We toggle this.input.enabled instead of removing the component.
+   */
   public setEnabled(enabled: boolean): this {
     this.isDisabled = !enabled;
 
     if (enabled) {
       this.label.setColor("#ffffff");
       this.drawButton(this.baseColor);
-      this.setInteractive();
+
+      // Re-enable input without destroying the hit area
+      if (this.input) {
+        this.input.enabled = true;
+        this.input.cursor = "pointer";
+      }
     } else {
       this.label.setColor("#888888");
       this.drawButton(Button.DISABLED_COLOR);
-      this.disableInteractive();
+
+      // Disable input but keep the component
+      if (this.input) {
+        this.input.enabled = false;
+        this.input.cursor = "default";
+      }
     }
     return this;
   }

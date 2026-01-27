@@ -1,7 +1,13 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Folder, FileText, ChevronRight, GripVertical } from "lucide-react";
+import {
+  Folder,
+  FileText,
+  ChevronRight,
+  GripVertical,
+  FolderOpen,
+} from "lucide-react";
 import { ProblemFile } from "@/lib/types";
 
 interface Props {
@@ -32,7 +38,7 @@ export default function FileExplorer({
   const startXRef = useRef<number>(0);
   const startWidthRef = useRef<number>(0);
 
-  // 处理拖拽开始
+  // Handle Resize Start
   const handleResizeStart = (e: React.MouseEvent) => {
     e.preventDefault();
     setIsResizing(true);
@@ -58,7 +64,7 @@ export default function FileExplorer({
     document.addEventListener("mouseup", handleMouseUp);
   };
 
-  // 全局拖拽状态样式
+  // Global Cursor Style during Resize
   useEffect(() => {
     if (isResizing) {
       document.body.style.cursor = "col-resize";
@@ -83,10 +89,10 @@ export default function FileExplorer({
   };
 
   const renderTree = (nodes: ProblemFile[], depth = 0, parentPath = "") => {
-    const paddingLeft = depth * 16 + 8;
+    const paddingLeft = depth * 12 + 8; // Slightly tighter padding
 
     return (
-      <ul className="space-y-0.5">
+      <ul className="space-y-1">
         {nodes.map((node) => {
           const nodePath = `${parentPath}/${node.id}`;
 
@@ -96,18 +102,22 @@ export default function FileExplorer({
               <li key={nodePath}>
                 <button
                   onClick={() => toggleFolder(node.id)}
-                  className={`flex items-center w-full p-2 text-left text-sm rounded-lg hover:bg-gray-700 ${
-                    isOpen ? "text-gray-200 font-medium" : "text-gray-400"
+                  className={`flex items-center w-full p-1.5 text-left text-sm rounded-lg hover:bg-slate-50 transition-colors ${
+                    isOpen ? "text-slate-700 font-medium" : "text-slate-500"
                   }`}
                   style={{ paddingLeft: `${paddingLeft}px` }}
                 >
                   <ChevronRight
                     size={14}
-                    className={`mr-2 transition-transform ${
-                      isOpen ? "rotate-90" : ""
-                    } text-blue-400`}
+                    className={`mr-1.5 transition-transform duration-200 ${
+                      isOpen ? "rotate-90 text-indigo-500" : "text-slate-400"
+                    }`}
                   />
-                  <Folder size={14} className="mr-2 text-blue-400" />
+                  {isOpen ? (
+                    <FolderOpen size={14} className="mr-2 text-indigo-500" />
+                  ) : (
+                    <Folder size={14} className="mr-2 text-indigo-400" />
+                  )}
                   <span className="truncate">{node.name}</span>
                 </button>
                 {isOpen && renderTree(node.children, depth + 1, nodePath)}
@@ -115,18 +125,23 @@ export default function FileExplorer({
             );
           }
 
+          const isSelected = selectedFileId === node.id;
+
           return (
             <li key={nodePath}>
               <button
                 onClick={() => onSelectFile(node)}
-                className={`flex items-center w-full p-2 text-left text-sm rounded-lg transition-all ${
-                  selectedFileId === node.id
-                    ? "bg-gray-700 text-white border-l-2 border-l-blue-500"
-                    : "text-gray-300 hover:bg-gray-700 border-l-2 border-transparent"
+                className={`flex items-center w-full p-1.5 text-left text-sm rounded-lg transition-all ${
+                  isSelected
+                    ? "bg-indigo-50 text-indigo-700 font-medium"
+                    : "text-slate-500 hover:bg-slate-50 hover:text-slate-700"
                 }`}
-                style={{ paddingLeft: `${paddingLeft + 24}px` }}
+                style={{ paddingLeft: `${paddingLeft + 22}px` }}
               >
-                <FileText size={14} className="mr-2 text-blue-400" />
+                <FileText
+                  size={14}
+                  className={`mr-2 transition-colors ${isSelected ? "text-indigo-500" : "text-slate-400"}`}
+                />
                 <span className="truncate">{node.name}</span>
               </button>
             </li>
@@ -141,45 +156,45 @@ export default function FileExplorer({
   return (
     <div
       ref={panelRef}
-      className="h-full bg-gray-800 border border-gray-700 flex flex-col relative shadow-lg rounded-lg overflow-hidden"
+      className="h-full bg-white border border-slate-200 flex flex-col relative shadow-sm rounded-2xl overflow-hidden transition-all duration-300"
       style={{ width: `${width}px` }}
     >
-      {/* 右侧拖拽手柄 */}
+      {/* Right Drag Handle (Gutter) */}
       <div
-        className="absolute right-0 top-0 bottom-0 w-2 cursor-col-resize z-10 hover:bg-gray-600 active:bg-gray-500 rounded-r-lg"
+        className="absolute right-0 top-0 bottom-0 w-3 cursor-col-resize z-10 hover:bg-slate-50 group flex items-center justify-center transition-colors"
         onMouseDown={handleResizeStart}
         onDoubleClick={() => {
           const resetWidth = defaultWidth;
           setWidth(resetWidth);
           onResize?.(resetWidth);
         }}
-        title="Drag to resize or double-click to reset"
+        title="Drag to resize"
       >
-        <div className="absolute right-0.5 top-1/2 transform -translate-y-1/2">
-          <GripVertical size={12} className="text-gray-500" />
-        </div>
+        <div className="h-8 w-1 rounded-full bg-slate-200 group-hover:bg-indigo-300 transition-colors" />
       </div>
 
-      {/* 面板内容 */}
+      {/* Panel Content */}
       <div className="h-full flex flex-col">
         {/* Header */}
-        <div className="px-4 py-3 border-b border-gray-700 bg-gray-900 rounded-t-lg">
+        <div className="px-4 py-3 border-b border-slate-100 bg-white shrink-0 h-14 flex items-center">
           <div className="flex items-center gap-2">
-            <div className="p-1.5 bg-gray-800 rounded-lg border border-gray-600">
-              <Folder size={14} className="text-blue-400" />
+            <div className="p-1.5 bg-indigo-50 rounded-lg border border-indigo-100 text-indigo-500">
+              <Folder size={14} />
             </div>
-            <h2 className="font-medium text-white">Files</h2>
+            <h2 className="font-bold text-slate-700 text-sm">Explorer</h2>
           </div>
         </div>
 
         {/* File List */}
-        <div className="flex-1 overflow-y-auto p-3">
+        <div className="flex-1 overflow-y-auto p-3 scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent">
           {files.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full text-center p-6">
-              <div className="p-3 bg-gray-700 rounded-lg mb-3 border border-gray-600">
-                <Folder size={24} className="text-blue-400" />
+            <div className="flex flex-col items-center justify-center h-full text-center p-6 opacity-60">
+              <div className="p-3 bg-slate-50 rounded-full mb-3 border border-slate-100">
+                <Folder size={24} className="text-slate-300" />
               </div>
-              <p className="text-sm text-gray-300">No files</p>
+              <p className="text-sm font-medium text-slate-400">
+                No files found
+              </p>
             </div>
           ) : (
             <div className="rounded">{renderTree(files)}</div>

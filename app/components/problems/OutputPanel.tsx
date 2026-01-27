@@ -3,11 +3,11 @@
 import {
   Loader2,
   X,
-  GripVertical,
   WrapText,
   Clock,
   AlertCircle,
   Keyboard,
+  Terminal,
 } from "lucide-react";
 import { ExecutionResult } from "@/lib/types";
 import { useState, useRef, useEffect } from "react";
@@ -74,8 +74,6 @@ export default function OutputPanel({
   const isInteractive = waitingForInput && executionId;
   const hasOutput = output && output.trim().length > 0;
   const hasError = Boolean(error && error.trim().length > 0);
-  const displayText = hasError ? error : output;
-  const isLongOutput = displayText && displayText.length > 1000;
 
   // --- EFFECTS ---
 
@@ -95,7 +93,6 @@ export default function OutputPanel({
         : rawContent;
 
     // 1. If the execution is finished (NOT interactive) OR it has an error:
-    // We reset the history entirely to the final output/error result.
     if (!isInteractive || hasError) {
       setSessionHistory([
         {
@@ -109,23 +106,18 @@ export default function OutputPanel({
         outputRef.current.scrollTop = outputRef.current.scrollHeight;
       }
     }
-    // 2. If it's an ongoing interactive session (isInteractive is true, no error):
+    // 2. If it's an ongoing interactive session:
     else if (isInteractive) {
       const lastItem = sessionHistory[sessionHistory.length - 1];
-
-      // 💡 FIX: Check if the new output content is just the prompt itself (server duplication).
       const newContentIsOnlyPrompt =
         content.trim() === (inputPrompt || "").trim();
 
-      // Only update history if the content is new/meaningful or if the last item was input
       if (
         sessionHistory.length === 0 ||
         lastItem?.type === "input" ||
         !newContentIsOnlyPrompt
       ) {
         const newHistory = [...sessionHistory];
-
-        // If the last item was a clean output, we might be replacing it with new output.
         if (
           newHistory.length > 0 &&
           newHistory[newHistory.length - 1].type === "output" &&
@@ -148,19 +140,17 @@ export default function OutputPanel({
         outputRef.current.scrollTop = outputRef.current.scrollHeight;
       }
     }
-
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [executionResult, isInteractive, hasOutput, hasError, output, error]);
 
   // Focus input when waiting for input
   useEffect(() => {
-    // Only focus if interactive and there is NO error
     if (isInteractive && !hasError && inputRef.current) {
       inputRef.current.focus();
     }
   }, [isInteractive, hasError]);
 
-  // Handle keyboard shortcuts for input history
+  // Handle keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!isInteractive || !inputRef.current) return;
@@ -199,7 +189,6 @@ export default function OutputPanel({
 
     const handleMouseMove = (moveEvent: MouseEvent) => {
       if (!panelRef.current) return;
-
       const containerRect =
         panelRef.current.parentElement?.getBoundingClientRect();
       if (!containerRect) return;
@@ -239,7 +228,6 @@ export default function OutputPanel({
 
     setInputHistory((prev) => [...prev, input]);
     setHistoryIndex(-1);
-
     setUserInput("");
 
     await onContinueExecution(executionId, input);
@@ -251,7 +239,6 @@ export default function OutputPanel({
     }, 50);
   };
 
-  // Handle Enter key in input
   const handleInputKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
@@ -268,7 +255,6 @@ export default function OutputPanel({
       document.body.style.cursor = "";
       document.body.style.userSelect = "";
     }
-
     return () => {
       document.body.style.cursor = "";
       document.body.style.userSelect = "";
@@ -278,68 +264,72 @@ export default function OutputPanel({
   if (!isVisible) return null;
 
   return (
+    // MAIN CONTAINER: White card style with rounded corners
     <div
       ref={panelRef}
-      className="h-full bg-gray-800 border border-gray-700 flex flex-col relative shadow-lg rounded-lg overflow-hidden"
+      className="h-full bg-white border border-slate-200 flex flex-col relative shadow-sm rounded-2xl overflow-hidden transition-colors"
       style={{ width: `${width}px` }}
     >
-      {/* Left drag handle */}
+      {/* Left drag handle (Gutter) */}
       <div
-        className="absolute left-0 top-0 bottom-0 w-2 cursor-col-resize z-10 hover:bg-gray-600 active:bg-gray-500 rounded-l-lg"
+        className="absolute left-0 top-0 bottom-0 w-3 cursor-col-resize z-10 hover:bg-violet-50 group flex items-center justify-center transition-colors"
         onMouseDown={handleResizeStart}
         onDoubleClick={() => {
           const resetWidth = defaultWidth;
           setWidth(resetWidth);
           onResize?.(resetWidth);
         }}
-        title="Drag to resize or double-click to reset"
+        title="Drag to resize"
       >
-        <div className="absolute left-0.5 top-1/2 transform -translate-y-1/2">
-          <GripVertical size={12} className="text-gray-500" />
-        </div>
+        <div className="h-8 w-1 rounded-full bg-slate-200 group-hover:bg-violet-300 transition-colors" />
       </div>
 
       {/* Panel content */}
-      <div className="h-full flex flex-col ml-2">
-        {/* Header */}
-        <div className="flex justify-between items-center px-4 py-3 bg-gray-900 border-b border-gray-700 rounded-t-lg">
+      <div className="h-full flex flex-col ml-3">
+        {/* Header: Clean & Minimal */}
+        <div className="flex justify-between items-center px-4 py-3 bg-white border-b border-slate-100 shrink-0 h-14">
           <div className="flex items-center gap-3">
+            {/* Status Icon */}
             <div
-              className={`p-1.5 rounded-lg ${
+              className={`p-1.5 rounded-lg border ${
                 hasError
-                  ? "bg-red-900/30 border-red-800"
+                  ? "bg-rose-50 border-rose-100 text-rose-500"
                   : isInteractive && !hasError
-                  ? "bg-blue-900/30 border-blue-800"
-                  : "bg-gray-700 border-gray-600"
-              } border`}
+                    ? "bg-indigo-50 border-indigo-100 text-indigo-500"
+                    : "bg-slate-50 border-slate-100 text-slate-500"
+              }`}
             >
               {hasError ? (
-                <AlertCircle size={16} className="text-red-400" />
+                <AlertCircle size={16} />
               ) : isInteractive && !hasError ? (
-                <Keyboard size={16} className="text-blue-400" />
+                <Keyboard size={16} />
               ) : (
-                <div className="w-4 h-4 rounded-full bg-blue-500"></div>
+                <Terminal size={16} />
               )}
             </div>
+
             <div>
-              <h3 className="text-sm font-semibold text-white">
+              <h3 className="text-sm font-bold text-slate-700">
                 {hasError
-                  ? "Error Output"
+                  ? "Runtime Error"
                   : isInteractive
-                  ? "Interactive Console"
-                  : "Code Output"}
+                    ? "Interactive Terminal"
+                    : "Output"}
               </h3>
-              {executionTime && !isInteractive && (
-                <div className="flex items-center gap-1 text-xs text-gray-400 mt-0.5">
-                  <Clock size={10} />
-                  <span>{executionTime.toFixed(2)}s execution time</span>
-                </div>
-              )}
-              {isInteractive && inputPrompt && !hasError && (
-                <div className="text-xs text-blue-400 mt-0.5">
-                  Awaiting input
-                </div>
-              )}
+
+              <div className="flex items-center gap-2">
+                {executionTime && !isInteractive && (
+                  <div className="flex items-center gap-1 text-[10px] font-medium text-slate-400 mt-0.5 bg-slate-50 px-1.5 py-0.5 rounded">
+                    <Clock size={10} />
+                    <span>{executionTime.toFixed(2)}s</span>
+                  </div>
+                )}
+                {isInteractive && inputPrompt && !hasError && (
+                  <div className="text-[10px] font-bold text-indigo-400 mt-0.5 animate-pulse">
+                    Awaiting input...
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
@@ -348,10 +338,10 @@ export default function OutputPanel({
             {sessionHistory.length > 0 && (
               <button
                 onClick={() => setWordWrap(!wordWrap)}
-                className={`p-2 rounded-lg border transition-colors ${
+                className={`p-2 rounded-xl border transition-all duration-200 ${
                   wordWrap
-                    ? "bg-gray-700 text-blue-400 border-gray-600"
-                    : "text-gray-400 hover:bg-gray-700 border-gray-700"
+                    ? "bg-indigo-50 text-indigo-500 border-indigo-100"
+                    : "bg-white text-slate-400 hover:bg-slate-50 border-slate-200 hover:text-slate-600"
                 }`}
                 title={wordWrap ? "Disable word wrap" : "Enable word wrap"}
               >
@@ -362,7 +352,7 @@ export default function OutputPanel({
             {/* Close button */}
             <button
               onClick={onClose}
-              className="p-2 hover:bg-gray-700 rounded-lg transition-colors text-gray-400 hover:text-white"
+              className="p-2 bg-white hover:bg-rose-50 border border-transparent hover:border-rose-100 rounded-xl transition-all text-slate-400 hover:text-rose-400"
               title="Close output"
             >
               <X size={16} />
@@ -370,60 +360,63 @@ export default function OutputPanel({
           </div>
         </div>
 
-        {/* Content */}
-        <div className="flex-1 overflow-hidden flex flex-col">
+        {/* Content Area */}
+        <div className="flex-1 overflow-hidden flex flex-col p-3 bg-white">
           {isSubmitting || isContinuing ? (
             // --- LOADER BLOCK ---
-            <div className="flex items-center justify-center h-full p-4">
-              <div className="flex flex-col items-center gap-3 text-blue-400">
+            <div className="flex items-center justify-center h-full rounded-xl bg-slate-50 border border-slate-100 border-dashed">
+              <div className="flex flex-col items-center gap-3 text-indigo-400">
                 <div className="relative">
-                  <Loader2 className="animate-spin" size={24} />
-                  <div className="absolute inset-0 animate-ping rounded-full border-2 border-blue-500/30"></div>
+                  <Loader2 className="animate-spin text-indigo-500" size={32} />
+                  <div className="absolute inset-0 animate-ping rounded-full border-2 border-indigo-200"></div>
                 </div>
-                <span className="text-sm font-medium">
+                <span className="text-sm font-bold text-slate-500">
                   {isContinuing ? "Processing input..." : "Running code..."}
                 </span>
               </div>
             </div>
           ) : sessionHistory.length > 0 || isInteractive ? (
             // --- OUTPUT/INTERACTIVE BLOCK ---
-            <div className="h-full flex flex-col">
-              {/* Output area - Renders history and the *inline* input field */}
-              <div className="flex-1 overflow-auto p-4">
+            <div className="h-full flex flex-col relative">
+              {/* Output area - CHANGED TO LIGHT THEME (bg-slate-50) */}
+              <div className="flex-1 overflow-hidden rounded-xl bg-slate-50 shadow-inner border border-slate-200">
                 <pre
                   ref={outputRef}
-                  className={`text-sm font-mono h-full overflow-auto bg-gray-900/50 rounded-lg border ${
-                    hasError ? "border-red-700" : "border-gray-700"
-                  } p-4 text-gray-300 ${
+                  className={`text-sm font-mono h-full overflow-auto p-4 text-slate-700 scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-transparent ${
                     wordWrap
                       ? "whitespace-pre-wrap break-words"
                       : "whitespace-pre"
                   } focus:outline-none`}
                   tabIndex={-1}
+                  style={{
+                    fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+                  }}
                 >
                   {sessionHistory.map((item, index) => (
                     <span key={index}>
                       {item.type === "input" ? (
-                        // Submitted input: Prompt + Value, with a newline after
-                        <span className="text-blue-300">
-                          {/* Icon for submitted prompt */}
-                          <span className="text-gray-500 mr-2">{">"}</span>
-                          {item.prompt}
-                          <span className="text-blue-500 font-bold">
+                        // Submitted input
+                        <span className="text-indigo-600 block my-1">
+                          <span className="text-slate-400 mr-2 opacity-70">
+                            {">"}
+                          </span>
+                          <span className="opacity-70 text-xs mr-2 text-slate-500">
+                            {item.prompt}
+                          </span>
+                          <span className="text-indigo-600 font-bold">
                             {item.content}
                           </span>
-                          {"\n"}
                         </span>
                       ) : (
                         // Standard output or error
                         <span
-                          className={
-                            item.isError ? "text-red-300" : "text-gray-300"
-                          }
+                          className={`block ${
+                            item.isError
+                              ? "text-rose-600 bg-rose-50 -mx-4 px-4 py-1 border-l-4 border-rose-400"
+                              : "text-slate-700"
+                          }`}
                         >
                           {item.content}
-                          {/* Ensure newline after output chunk if it doesn't end with one */}
-                          {item.content.endsWith("\n") ? "" : "\n"}
                         </span>
                       )}
                     </span>
@@ -431,70 +424,64 @@ export default function OutputPanel({
 
                   {/* INLINE INPUT LOGIC */}
                   {isInteractive &&
-                    !hasError && // Do not show input prompt if there is an error
+                    !hasError &&
                     executionResult &&
                     executionResult.inputPrompt && (
-                      <span className="text-blue-300">
-                        {/* Add newline BEFORE the current prompt if necessary */}
-                        {sessionHistory.length > 0 &&
-                        sessionHistory[sessionHistory.length - 1].type !==
-                          "input"
-                          ? ""
-                          : ""}
+                      <div className="text-indigo-600 mt-2 flex items-center">
+                        <span className="text-slate-400 mr-2 animate-pulse">
+                          {">"}
+                        </span>
+                        <span className="mr-2 text-slate-500">
+                          {executionResult.inputPrompt}
+                        </span>
 
-                        {/* Icon for current interactive prompt */}
-                        <span className="text-gray-500 mr-2">{">"}</span>
-
-                        {executionResult.inputPrompt}
-
-                        {/* The actual input element, styled to look like inline text */}
                         <input
                           ref={inputRef}
                           type="text"
                           value={userInput}
                           onChange={(e) => setUserInput(e.target.value)}
                           onKeyDown={handleInputKeyDown}
-                          className="bg-transparent border-0 p-0 m-0 w-auto min-w-[50px] focus:ring-0 text-white inline font-bold"
-                          style={{
-                            width: `${userInput.length * 8 + 10}px`,
-                          }}
+                          className="bg-transparent border-0 p-0 m-0 w-auto flex-1 focus:ring-0 text-slate-800 font-bold outline-none placeholder-slate-400"
                           disabled={isContinuing}
                           autoFocus
+                          placeholder="_"
+                          autoComplete="off"
                         />
-                      </span>
+                      </div>
                     )}
                 </pre>
               </div>
 
-              {/* Footer info (only showing history hint) */}
-              <div className="px-4 py-3 border-t border-gray-700 bg-gray-900/30 flex justify-between items-center text-xs text-gray-400">
-                <span className="text-gray-500">
+              {/* Footer status bar */}
+              <div className="mt-2 flex justify-between items-center text-[10px] font-medium text-slate-400 px-1">
+                <span>
                   {isInteractive && !hasError && inputHistory.length > 0 && (
-                    <span>↑↓ history. Press Enter to submit.</span>
+                    <span className="flex items-center gap-1">
+                      <span className="bg-slate-100 px-1 rounded border border-slate-200">
+                        ↑
+                      </span>
+                      <span className="bg-slate-100 px-1 rounded border border-slate-200">
+                        ↓
+                      </span>
+                      <span>History</span>
+                    </span>
                   )}
                   {!isInteractive &&
-                    (hasError ? "Execution failed" : "Execution completed")}
+                    (hasError
+                      ? "Process exited with error (Exit 1)"
+                      : "Process finished (Exit 0)")}
                 </span>
-                {executionTime && !isInteractive && (
-                  <span className="text-gray-500">
-                    {executionTime.toFixed(2)}s
-                  </span>
-                )}
               </div>
             </div>
           ) : (
-            // --- NO OUTPUT BLOCK ---
-            <div className="flex flex-col items-center justify-center h-full p-4 text-center">
-              <div className="mb-4 p-3 bg-gray-700 rounded-full border border-gray-600">
-                <div className="w-8 h-8 flex items-center justify-center">
-                  <div className="w-3 h-3 rounded-full bg-blue-500"></div>
-                </div>
+            // --- NO OUTPUT BLOCK (Empty State) ---
+            <div className="flex flex-col items-center justify-center h-full p-4 text-center rounded-xl bg-slate-50/50 border border-slate-100 border-dashed">
+              <div className="mb-3 p-3 bg-white rounded-full shadow-sm border border-slate-100">
+                <Terminal className="text-slate-300" size={24} />
               </div>
-              <p className="text-sm text-gray-300 font-medium mb-1">
-                No output generated
-              </p>
-              <p className="text-xs text-gray-500">
-                Run your code to see the output here
+              <p className="text-sm text-slate-600 font-bold mb-1">No Output</p>
+              <p className="text-xs text-slate-400">
+                Click ==Run== to see code execution results.
               </p>
             </div>
           )}

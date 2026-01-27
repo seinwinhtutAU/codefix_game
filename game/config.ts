@@ -13,6 +13,7 @@ import EasyToHomeTransitionScene from "./scenes/EasyToHomeTransitionScene";
 import BossLevelScene from "./scenes/BossLevelScene";
 import WarningScene from "./scenes/WarningScene";
 import MediumTransitionScene from "./scenes/MediumTransitionScene";
+import LevelScene from "./scenes/LevelScene";
 
 export const phaserConfig: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
@@ -36,6 +37,7 @@ export const phaserConfig: Phaser.Types.Core.GameConfig = {
   scene: [
     PreloadScene,
     MainMenuScene,
+    LevelScene,
     IntroScene,
     CarDriveScene,
     OfficeScene,

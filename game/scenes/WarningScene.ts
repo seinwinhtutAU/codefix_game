@@ -153,7 +153,6 @@ export default class WarningScene extends GameScene {
         color: "#ffffff",
       },
       onClick: () => {
-        AudioManager.getInstance().playSound("click", { volume: 0.5 });
         this.handleExit();
       },
     });

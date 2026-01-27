@@ -1,9 +1,10 @@
+"use client";
+
 import { useState, useRef, useEffect } from "react";
 import {
   Lightbulb,
   ChevronLeft,
   ChevronRight,
-  Sparkles,
   AlertCircle,
   GripVertical,
   X,
@@ -35,7 +36,7 @@ export default function HintsPanel({
   const [selectedLevel, setSelectedLevel] = useState<HintLevel | null>(null);
   const [hintIndex, setHintIndex] = useState(0);
   const [usedHintLevels, setUsedHintLevels] = useState<Set<HintLevel>>(
-    new Set()
+    new Set(),
   );
   const [width, setWidth] = useState(defaultWidth);
   const [isResizing, setIsResizing] = useState(false);
@@ -45,7 +46,7 @@ export default function HintsPanel({
   const currentHints = selectedLevel ? hints[selectedLevel] || [] : [];
   const levels: HintLevel[] = ["small", "medium", "big"];
 
-  // 处理拖拽调整宽度
+  // Handle Resize Logic
   const handleResizeStart = (e: React.MouseEvent) => {
     e.preventDefault();
     setIsResizing(true);
@@ -74,7 +75,7 @@ export default function HintsPanel({
     document.addEventListener("mouseup", handleMouseUp);
   };
 
-  // 全局拖拽状态样式
+  // Global Resize Cursor
   useEffect(() => {
     if (isResizing) {
       document.body.style.cursor = "col-resize";
@@ -143,12 +144,12 @@ export default function HintsPanel({
   return (
     <div
       ref={panelRef}
-      className="h-full bg-gray-900 border border-yellow-700/30 rounded-lg shadow-xl overflow-hidden flex flex-col relative"
+      className="h-full bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden flex flex-col relative"
       style={{ width: `${width}px` }}
     >
-      {/* 左侧拖拽手柄 */}
+      {/* Left Drag Handle (Gutter) */}
       <div
-        className="absolute left-0 top-0 bottom-0 w-2 cursor-col-resize z-20 hover:bg-yellow-600/30 active:bg-yellow-500/40"
+        className="absolute left-0 top-0 bottom-0 w-3 cursor-col-resize z-20 hover:bg-amber-50 group flex items-center justify-center transition-colors"
         onMouseDown={handleResizeStart}
         onDoubleClick={() => {
           const newWidth = defaultWidth;
@@ -156,22 +157,20 @@ export default function HintsPanel({
           if (onResize) onResize(newWidth);
         }}
       >
-        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
-          <GripVertical size={12} className="text-yellow-500/60" />
-        </div>
+        <div className="h-8 w-1 rounded-full bg-slate-200 group-hover:bg-amber-300 transition-colors" />
       </div>
 
       {/* Header */}
-      <div className="flex justify-between items-center px-4 py-3 bg-gray-900 border-b border-yellow-700/30 flex-shrink-0">
+      <div className="flex justify-between items-center px-4 py-3 bg-white border-b border-slate-100 flex-shrink-0 h-14">
         <div className="flex items-center gap-3">
-          <div className="p-1.5 bg-yellow-900/20 rounded-lg border border-yellow-700/50">
-            <Lightbulb size={16} className="text-yellow-400" />
+          <div className="p-1.5 bg-amber-50 rounded-lg border border-amber-100">
+            <Lightbulb size={16} className="text-amber-500" />
           </div>
           <div>
-            <h3 className="text-sm font-semibold text-yellow-100">Hints</h3>
-            <p className="text-xs text-yellow-300/70 mt-0.5">
+            <h3 className="text-sm font-bold text-slate-700">Hints</h3>
+            <p className="text-[10px] text-slate-400 mt-0.5">
               {getHighestUsedLevel() !== "none"
-                ? `Using ${getHighestUsedLevel()} hints`
+                ? `Current Level: ${getHighestUsedLevel()}`
                 : "No hints used yet"}
             </p>
           </div>
@@ -180,22 +179,28 @@ export default function HintsPanel({
         <div className="flex items-center gap-2">
           <button
             onClick={handleClose}
-            className="p-1.5 hover:bg-yellow-900/20 rounded-lg text-yellow-400 hover:text-yellow-300"
+            className="p-1.5 hover:bg-rose-50 rounded-lg text-slate-400 hover:text-rose-400 transition-colors"
           >
             <X size={16} />
           </button>
         </div>
       </div>
 
-      {/* 内容区域 - 可滚动 */}
-      <div className="flex-1 overflow-hidden p-4">
-        <div ref={contentRef} className="h-full overflow-auto pr-2">
+      {/* Content Area - Scrollable */}
+      <div className="flex-1 overflow-hidden p-4 bg-white">
+        <div
+          ref={contentRef}
+          className="h-full overflow-auto pr-2 scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent"
+        >
           {/* Level Selection */}
           {!selectedLevel && (
-            <div className="space-y-4">
-              <div className="mb-4">
-                <p className="text-sm text-yellow-300/70 mb-2">
-                  Select a hint level to view hints.
+            <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
+              <div className="mb-2">
+                <p className="text-xs text-slate-500">
+                  Stuck? Select a hint level below.
+                  <span className="block text-[10px] text-amber-600 mt-1 font-medium">
+                    Note: Using hints will affect your final score.
+                  </span>
                 </p>
               </div>
 
@@ -204,35 +209,38 @@ export default function HintsPanel({
                   <button
                     key={level}
                     onClick={() => handleLevelSelect(level)}
-                    className={`flex flex-col w-full p-4 rounded-lg border transition-all text-left ${
+                    className={`flex flex-col w-full p-4 rounded-xl border transition-all text-left shadow-sm ${
                       usedHintLevels.has(level)
-                        ? "border-yellow-500 bg-yellow-900/20"
-                        : "border-yellow-700/40 bg-yellow-900/10 hover:bg-yellow-900/20"
+                        ? "border-amber-200 bg-amber-50/50"
+                        : "border-slate-100 bg-white hover:bg-slate-50 hover:border-slate-200"
                     }`}
                   >
                     <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-2">
                         {usedHintLevels.has(level) && (
-                          <span className="w-2 h-2 rounded-full bg-yellow-500"></span>
+                          <div className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
                         )}
-                        <span className="capitalize font-medium text-yellow-100">
+                        <span className="capitalize font-bold text-slate-700">
                           {level} Hint
                         </span>
                       </div>
-                      <div className="text-xs text-yellow-400">
+                      <div className="text-xs font-medium text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
                         {hints[level]?.length || 0} hint
                         {hints[level]?.length !== 1 ? "s" : ""}
                       </div>
                     </div>
-                    <div className="flex items-center justify-between text-xs text-yellow-300/70">
-                      <span>
-                        {level === "small" && "90 points"}
-                        {level === "medium" && "70 points"}
-                        {level === "big" && "50 points"}
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-slate-500 font-medium">
+                        Max Score:
+                        <span className="text-indigo-500 ml-1">
+                          {level === "small" && "90"}
+                          {level === "medium" && "70"}
+                          {level === "big" && "50"} pts
+                        </span>
                       </span>
                       {usedHintLevels.has(level) && (
-                        <span className="text-yellow-400 font-medium">
-                          Used
+                        <span className="text-amber-600 font-bold text-[10px] uppercase tracking-wide">
+                          Unlocked
                         </span>
                       )}
                     </div>
@@ -244,75 +252,79 @@ export default function HintsPanel({
 
           {/* Hint Content */}
           {selectedLevel && currentHints.length > 0 && (
-            <div className="space-y-4 h-full">
-              {/* 返回按钮和标题 */}
-              <div className="flex items-center justify-between mb-4">
+            <div className="space-y-4 h-full flex flex-col animate-in fade-in slide-in-from-right-4 duration-300">
+              {/* Back Button & Title */}
+              <div className="flex items-center justify-between mb-2 shrink-0">
                 <button
                   onClick={handleBackToLevels}
-                  className="flex items-center gap-2 text-sm text-yellow-400 hover:text-yellow-300"
+                  className="flex items-center gap-1 text-xs font-bold text-slate-500 hover:text-indigo-600 transition-colors bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-100 hover:border-indigo-100"
                 >
-                  <ChevronLeft size={16} />
-                  <span>Back to levels</span>
+                  <ChevronLeft size={14} />
+                  <span>Back</span>
                 </button>
-                <div className="flex items-center gap-2 px-3 py-1.5 bg-yellow-900/20 rounded-lg border border-yellow-700/40">
-                  <div className="p-1 bg-yellow-900/30 rounded">
-                    <Lightbulb size={12} className="text-yellow-400" />
-                  </div>
-                  <span className="text-sm font-medium text-yellow-100 capitalize">
+                <div className="flex items-center gap-2 px-3 py-1 bg-amber-50 rounded-lg border border-amber-100">
+                  <span className="text-xs font-bold text-amber-700 capitalize">
                     {selectedLevel} Hint
                   </span>
                 </div>
               </div>
 
-              {/* 导航和提示信息 */}
-              <div className="flex justify-between items-center mb-3 text-sm text-yellow-300/70">
+              {/* Navigation & Counter */}
+              <div className="flex justify-between items-center mb-1 text-xs text-slate-400 font-medium shrink-0">
                 <span>
-                  Hint {hintIndex + 1} of {currentHints.length}
+                  Tip {hintIndex + 1} of {currentHints.length}
                 </span>
-                <div className="flex gap-2">
+                <div className="flex gap-1">
                   <button
                     disabled={hintIndex === 0}
                     onClick={() => handleHintNavigation(hintIndex - 1)}
-                    className="p-1.5 hover:bg-yellow-900/20 rounded-lg disabled:opacity-30 border border-yellow-700/40 text-yellow-300/70 disabled:cursor-not-allowed"
+                    className="p-1.5 hover:bg-slate-100 rounded-lg disabled:opacity-30 border border-slate-200 text-slate-500 disabled:cursor-not-allowed transition-colors"
                   >
-                    <ChevronLeft size={16} />
+                    <ChevronLeft size={14} />
                   </button>
                   <button
                     disabled={hintIndex === currentHints.length - 1}
                     onClick={() => handleHintNavigation(hintIndex + 1)}
-                    className="p-1.5 hover:bg-yellow-900/20 rounded-lg disabled:opacity-30 border border-yellow-700/40 text-yellow-300/70 disabled:cursor-not-allowed"
+                    className="p-1.5 hover:bg-slate-100 rounded-lg disabled:opacity-30 border border-slate-200 text-slate-500 disabled:cursor-not-allowed transition-colors"
                   >
-                    <ChevronRight size={16} />
+                    <ChevronRight size={14} />
                   </button>
                 </div>
               </div>
 
-              {/* 提示内容 - 可滚动 */}
-              <div className="bg-yellow-900/10 border border-yellow-700/30 rounded-lg p-4 min-h-[150px] max-h-[300px] overflow-auto">
-                <p className="text-sm text-yellow-100 leading-relaxed whitespace-pre-wrap">
-                  {currentHints[hintIndex]}
-                </p>
+              {/* Hint Card - Scrollable */}
+              <div className="bg-amber-50/50 border border-amber-100 rounded-xl p-5 shadow-sm flex-1 overflow-auto">
+                <div className="flex gap-3">
+                  <Lightbulb
+                    size={18}
+                    className="text-amber-500 shrink-0 mt-0.5"
+                  />
+                  <p className="text-sm text-slate-700 leading-relaxed font-medium">
+                    {currentHints[hintIndex]}
+                  </p>
+                </div>
               </div>
             </div>
           )}
 
           {/* No hints available */}
           {selectedLevel && currentHints.length === 0 && (
-            <div className="flex flex-col items-center justify-center h-full text-center p-6">
-              <div className="mb-4 p-4 bg-yellow-900/20 rounded-full border border-yellow-700/30">
-                <AlertCircle size={24} className="text-yellow-500/50" />
+            <div className="flex flex-col items-center justify-center h-full text-center p-6 opacity-80">
+              <div className="mb-3 p-3 bg-slate-50 rounded-full border border-slate-100">
+                <AlertCircle size={24} className="text-slate-400" />
               </div>
-              <h4 className="text-sm font-medium text-yellow-100 mb-2">
-                No Hints Available
+              <h4 className="text-sm font-bold text-slate-600 mb-1">
+                No Hints Found
               </h4>
-              <p className="text-sm text-yellow-300/70 mb-4">
-                No hints available for {selectedLevel} level.
+              <p className="text-xs text-slate-400 mb-4 max-w-[200px]">
+                There are currently no hints available for the {selectedLevel}{" "}
+                level.
               </p>
               <button
                 onClick={handleBackToLevels}
-                className="text-sm text-yellow-400 hover:text-yellow-300 underline"
+                className="text-xs font-bold text-indigo-500 hover:text-indigo-600 hover:underline"
               >
-                Choose another level
+                Select another level
               </button>
             </div>
           )}
@@ -320,13 +332,16 @@ export default function HintsPanel({
       </div>
 
       {/* Footer */}
-      <div className="px-4 py-3 border-t border-yellow-700/30 bg-yellow-900/10 flex-shrink-0">
-        <div className="flex justify-between items-center text-xs text-yellow-300/70">
-          <span>Using hints will reduce your final score</span>
+      <div className="px-4 py-2 border-t border-slate-100 bg-slate-50/50 flex-shrink-0">
+        <div className="flex justify-between items-center text-[10px] font-medium text-slate-400">
+          <span className="flex items-center gap-1">
+            <AlertCircle size={10} className="text-amber-500" />
+            Hints reduce score
+          </span>
           <span>
             {getHighestUsedLevel() !== "none"
-              ? `Highest hint used: ${getHighestUsedLevel()}`
-              : "No hints used"}
+              ? `Used: ${getHighestUsedLevel()}`
+              : "0 Used"}
           </span>
         </div>
       </div>

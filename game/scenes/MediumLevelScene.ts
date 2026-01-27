@@ -2,7 +2,7 @@ import AudioManager from "../AudioManager";
 import GameScene from "./GameScene";
 import { checkExistingSolveRecord } from "@/services/problem";
 import { EventBus } from "@/game/events";
-import { IGameProgress } from "@/lib/types";
+import { IGameProgress, ProblemSolveRecord } from "@/lib/types";
 
 export interface SolvedPointStatus {
   attempts: number;
@@ -86,6 +86,7 @@ export default class MediumLevelScene extends GameScene {
     },
   ];
 
+  private solvedRecords: ProblemSolveRecord[] = [];
   private currentPointIndex = 0;
   private mapPoints: Phaser.GameObjects.Image[] = [];
   private solvedPoints: SolvedPointStatus[] = [];
@@ -112,6 +113,7 @@ export default class MediumLevelScene extends GameScene {
     this.createParticle();
     this.initSolvedPoints();
     this.drawMapAndPoints();
+    this.solvedRecords = await this.getAllSolvedRecord();
     this.drawStartHere();
     this.addTooltip();
     await this.updateAllSolvePoint();
@@ -136,8 +138,8 @@ export default class MediumLevelScene extends GameScene {
     const bg = this.add.graphics();
     bg.fillStyle(0x000000, 0.8);
     bg.lineStyle(2, 0xffffff, 1);
-    bg.fillRoundedRect(0, 0, 180, 100, 10);
-    bg.strokeRoundedRect(0, 0, 180, 100, 10);
+    bg.fillRoundedRect(0, 0, 180, 120, 10);
+    bg.strokeRoundedRect(0, 0, 180, 120, 10);
 
     // Create the text object
     this.tooltipText = this.add.text(10, 10, "", {
@@ -229,6 +231,7 @@ export default class MediumLevelScene extends GameScene {
   private handleProgressResume = async (progress: IGameProgress) => {
     const { currentTask } = progress.gameState;
 
+    this.solvedRecords = await this.getAllSolvedRecord();
     const index = currentTask.currentActiveIndex ?? 0;
     const completedIndex = index - 1;
     const userId = progress.userId;
@@ -274,6 +277,17 @@ export default class MediumLevelScene extends GameScene {
     audioManager.playMusic("bgm", { volume: 0.15, loop: true });
   }
 
+  private formatTime(seconds: number): string {
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+
+    // Using padStart ensures we see "5:05" instead of "5:5"
+    const minutesString = minutes.toString().padStart(2, "0");
+    const secondsString = remainingSeconds.toString().padStart(2, "0");
+
+    return `${minutesString}:${secondsString}`;
+  }
+
   private drawMapAndPoints() {
     // Clear existing points if they exist
     if (this.mapPoints.length > 0) {
@@ -294,6 +308,8 @@ export default class MediumLevelScene extends GameScene {
         .setDepth(2);
 
       point.on("pointerdown", () => {
+        AudioManager.getInstance().playSound("click", { volume: 0.5 });
+
         if (index === this.currentPointIndex) {
           EventBus.emit("ui-open-problem", {
             problemId: this.problemIds[index],
@@ -313,31 +329,34 @@ export default class MediumLevelScene extends GameScene {
 
       point.on("pointerover", () => {
         const state = this.getPointState(index);
-        const solvedData = this.solvedPoints[index];
 
         // Prepare information strings
         const statusText = state.toUpperCase();
-        const pointsEarned = solvedData ? "100" : "0"; // Example logic
-        const totalTime = "02:45"; // You would pull this from your solved record data
-
+        const pointsEarned = this.solvedRecords[index]?.pointsEarned || 0;
+        const totalTime = this.formatTime(
+          this.solvedRecords[index]?.timeSpent || 0,
+        );
+        const attempt = this.solvedRecords[index]?.attempt || 0;
         this.tooltipText.setText(
           `Challenge: #${index + 1}\n` +
             `STATE: ${statusText}\n` +
-            `EARNED: ${pointsEarned}\n` +
-            `TIME: ${totalTime}`,
+            `POINTS: ${pointsEarned}\n` +
+            `TIME: ${totalTime}(m:s)\n` +
+            `ATTEMPT: ${attempt}`,
         );
 
         // Position above the point
         this.tooltipContainer.setPosition(value.x - 90, value.y - 120);
         this.tooltipContainer.setVisible(true);
 
-        // Simple hover effect on the point itself
-        this.tweens.add({ targets: point, scale: 1.1, duration: 100 });
+        if (index !== this.currentPointIndex)
+          this.tweens.add({ targets: point, scale: 1, duration: 100 });
       });
 
       point.on("pointerout", () => {
         this.tooltipContainer.setVisible(false);
-        this.tweens.add({ targets: point, scale: 1.0, duration: 100 });
+        if (index !== this.currentPointIndex)
+          this.tweens.add({ targets: point, scale: 0.78, duration: 100 });
       });
 
       this.mapPoints.push(point);
@@ -421,7 +440,7 @@ export default class MediumLevelScene extends GameScene {
       // point.setScale(1);
       point.setAlpha(1);
       point.clearTint();
-      point.disableInteractive();
+      point.setInteractive({ useHandCursor: true });
 
       switch (state) {
         case "solved":
@@ -580,7 +599,12 @@ export default class MediumLevelScene extends GameScene {
       confirmLabel: "NEXT",
       onConfirm: () => {
         EventBus.emit("hide-notification");
-        // Use the helper to ensure progress is saved before switching
+
+        if (this.savedProgress && this.savedProgress.gameState) {
+          this.savedProgress.gameState.eventFlags.mediumLevelCompleted = true;
+          this.savedProgress.gameState.currentScene = "PlayGroundScene";
+        }
+
         this.emitLevelCompleted(this.savedProgress);
         this.scene.start("MediumTransitionScene", this.savedProgress);
       },
@@ -588,15 +612,33 @@ export default class MediumLevelScene extends GameScene {
   }
 
   private checkLevelCompleted(): boolean {
-    let countOfSolved = 0;
-    this.solvedPoints.forEach((status) => {
-      if (status.isSolved) countOfSolved++;
+    let counts = 0;
+    this.solvedRecords.forEach((record) => {
+      if (!!record) {
+        counts += 1;
+      }
     });
 
-    if (countOfSolved === this.solvedPoints.length) {
+    if (counts === this.roadPoints.length) {
       return true;
     }
 
     return false;
+  }
+
+  private async getAllSolvedRecord(): Promise<ProblemSolveRecord[]> {
+    const problemIds = this.problemIds;
+    const userId = this.savedProgress.userId;
+
+    const solveRecords = await Promise.all(
+      problemIds.map(async (id) => {
+        const record = await checkExistingSolveRecord(userId, id);
+        return record?.data;
+      }),
+    );
+
+    return solveRecords.filter(
+      (record): record is ProblemSolveRecord => record !== undefined,
+    );
   }
 }

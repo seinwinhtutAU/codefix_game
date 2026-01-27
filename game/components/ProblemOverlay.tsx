@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { AnimatePresence } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import Editor from "@monaco-editor/react";
 import {
   Loader2,
@@ -13,6 +13,10 @@ import {
   X,
   Timer,
   Sparkle,
+  Layout,
+  LucideIcon,
+  CheckCircle2,
+  Code2,
 } from "lucide-react";
 import {
   ProblemDescription,
@@ -44,7 +48,6 @@ import {
 } from "@/lib/types";
 import { getPlayerProgress } from "@/services/game";
 import { HintUsage } from "@/lib/types";
-import { time } from "console";
 
 interface ProblemOverlayProps {
   problemId: string;
@@ -70,8 +73,7 @@ export function ProblemOverlay({
   const [finalRecord, setFinalRecord] = useState<ProblemSolveRecord>();
   const [progress, setProgress] = useState<IGameProgress>();
 
-  // ✅ DERIVED STATE: Single Source of Truth
-  // We read directly from the progress object. If it updates, this recalculates.
+  // ✅ DERIVED STATE
   const attempts = progress?.gameState?.currentTask?.attempts ?? 0;
 
   // --- 1. INITIAL LOAD ---
@@ -79,31 +81,20 @@ export function ProblemOverlay({
     const fetchProgress = async () => {
       try {
         const data = await getPlayerProgress();
-        console.log(
-          "ProblemOverly, Initial Progress",
-          JSON.stringify(data, null, 2),
-        );
         setProgress(data);
       } catch (err) {
         console.error("Failed to load progress:", err);
       }
     };
-
     fetchProgress();
   }, []);
 
   // --- 2. PROGRESS MODIFIERS ---
   const incrementAttemptsInProgress = () => {
-    console.log("Run incrementAttemptsInProgress");
     setProgress((prev) => {
       if (!prev?.gameState?.currentTask) return prev;
-
       const currentAttempts = prev.gameState.currentTask.attempts ?? 0;
-
-      // Logic: If currently 4 (becoming 5), reset to 0? Or keep at 5?
-      // Based on your previous code logic (resetting if >=5):
       const newAttempts = currentAttempts + 1 > 5 ? 0 : currentAttempts + 1;
-
       return {
         ...prev,
         gameState: {
@@ -120,12 +111,6 @@ export function ProblemOverlay({
   // --- 3. DATABASE SYNC ---
   useEffect(() => {
     if (!progress) return;
-
-    console.log(
-      "ProblemOverlay, Updated Progress: ",
-      JSON.stringify(progress, null, 2),
-    );
-
     const updateProgress = async () => {
       try {
         await fetch("/api/game-progress", {
@@ -142,14 +127,12 @@ export function ProblemOverlay({
         console.error("Database Save Error:", e);
       }
     };
-
-    const timeoutId = setTimeout(updateProgress, 500); // Debounce slightly
+    const timeoutId = setTimeout(updateProgress, 500);
     return () => clearTimeout(timeoutId);
   }, [progress]);
 
   useEffect(() => {
     if (!progress) return;
-
     const timeoutId = setTimeout(() => {
       EventBus.emit("problem-update-progress", {
         userId: progress.userId,
@@ -158,7 +141,6 @@ export function ProblemOverlay({
         bugCounts: progress.bugCounts,
       } as IGameProgress);
     }, 500);
-
     return () => clearTimeout(timeoutId);
   }, [progress]);
 
@@ -203,7 +185,6 @@ export function ProblemOverlay({
   } = useUserCodeManager();
 
   // --- TIMER LOGIC ---
-
   const [timeLimited, setTimeLimited] = useState(60);
   const [basePoints, setBasePoints] = useState(100);
 
@@ -212,14 +193,11 @@ export function ProblemOverlay({
   );
 
   const minBugs: number = 10;
-  const maxBugs: number = 20;
   const timerIncrementPerBug: number = 120;
   const pointIncrementPerBug: number = 10;
-  // Define constants at the top
   const BASE_TIME_LIMIT = 60;
   const BASE_POINTS = 100;
 
-  // Create a calculation function
   const calculateTimeAndPoints = (bugCount: number) => {
     const bugFactor = bugCount - minBugs;
     const calculatedTime = bugFactor * timerIncrementPerBug + BASE_TIME_LIMIT;
@@ -232,13 +210,8 @@ export function ProblemOverlay({
       const { calculatedTime, calculatedPoints } = calculateTimeAndPoints(
         currentBugCount.bugCount,
       );
-
       setTimeLimited(calculatedTime);
       setBasePoints(calculatedPoints);
-
-      console.log(
-        `Time Limit Updated: ${calculatedTime}s for ${currentBugCount.bugCount} bugs`,
-      );
     }
   }, [currentBugCount]);
 
@@ -273,13 +246,13 @@ export function ProblemOverlay({
   // Panel dimensions
   const [fileExplorerWidth, setFileExplorerWidth] = useState(200);
   const [hintsPanelWidth, setHintsPanelWidth] = useState(300);
-  const [outputPanelWidth, setOutputPanelWidth] = useState(500);
-  const [testCasePanelHeight, setTestCasePanelHeight] = useState(288);
+  const [outputPanelWidth, setOutputPanelWidth] = useState(400);
+  const [testCasePanelHeight, setTestCasePanelHeight] = useState(200);
 
   // --- GAME OVER LOGIC ---
   useEffect(() => {
     if (isTimeUp && !hasCompleted) {
-      incrementAttemptsInProgress(); // This updates 'progress', which updates 'attempts', which triggers DB save
+      incrementAttemptsInProgress();
       setShowGameOver(true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -290,9 +263,6 @@ export function ProblemOverlay({
     if (hasCompleted) return;
 
     if (attempts === 5) {
-      console.log("Max attempts reached. Saving failed record.");
-
-      // 🔒 Prevent duplicate saves
       if (progress.gameState.currentTask.status === "completed") return;
 
       const failedRecord: SolveRecordRequest = {
@@ -311,14 +281,14 @@ export function ProblemOverlay({
   const handleTryAgain = () => {
     setShowGameOver(false);
     resetTimer();
-    resetAllFileInTryAgain();
   };
 
   const editorWidth = () => {
     let width = "100%";
-    if (showExplorer) width = `calc(${width} - ${fileExplorerWidth}px - 1rem)`;
-    if (showHints) width = `calc(${width} - ${hintsPanelWidth}px - 1rem)`;
-    if (showOutput) width = `calc(${width} - ${outputPanelWidth}px - 1rem)`;
+    if (showExplorer)
+      width = `calc(${width} - ${fileExplorerWidth}px - 0.75rem)`;
+    if (showHints) width = `calc(${width} - ${hintsPanelWidth}px - 0.75rem)`;
+    if (showOutput) width = `calc(${width} - ${outputPanelWidth}px - 0.75rem)`;
     return width;
   };
 
@@ -360,9 +330,19 @@ export function ProblemOverlay({
     }
   };
 
+  // ✅ 1. NEW HANDLER: Run Code & Auto-Show Output
+  const handleRunCode = () => {
+    setShowOutput(true);
+    runNormalCode();
+  };
+
   const handleSubmitCode = async () => {
     if (hasCompleted || isTimeUp) return;
+
+    // ✅ 2. MODIFIED: Auto-Show Test Cases
+    setShowTestCases(true);
     setIsTestRunning(true);
+
     try {
       const result = await runTestCode();
       const totalTests = result?.totalTests;
@@ -423,13 +403,11 @@ export function ProblemOverlay({
           hintLevelMap[usage.hintLevel],
         );
       }
-
       return reverseHintLevelMap[highestHintLevel];
     },
     [],
   );
 
-  // update progress after hints used
   useEffect(() => {
     if (
       JSON.stringify(hintUsages) ===
@@ -440,7 +418,6 @@ export function ProblemOverlay({
 
     setProgress((prev) => {
       if (!prev?.gameState?.currentTask) return prev;
-
       return {
         ...prev,
         gameState: {
@@ -476,7 +453,6 @@ export function ProblemOverlay({
       currentScene = scene;
     });
 
-    // 3. Prepare the full Progress object
     const updatedProgress: IGameProgress = {
       ...progress,
       gameState: {
@@ -497,7 +473,6 @@ export function ProblemOverlay({
           bugCounts: updatedProgress?.bugCounts,
         }),
       });
-      console.log("Database updated successfully before exit.");
     } catch (e) {
       console.error("Failed to persist progress to DB on exit:", e);
     }
@@ -505,7 +480,6 @@ export function ProblemOverlay({
     if (hasCompleted) {
       EventBus.emit("problem-solved", { currentTask: updatedTask });
     }
-    // Always trigger resume to unpause the game
     EventBus.emit("resume-after-solve", updatedProgress);
     EventBus.emit("ui-close-problem");
     onClose();
@@ -514,11 +488,8 @@ export function ProblemOverlay({
   const calculateEstimatedPoints = () => {
     if (hasCompleted && finalRecord) return finalRecord.pointsEarned;
     if (attempts >= 5) return 0;
-
     const hintLevel = progress?.gameState.currentTask.highestHintLevelUsed;
-
     let currentPoints = basePoints;
-
     switch (hintLevel) {
       case "small":
         currentPoints = Math.min(currentPoints, 90);
@@ -530,7 +501,6 @@ export function ProblemOverlay({
         currentPoints = Math.min(currentPoints, 50);
         break;
     }
-
     return Math.max(0, currentPoints - attempts * 10);
   };
 
@@ -538,7 +508,6 @@ export function ProblemOverlay({
 
   const resetCurrentFile = () => {
     if (!selectedFile || !problem) return;
-
     const originalContent = getOriginalFileContent(
       selectedFile,
       originalFileContents,
@@ -547,7 +516,6 @@ export function ProblemOverlay({
       ...prev,
       [selectedFile.id]: originalContent,
     }));
-
     const updatedProblem = updateUserCodeFiles(
       problem,
       selectedFile,
@@ -568,7 +536,6 @@ export function ProblemOverlay({
     ) {
       return;
     }
-
     setFileContents(originalFileContents);
     const updatedProblem = resetAllFiles(problem, originalFileContents);
     if (updatedProblem) {
@@ -578,9 +545,7 @@ export function ProblemOverlay({
 
   const resetAllFileInTryAgain = async () => {
     if (!problem) return;
-
     setFileContents(originalFileContents);
-
     const updatedProblem = resetAllFiles(problem, originalFileContents);
     if (updatedProblem) {
       setProblem(updatedProblem);
@@ -589,145 +554,214 @@ export function ProblemOverlay({
 
   if (isLoading || !problem) {
     return (
-      <div className="absolute inset-0 z-[200] flex flex-col items-center justify-center bg-gray-900/90 backdrop-blur-sm gap-4">
-        <Loader2 className="animate-spin text-red-500" size={64} />
-        {difficulty === "boss" && (
-          <div className="text-center animate-pulse">
-            <h2 className="text-xl font-mono text-red-500 font-bold">
-              WARNING: BOSS ENCOUNTER
-            </h2>
-            <p className="text-gray-400 font-mono text-sm mt-2">
-              Generating System Anomalies...
-            </p>
-          </div>
-        )}
+      <div className="absolute inset-0 z-[200] flex flex-col items-center justify-center bg-violet-50/90 backdrop-blur-sm gap-4">
+        <Loader2 className="animate-spin text-violet-500" size={64} />
       </div>
     );
   }
 
+  // Helper for Sidebar Buttons
+  const SidebarButton = ({
+    active,
+    onClick,
+    icon: Icon,
+    colorClass,
+  }: {
+    active: boolean;
+    onClick: () => void;
+    icon: LucideIcon;
+    colorClass: string;
+  }) => (
+    <button
+      onClick={onClick}
+      className={`p-3 rounded-2xl transition-all duration-300 shadow-sm ${
+        active
+          ? `${colorClass} text-white shadow-md scale-105`
+          : "bg-white text-slate-400 hover:bg-slate-50 hover:text-slate-600 hover:scale-105"
+      }`}
+    >
+      <Icon size={22} strokeWidth={active ? 2.5 : 2} />
+    </button>
+  );
+
   return (
+    // MAIN CONTAINER: 柔和的暖白色背景，适应 768px 高度
     <div
-      className="absolute inset-0 z-[150] bg-gray-900 flex flex-col p-4 animate-in fade-in zoom-in duration-200 overflow-hidden"
+      className="absolute inset-0 z-[150] bg-[#FDFBF7] flex flex-row animate-in fade-in zoom-in duration-200 overflow-hidden font-sans"
       onKeyDown={(e) => e.stopPropagation()}
     >
       <AnimatePresence>
-        {/* SUCCESS NOTIFICATION */}
+        {/* SUCCESS POPUP */}
         {showSuccessPopup && (
           <GameNotification
             type="SUCCESS"
             title="Great Job!"
-            message={`You have solved problem successfully.
-                    Attempts: ${attempts} 
-                    Time: ${finalRecord?.timeSpent || totalTimeSpent}s 
-                    Points: ${
-                      finalRecord?.pointsEarned ??
-                      (attempts >= 5 ? 0 : basePoints)
-                    }`}
+            message={`Solved in ${finalRecord?.timeSpent || totalTimeSpent}s and ${attempts} attempts`}
+            points={
+              finalRecord?.pointsEarned ?? (attempts >= 5 ? 0 : basePoints)
+            }
             confirmLabel="Back to Game"
             onConfirm={handleFinalExit}
           />
         )}
 
-        {/* GAME OVER NOTIFICATION */}
+        {/* GAME OVER POPUP */}
         {showGameOver && (
           <GameNotification
             type="GAMEOVER"
-            title="Game Over!"
+            title="Game Over"
             message={
               attempts >= 5
-                ? "You have reached the maximum of 5 attempts. Proceeding to the next problem."
-                : `Time Expired! Please Try agan! Attempt ${attempts}/5.`
+                ? "Maximum attempts reached. Proceeding to next problem."
+                : `Time's up! Please try again. (Attempt ${attempts}/5)`
             }
             confirmLabel={attempts >= 5 ? "Back to Game" : "Try Again"}
-            // Logic: If attempts < 5, try again. If >= 5, final exit.
             onConfirm={attempts >= 5 ? handleFinalExit : handleTryAgain}
           />
         )}
       </AnimatePresence>
 
-      {/* Header with Timer */}
-      <div className="flex items-center justify-between mb-4 bg-gray-800 p-3 rounded-lg border border-gray-700">
-        <div className="flex items-center gap-6">
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-gray-700 rounded-full text-gray-400 hover:text-white transition-colors"
-          >
-            <X size={24} />
-          </button>
+      {/* --- LEFT SIDEBAR (Compact Navigation) --- */}
+      <div className="w-16 flex flex-col items-center py-4 bg-white border-r border-slate-100 shadow-[2px_0_15px_-5px_rgba(0,0,0,0.05)] z-20 gap-3">
+        <button
+          onClick={onClose}
+          className="mb-2 p-2 rounded-full hover:bg-red-50 text-slate-300 hover:text-red-400 transition-colors"
+        >
+          <X size={24} />
+        </button>
 
-          <h2 className="text-xl font-mono text-white tracking-tight underline decoration-blue-500">
-            SECURE_TERMINAL // {problem.title}
-          </h2>
+        <div className="w-8 h-[1px] bg-slate-100 mb-2" />
 
-          {/* TIMER */}
-          <div
-            className={`flex items-center gap-2 px-3 py-1 rounded bg-black/40 border ${
-              timeLeft < 10
-                ? "border-red-500 animate-pulse"
-                : "border-blue-500/30"
-            }`}
-          >
-            <Timer
-              size={18}
-              className={timeLeft < 10 ? "text-red-500" : "text-blue-400"}
-            />
-            <span
-              className={`font-mono text-xl ${
-                timeLeft < 10 ? "text-red-500" : "text-blue-400"
+        <SidebarButton
+          active={showExplorer}
+          onClick={() => setShowExplorer(!showExplorer)}
+          icon={Files}
+          colorClass="bg-indigo-400"
+        />
+        <SidebarButton
+          active={showHints}
+          onClick={() => setShowHints(!showHints)}
+          icon={Lightbulb}
+          colorClass="bg-amber-400"
+        />
+        <SidebarButton
+          active={showTestCases}
+          onClick={() => setShowTestCases(!showTestCases)}
+          icon={Terminal}
+          colorClass="bg-emerald-400"
+        />
+        <SidebarButton
+          active={showOutput}
+          onClick={() => setShowOutput(!showOutput)}
+          icon={Layout}
+          colorClass="bg-violet-400"
+        />
+      </div>
+
+      {/* --- MAIN CONTENT AREA --- */}
+      <div className="flex-1 flex flex-col min-h-0 overflow-hidden p-3 gap-3">
+        {/* 1. HEADER (Compact & Cute) */}
+        <div className="flex items-center justify-between bg-white px-4 py-2 rounded-2xl border border-slate-100 shadow-sm shrink-0 h-14">
+          <div className="flex items-center gap-4">
+            <h2 className="text-lg font-bold text-slate-700 tracking-tight flex items-center gap-2">
+              <span className="text-violet-400">#</span>
+              {problem.title}
+            </h2>
+
+            {/* TIMER - Capsule Style */}
+            <div
+              className={`flex items-center gap-2 px-3 py-1 rounded-full border ${
+                timeLeft < 10
+                  ? "bg-red-50 border-red-200"
+                  : "bg-blue-50 border-blue-100"
               }`}
             >
-              {Math.floor(timeLeft / 60)
-                .toString()
-                .padStart(2, "0")}
-              :{(timeLeft % 60).toString().padStart(2, "0")}
-            </span>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-6">
-          {/* ESTIMATED REWARD */}
-          <div className="flex flex-col items-end border-r border-gray-700 pr-6">
-            <span className="text-[10px] font-mono text-gray-500 uppercase tracking-widest">
-              Est. Reward
-            </span>
-            <div className="flex items-center gap-1">
-              <Sparkle size={14} className="text-yellow-400" />
-              <span className="text-xl font-mono font-bold text-yellow-400">
-                {estimatedPoints}
+              <Timer
+                size={16}
+                className={timeLeft < 10 ? "text-red-500" : "text-blue-400"}
+              />
+              <span
+                className={`font-mono text-base font-bold ${
+                  timeLeft < 10 ? "text-red-500" : "text-blue-500"
+                }`}
+              >
+                {Math.floor(timeLeft / 60)
+                  .toString()
+                  .padStart(2, "0")}
+                :{(timeLeft % 60).toString().padStart(2, "0")}
               </span>
             </div>
           </div>
 
-          {/* SECURITY TRACE (ATTEMPTS) */}
-          <div className="flex flex-col items-end">
-            <span className="text-[10px] font-mono text-gray-500 uppercase tracking-widest">
-              Security Trace
-            </span>
+          <div className="flex items-center gap-6">
             <span
-              className={`font-mono text-xl font-bold ${
-                attempts >= 4 ? "text-red-500" : "text-gray-300"
+              className={`text-xs font-bold px-3 py-1 rounded-full border ${
+                hasCompleted
+                  ? "bg-emerald-50 text-emerald-500 border-emerald-100"
+                  : "bg-slate-50 text-slate-400 border-slate-100"
               }`}
             >
-              {attempts}/5
+              {hasCompleted ? "SOLVED" : "CODING"}
             </span>
+
+            <div className="flex items-center gap-4 text-slate-500">
+              <div className="flex flex-col items-end leading-none">
+                <span className="text-[9px] uppercase tracking-wider text-slate-300 font-bold">
+                  Reward
+                </span>
+                <div className="flex items-center gap-1">
+                  <Sparkle
+                    size={12}
+                    className="text-amber-400 fill-amber-400"
+                  />
+                  <span className="text-lg font-bold text-slate-700">
+                    {estimatedPoints}
+                  </span>
+                </div>
+              </div>
+
+              <div className="w-[1px] h-6 bg-slate-100" />
+
+              <div className="flex flex-col items-end leading-none">
+                <span className="text-[9px] uppercase tracking-wider text-slate-300 font-bold">
+                  Attempts
+                </span>
+                <span
+                  className={`text-lg font-bold ${
+                    attempts >= 4 ? "text-rose-500" : "text-slate-700"
+                  }`}
+                >
+                  {attempts}/5
+                </span>
+              </div>
+            </div>
           </div>
-
-          <span className="text-xs font-mono text-blue-400 border border-blue-400/30 px-3 py-1 rounded bg-blue-400/5 uppercase tracking-widest">
-            {hasCompleted ? "DECRYPTED" : "ENCRYPTED"}
-          </span>
         </div>
-      </div>
 
-      <div className="flex-1 flex flex-col min-h-0">
-        <ProblemDescription
-          problem={problem}
-          isOpen={showProblem}
-          totalTimeSpent={totalTimeSpent}
-          userId={userId}
-          hasCompleted={hasCompleted}
-        />
+        {/* 2. DESCRIPTION AREA */}
+        <AnimatePresence>
+          {showProblem && (
+            <motion.div
+              initial={{ opacity: 0, height: 0, marginBottom: 0 }}
+              animate={{ opacity: 1, height: "auto", marginBottom: 12 }}
+              exit={{ opacity: 0, height: 0, marginBottom: 0 }}
+              transition={{ duration: 0.2 }}
+              className="flex-shrink-0"
+            >
+              <ProblemDescription
+                problem={problem}
+                isOpen={showProblem}
+                totalTimeSpent={totalTimeSpent}
+                userId={userId}
+                hasCompleted={hasCompleted}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-        <div className="flex flex-1 gap-4 mt-4 min-h-0 overflow-hidden">
+        {/* 3. WORKSPACE AREA (Panels + Editor) */}
+        <div className="flex-1 flex gap-3 min-h-0 relative">
+          {/* EXPLORER PANEL */}
           <FileExplorer
             files={problem.files}
             isOpen={showExplorer}
@@ -737,38 +771,43 @@ export function ProblemOverlay({
             defaultWidth={200}
           />
 
+          {/* EDITOR CONTAINER - The Core */}
           <div
-            className="flex flex-col min-w-0 rounded-lg border border-gray-700 bg-gray-800 overflow-hidden shadow-2xl relative"
+            className="flex flex-col min-w-0 rounded-2xl bg-white shadow-sm border border-slate-200 overflow-hidden relative transition-all duration-300"
             style={{ width: editorWidth() }}
           >
-            <Toolbar
-              selectedFile={selectedFile!}
-              hasCompleted={hasCompleted}
-              isCurrentFileModified={isCurrentFileModified(
-                selectedFile,
-                getCurrentFileContent(
+            {/* Editor Toolbar */}
+            <div className="border-b border-slate-100 bg-white shrink-0">
+              <Toolbar
+                selectedFile={selectedFile!}
+                hasCompleted={hasCompleted}
+                isCurrentFileModified={isCurrentFileModified(
                   selectedFile,
-                  problem,
+                  getCurrentFileContent(
+                    selectedFile,
+                    problem,
+                    fileContents,
+                    (n) => findContentInUserCodeFiles(problem, n),
+                  ),
+                  getOriginalFileContent(selectedFile, originalFileContents),
+                )}
+                isAnyFileModified={isAnyFileModified(
                   fileContents,
-                  (n) => findContentInUserCodeFiles(problem, n),
-                ),
-                getOriginalFileContent(selectedFile, originalFileContents),
-              )}
-              isAnyFileModified={isAnyFileModified(
-                fileContents,
-                originalFileContents,
-              )}
-              onResetCurrentFile={() => resetCurrentFile}
-              onResetAllFiles={() => handleResetAllFiles}
-              onSaveCode={handleSaveCode}
-              isSaving={isSaving}
-            />
+                  originalFileContents,
+                )}
+                onResetCurrentFile={resetCurrentFile}
+                onResetAllFiles={handleResetAllFiles}
+                onSaveCode={handleSaveCode}
+                isSaving={isSaving}
+              />
+            </div>
 
-            <div className="flex-1 relative">
+            {/* Editor Body - Added min-h-0 and overflow-hidden to fix layout overflow */}
+            <div className="flex-1 min-h-0 overflow-hidden relative bg-white">
               <Editor
                 height="100%"
                 language="python"
-                theme="vs-dark"
+                theme="light"
                 value={getCurrentFileContent(
                   selectedFile,
                   problem,
@@ -780,40 +819,63 @@ export function ProblemOverlay({
                   minimap: { enabled: false },
                   readOnly: hasCompleted || isTimeUp,
                   fontSize: 14,
+                  fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+                  scrollBeyondLastLine: false,
+                  padding: { top: 16, bottom: 16 },
+                  overviewRulerBorder: false,
+                  renderLineHighlight: "none",
+                  fixedOverflowWidgets: true,
                 }}
               />
+            </div>
 
-              <div className="absolute bottom-4 right-4 flex gap-2 z-10">
+            {/* ACTION BAR (Footer) - Fixed Visibility */}
+            <div className="flex items-center justify-between px-4 py-3 border-t border-slate-100 bg-slate-50/80 backdrop-blur-sm shrink-0 z-10">
+              {/* Left side: Status or Info */}
+              <div className="flex items-center gap-2 text-xs text-slate-400 font-medium">
+                <Code2 size={14} className="text-slate-400" />
+                <span>Ready to run</span>
+              </div>
+
+              {/* Right side: Buttons */}
+              <div className="flex gap-3">
                 <button
-                  onClick={runNormalCode}
+                  onClick={handleRunCode}
                   disabled={
                     isSubmitting || hasCompleted || isContinuing || isTimeUp
                   }
-                  className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 shadow-lg"
+                  className="bg-white hover:bg-indigo-50 text-indigo-600 border border-indigo-100 hover:border-indigo-200 active:scale-95 px-4 py-2 rounded-lg flex items-center gap-2 shadow-sm transition-all font-bold text-sm disabled:opacity-50 disabled:shadow-none"
                 >
                   {isSubmitting ? (
                     <Loader2 className="animate-spin" size={16} />
                   ) : (
-                    <Play size={16} />
+                    <Play size={16} fill="currentColor" />
                   )}{" "}
-                  Run
+                  Run Code
                 </button>
                 <button
                   onClick={handleSubmitCode}
                   disabled={isTestRunning || hasCompleted || isTimeUp}
-                  className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 shadow-lg"
+                  className={`px-4 py-2 rounded-lg flex items-center gap-2 shadow-sm transition-all font-bold text-sm disabled:opacity-50 disabled:shadow-none active:scale-95 ${
+                    hasCompleted
+                      ? "bg-emerald-50 text-emerald-600 border border-emerald-200"
+                      : "bg-indigo-600 text-white hover:bg-indigo-700 shadow-indigo-200 shadow-md"
+                  }`}
                 >
                   {isTestRunning ? (
                     <Loader2 className="animate-spin" size={16} />
+                  ) : hasCompleted ? (
+                    <CheckCircle2 size={16} />
                   ) : (
                     <Upload size={16} />
                   )}{" "}
-                  {hasCompleted ? "Verified" : "Decrypt"}
+                  {hasCompleted ? "Solved" : "Submit"}
                 </button>
               </div>
             </div>
           </div>
 
+          {/* HINTS & OUTPUT PANELS (Side by side with editor if open) */}
           {showHints && problem.hints && (
             <HintsPanel
               hints={problem.hints}
@@ -824,6 +886,7 @@ export function ProblemOverlay({
               defaultWidth={300}
             />
           )}
+
           {showOutput && (
             <OutputPanel
               executionResult={executionResult}
@@ -839,60 +902,20 @@ export function ProblemOverlay({
           )}
         </div>
 
+        {/* 4. BOTTOM AREA (Test Cases) */}
         {showTestCases && (
-          <div className="mt-4 flex-shrink-0">
-            <TestCasePanel
-              executionResult={executionResult}
-              isVisible={showTestCases}
-              isSubmitting={isTestRunning || isSubmitting}
-              onResize={setTestCasePanelHeight}
-              onClose={() => setShowTestCases(false)}
-            />
+          <div className="flex-shrink-0 animate-in slide-in-from-bottom-4 duration-300">
+            <div className="rounded-2xl border border-slate-200 overflow-hidden shadow-sm bg-white">
+              <TestCasePanel
+                executionResult={executionResult}
+                isVisible={showTestCases}
+                isSubmitting={isTestRunning || isSubmitting}
+                onResize={setTestCasePanelHeight}
+                onClose={() => setShowTestCases(false)}
+              />
+            </div>
           </div>
         )}
-      </div>
-
-      <div className="fixed left-8 top-1/2 -translate-y-1/2 flex flex-col gap-4">
-        <button
-          onClick={() => setShowExplorer(!showExplorer)}
-          className={`p-3 rounded-lg border transition-all ${
-            showExplorer
-              ? "bg-blue-600 border-blue-400"
-              : "bg-gray-800 border-gray-700 hover:bg-gray-700"
-          }`}
-        >
-          <Files size={20} />
-        </button>
-        <button
-          onClick={() => setShowHints(!showHints)}
-          className={`p-3 rounded-lg border transition-all ${
-            showHints
-              ? "bg-yellow-600 border-yellow-400"
-              : "bg-gray-800 border-gray-700 hover:bg-gray-700"
-          }`}
-        >
-          <Lightbulb size={20} />
-        </button>
-        <button
-          onClick={() => setShowTestCases(!showTestCases)}
-          className={`p-3 rounded-lg border transition-all ${
-            showTestCases
-              ? "bg-blue-600 border-blue-400"
-              : "bg-gray-800 border-gray-700 hover:bg-gray-700"
-          }`}
-        >
-          <Terminal size={20} />
-        </button>
-        <button
-          onClick={() => setShowOutput(!showOutput)}
-          className={`p-3 rounded-lg border transition-all ${
-            showOutput
-              ? "bg-green-600 border-green-400"
-              : "bg-gray-800 border-gray-700 hover:bg-gray-700"
-          }`}
-        >
-          <div className="w-4 h-4 rounded-full bg-white animate-pulse" />
-        </button>
       </div>
     </div>
   );

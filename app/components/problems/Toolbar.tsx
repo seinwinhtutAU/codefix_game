@@ -1,5 +1,12 @@
 import { ProblemFile } from "@/lib/types";
-import { FileText, RefreshCw, Undo2, Save, CheckCircle } from "lucide-react";
+import {
+  FileText,
+  RefreshCw,
+  Undo2,
+  Save,
+  CheckCircle,
+  CircleDashed,
+} from "lucide-react";
 
 interface ToolbarProps {
   selectedFile: ProblemFile;
@@ -23,77 +30,84 @@ export default function Toolbar({
   isSaving = false,
 }: ToolbarProps) {
   return (
-    <div className="bg-gray-800 border-b border-gray-700 px-5 py-3 flex justify-between items-center">
-      {/* Left Section */}
-      <div className="flex items-center gap-4">
-        <div className="flex items-center text-sm text-white">
-          <div className="p-1.5 bg-gray-700 rounded-lg mr-3 border border-gray-600">
-            <FileText size={16} className="text-blue-400" />
+    <div className="bg-white border-b border-slate-100 px-4 py-2 flex justify-between items-center h-12 shrink-0">
+      {/* Left Section: File Info */}
+      <div className="flex items-center gap-3">
+        <div className="flex items-center text-sm">
+          {/* File Icon */}
+          <div className="p-1.5 bg-indigo-50 rounded-lg mr-2 border border-indigo-100 text-indigo-500">
+            <FileText size={14} />
           </div>
+
           <div className="flex items-center gap-3">
-            <div className="font-medium text-gray-200">{selectedFile.name}</div>
-            {isCurrentFileModified && (
-              <span className="text-xs px-2 py-0.5 rounded-full bg-yellow-900/30 text-yellow-400 border border-yellow-800">
+            <span className="font-bold text-slate-700">
+              {selectedFile.name}
+            </span>
+
+            {/* Modified Badge */}
+            {isCurrentFileModified && !hasCompleted && (
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-600 border border-amber-100 flex items-center gap-1">
+                <CircleDashed size={10} />
                 Modified
+              </span>
+            )}
+
+            {/* Completed Badge */}
+            {hasCompleted && (
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-100 flex items-center gap-1">
+                <CheckCircle size={10} />
+                Completed
               </span>
             )}
           </div>
         </div>
-
-        {/* Completion Status - 直接放在Modified标签后面 */}
-        {hasCompleted && (
-          <div className="flex items-center gap-1 text-xs px-3 py-1 rounded-full bg-green-900/30 text-green-400 border border-green-800">
-            <CheckCircle size={12} />
-            <span>Completed</span>
-          </div>
-        )}
       </div>
 
-      {/* Right Section */}
-      <div className="flex items-center gap-3">
+      {/* Right Section: Actions */}
+      <div className="flex items-center gap-2">
         {/* Save Button */}
         <button
           onClick={onSaveCode}
           disabled={!isAnyFileModified || hasCompleted || isSaving}
-          className={`flex items-center gap-2 px-4 py-2 text-sm rounded-lg border transition-all ${
+          className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg border transition-all duration-200 shadow-sm ${
             isAnyFileModified && !hasCompleted
-              ? "bg-blue-600 text-white border-blue-600 hover:bg-blue-700 hover:border-blue-700 active:scale-95"
-              : "bg-gray-700 text-gray-500 border-gray-600 cursor-not-allowed"
+              ? "bg-indigo-600 text-white border-indigo-600 hover:bg-indigo-700 hover:border-indigo-700 active:scale-95 shadow-indigo-100"
+              : "bg-slate-50 text-slate-400 border-slate-100 cursor-not-allowed shadow-none"
           }`}
         >
-          <Save size={16} />
-          {isSaving ? "Saving..." : "Save"}
+          <Save size={14} />
+          {isSaving ? "Saving..." : "Save Code"}
         </button>
 
-        <div className="h-6 w-px bg-gray-700" />
+        {/* Divider */}
+        <div className="h-4 w-px bg-slate-200 mx-1" />
 
-        {/* Reset Buttons */}
-        <div className="flex gap-2">
+        {/* Reset Buttons Group */}
+        <div className="flex items-center gap-1">
           <button
             onClick={onResetCurrentFile}
             disabled={!isCurrentFileModified || hasCompleted}
-            className={`flex items-center gap-2 px-3 py-2 text-sm rounded-lg border transition-all ${
+            className={`p-1.5 rounded-lg transition-all duration-200 border ${
               isCurrentFileModified && !hasCompleted
-                ? "text-blue-400 border-blue-600 hover:bg-gray-700 active:scale-95"
-                : "text-gray-600 border-gray-700 cursor-not-allowed"
+                ? "text-slate-500 border-slate-200 hover:bg-slate-50 hover:text-indigo-600 hover:border-indigo-100"
+                : "text-slate-300 border-transparent cursor-not-allowed"
             }`}
             title="Reset current file"
           >
             <Undo2 size={16} />
-            {/* Reset Current */}
           </button>
+
           <button
             onClick={onResetAllFiles}
             disabled={!isAnyFileModified || hasCompleted}
-            className={`flex items-center gap-2 px-3 py-2 text-sm rounded-lg border transition-all ${
+            className={`p-1.5 rounded-lg transition-all duration-200 border ${
               isAnyFileModified && !hasCompleted
-                ? "text-red-400 border-red-600 hover:bg-gray-700 active:scale-95"
-                : "text-gray-600 border-gray-700 cursor-not-allowed"
+                ? "text-slate-500 border-slate-200 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-100"
+                : "text-slate-300 border-transparent cursor-not-allowed"
             }`}
             title="Reset all files"
           >
             <RefreshCw size={16} />
-            {/* Reset All */}
           </button>
         </div>
       </div>

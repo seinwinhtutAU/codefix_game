@@ -38,7 +38,7 @@ export default class OfficeScene extends GameScene {
       x: width - 150,
       y: height - 100,
       text: "NEXT >",
-      color: 0x2ecc71, // Consistent green theme
+      color: 0x2ecc71,
       onClick: () => {
         this.completeOffice();
       },
@@ -86,7 +86,6 @@ export default class OfficeScene extends GameScene {
           alpha: 1,
           duration: 500,
           onComplete: () => {
-            // Pulse effect to urge the player to click
             this.tweens.add({
               targets: this.nextButton,
               scale: 1.05,
@@ -102,10 +101,7 @@ export default class OfficeScene extends GameScene {
   }
 
   private async completeOffice() {
-    // Standardized way to disable click through the Button class
     this.nextButton.setEnabled(false);
-
-    AudioManager.getInstance().playSound("click", { volume: 0.5 });
 
     if (!this.savedProgress) {
       this.handleTransition();

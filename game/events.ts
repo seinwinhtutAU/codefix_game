@@ -7,6 +7,9 @@ type Events = {
   "ui-reset-start": void;
   "ui-open-problem": { problemId: string; difficulty: string };
   "ui-close-problem": void;
+  "ui-open-quiz": void;
+  "ui-close-quiz": void;
+  "quiz-completed": { score: number; total: number };
   "show-notification": GameNotificationProps;
   "hide-notification": void;
   "play-ui-sound": string;

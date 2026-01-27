@@ -1,9 +1,9 @@
 "use client";
 
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { useEffect } from "react";
+import Image from "next/image";
 import { EventBus } from "@/game/events";
-import { Trophy, AlertTriangle, CheckCircle2, Star } from "lucide-react";
 
 export type NotificationType = "SUCCESS" | "GAMEOVER" | "LEVEL_UP" | "VICTORY";
 
@@ -11,38 +11,44 @@ export interface GameNotificationProps {
   type: NotificationType;
   title: string;
   message: string;
+  points?: number;
   onConfirm?: () => void;
   confirmLabel?: string;
 }
 
 const THEMES = {
   SUCCESS: {
-    color: "text-green-400",
-    border: "border-green-500/50",
-    bg: "bg-green-950/90",
-    icon: <CheckCircle2 className="w-12 h-12 text-green-400" />,
-    sound: "success-chime",
+    color: "text-[#FF85A1]", // Strawberry Pink
+    border: "border-[#FFB3C6]",
+    bg: "bg-[#FFF0F3]",
+    btn: "bg-[#FF85A1] hover:bg-[#FF4D6D]",
+    // Changed from solid offset to soft blurred shadow for alignment
+    shadow: "shadow-2xl shadow-[#FFB3C6]/40",
+    sound: "success",
   },
   GAMEOVER: {
-    color: "text-red-500",
-    border: "border-red-500/50",
-    bg: "bg-red-950/90",
-    icon: <AlertTriangle className="w-12 h-12 text-red-500" />,
-    sound: "game-over-sting",
+    color: "text-[#EF4444]",
+    border: "border-[#FCA5A5]",
+    bg: "bg-[#FEE2E2]",
+    btn: "bg-[#EF4444] hover:bg-[#DC2626]",
+    shadow: "shadow-2xl shadow-[#FCA5A5]/40",
+    sound: "gameover",
   },
   LEVEL_UP: {
-    color: "text-blue-400",
-    border: "border-blue-500/50",
-    bg: "bg-blue-950/90",
-    icon: <Trophy className="w-12 h-12 text-blue-400" />,
-    sound: "level-up-fanfare",
+    color: "text-[#4CC9F0]", // Sky Blue
+    border: "border-[#BEE9E8]",
+    bg: "bg-[#F0F9F9]",
+    btn: "bg-[#4CC9F0] hover:bg-[#4361EE]",
+    shadow: "shadow-2xl shadow-[#BEE9E8]/40",
+    sound: "level-up",
   },
   VICTORY: {
-    color: "text-yellow-400",
-    border: "border-yellow-500/50",
-    bg: "bg-yellow-950/90",
-    icon: <Star className="w-12 h-12 text-yellow-400" />,
-    sound: "victory-music",
+    color: "text-[#FFD60A]", // Honey Yellow
+    border: "border-[#FFEA00]",
+    bg: "bg-[#FFFDF0]",
+    btn: "bg-[#FFD60A] hover:bg-[#FFC300]",
+    shadow: "shadow-2xl shadow-[#FFEA00]/40",
+    sound: "victory",
   },
 };
 
@@ -50,58 +56,146 @@ export function GameNotification({
   type,
   title,
   message,
+  points = 0,
   onConfirm,
-  confirmLabel = "CONTINUE",
+  confirmLabel = "OKAY!",
 }: GameNotificationProps) {
   const theme = THEMES[type];
 
   useEffect(() => {
-    // Play the associated sound via Phaser's AudioManager
     EventBus.emit("play-ui-sound", theme.sound);
   }, [type, theme.sound]);
 
   return (
-    <div className="absolute inset-0 z-[300] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+    <div className="absolute inset-0 z-[300] flex items-center justify-center bg-white/20 backdrop-blur-md p-4 font-gluten">
       <motion.div
-        initial={{ scale: 0.8, opacity: 0, y: 20 }}
+        initial={{ scale: 0.6, opacity: 0, y: 20 }}
         animate={{ scale: 1, opacity: 1, y: 0 }}
-        exit={{ scale: 1.1, opacity: 0 }}
-        className={`relative w-full max-w-md p-8 rounded-2xl border-2 ${theme.bg} ${theme.border} shadow-[0_0_50px_rgba(0,0,0,0.5)] text-center`}
+        exit={{ scale: 0.6, opacity: 0, y: -20 }}
+        transition={{ type: "spring", stiffness: 260, damping: 20 }}
+        className={`relative w-full max-w-sm p-10 rounded-[48px] border-[6px] ${theme.bg} ${theme.border} ${theme.shadow} text-center`}
       >
-        {/* Glow Effect */}
-        <div className={`absolute -inset-1 blur-2xl opacity-20 ${theme.bg}`} />
-
-        <div className="relative z-10 flex flex-col items-center gap-4">
-          <motion.div
-            animate={{ scale: [1, 1.2, 1] }}
-            transition={{ repeat: Infinity, duration: 2 }}
-          >
-            {theme.icon}
-          </motion.div>
-
+        <div className="relative z-10 flex flex-col items-center">
           <h2
-            className={`text-4xl font-mono font-bold tracking-tighter ${theme.color}`}
+            className={`text-5xl mb-4 tracking-tight ${theme.color} drop-shadow-sm`}
           >
-            {title.toUpperCase()}
+            {title}
           </h2>
 
-          <p className="text-gray-300 font-mono text-sm leading-relaxed mb-6">
-            {message}
-          </p>
+          {/* COIN SECTION: HALF-CIRCLE ANIMATION */}
+          {type === "SUCCESS" && (
+            <div className="relative w-full h-44 flex items-center justify-center mb-2">
+              {/* Glow behind the pot */}
+              <div className="absolute w-32 h-32 bg-yellow-300/20 blur-3xl rounded-full" />
 
+              <div className="relative w-full h-full">
+                {[...Array(5)].map((_, i) => {
+                  const angle = i * 30 + 210;
+                  const radius = 85;
+                  const x = Math.cos((angle * Math.PI) / 180) * radius;
+                  const y = Math.sin((angle * Math.PI) / 180) * radius + 40;
+
+                  return (
+                    <motion.div
+                      key={i}
+                      className="absolute"
+                      initial={{ x: 0, y: 50, opacity: 0 }}
+                      animate={{
+                        x,
+                        y: [y, y - 12, y],
+                        opacity: 1,
+                      }}
+                      transition={{
+                        delay: i * 0.12,
+                        y: { repeat: Infinity, duration: 2, ease: "easeInOut" },
+                      }}
+                      style={{ left: "calc(50% - 15px)", top: "40%" }}
+                    >
+                      <Image
+                        src="/ui/coin.png"
+                        width={30}
+                        height={30}
+                        style={{ width: "30px", height: "auto" }}
+                        alt="coin"
+                        priority
+                      />
+                    </motion.div>
+                  );
+                })}
+              </div>
+
+              <motion.div
+                animate={{ scale: [1, 1.05, 1] }}
+                transition={{
+                  repeat: Infinity,
+                  duration: 2,
+                  ease: "easeInOut",
+                }}
+                className="absolute z-10 bottom-4"
+              >
+                <Image
+                  src="/ui/coin-pot.png"
+                  width={110}
+                  height={90}
+                  style={{ width: "110px", height: "auto" }}
+                  alt="pot"
+                  priority
+                />
+              </motion.div>
+            </div>
+          )}
+
+          {/* MESSAGE SECTION */}
+          <div className="space-y-4 mb-6">
+            <p className="text-[#8B5E66] text-xl font-bold leading-tight px-4">
+              {message}
+            </p>
+
+            {points > 0 && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="block"
+              >
+                <span className="text-yellow-700 text-lg font-bold bg-yellow-100 px-4 py-1.5 rounded-full border-2 border-yellow-200 shadow-sm">
+                  You get ${points}
+                </span>
+              </motion.div>
+            )}
+          </div>
+
+          {/* BUTTON */}
           {onConfirm && (
-            <button
+            <motion.button
+              whileHover={{ scale: 1.05, y: -2 }}
+              whileTap={{ scale: 0.95 }}
               onClick={() => {
                 EventBus.emit("play-ui-sound", "click");
                 onConfirm();
               }}
-              className={`px-8 py-3 rounded-lg font-mono font-bold transition-all active:scale-95
-                ${theme.bg} border ${theme.border} ${theme.color} hover:bg-white hover:text-black`}
+              className={`px-8 py-3 rounded-full text-white text-xl font-bold transition-all
+                ${theme.btn} shadow-[0_4px_0_rgba(0,0,0,0.1)] active:shadow-none active:translate-y-[4px]`}
             >
-              {confirmLabel}
-            </button>
+              {confirmLabel.toUpperCase()}
+            </motion.button>
           )}
         </div>
+
+        {/* Decorative Sparkles */}
+        <motion.div
+          animate={{ opacity: [0.3, 1, 0.3], scale: [1, 1.2, 1] }}
+          transition={{ repeat: Infinity, duration: 3 }}
+          className="absolute top-8 left-8 text-2xl"
+        >
+          ✨
+        </motion.div>
+        <motion.div
+          animate={{ opacity: [0.3, 1, 0.3], scale: [1, 1.2, 1] }}
+          transition={{ repeat: Infinity, duration: 3, delay: 1 }}
+          className="absolute bottom-12 right-8 text-2xl"
+        >
+          ✨
+        </motion.div>
       </motion.div>
     </div>
   );

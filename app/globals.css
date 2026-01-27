@@ -1,5 +1,11 @@
 @import "tailwindcss";
 
+/* @import url('https://fonts.googleapis.com/css2?family=Gluten:wght@100..900&display=swap');
+
+.font-gluten {
+  font-family: 'Gluten', cursive;
+} */
+
 @layer base {
   html,
   body,

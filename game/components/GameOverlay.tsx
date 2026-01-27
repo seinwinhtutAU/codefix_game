@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState, useEffect } from "react";
+import Image from "next/image";
 import { EventBus } from "../events";
 
 export function GameOverlay() {
   const [isPaused, setIsPaused] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
-  const [scene, setScene] = useState("MainMenuScene");
+  const [scene, setScene] = useState("PreloadScene");
 
   const togglePause = () => {
     const nextState = !isPaused;
@@ -14,14 +15,15 @@ export function GameOverlay() {
     EventBus.emit("ui-toggle-pause", nextState);
   };
 
-  const handleAction = (action: string) => {
-    setIsPaused(false);
-    EventBus.emit("ui-action", action);
+  const toggleMute = () => {
+    const nextMute = !isMuted;
+    setIsMuted(nextMute);
+    EventBus.emit("ui-toggle-mute", nextMute);
   };
 
-  const toggleMute = () => {
-    setIsMuted(!isMuted);
-    EventBus.emit("ui-toggle-mute", !isMuted);
+  const goToHome = () => {
+    setIsPaused(false);
+    EventBus.emit("ui-action", "menu");
   };
 
   useEffect(() => {
@@ -37,48 +39,79 @@ export function GameOverlay() {
     };
   }, []);
 
+  // 1. Completely hide everything during Preload
+  if (scene === "PreloadScene") return null;
+
+  // 2. Determine if we are on Main Menu to filter buttons
+  const isMainMenu = scene === "MainMenuScene";
+
   return (
-    <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center">
-      <div className="absolute top-4 right-4 flex gap-2 pointer-events-auto">
+    <div className="absolute inset-0 pointer-events-none font-mono">
+      {/* --- TOP HUD CONTROLS --- */}
+      <div className="absolute top-6 right-6 flex items-center gap-4 pointer-events-auto">
+        {/* HOME BUTTON - Hide on Main Menu */}
+        {!isMainMenu && (
+          <button
+            onClick={goToHome}
+            className="transition-all active:scale-90 hover:brightness-110"
+          >
+            <Image
+              src="/ui/Buttons-home.png"
+              alt="Home Button"
+              width={38}
+              height={38}
+              style={{ width: "38px", height: "auto" }}
+              className="object-contain"
+              priority
+            />
+          </button>
+        )}
+
+        {/* MUTE TOGGLE - Always shows (Main Menu & Levels) */}
         <button
           onClick={toggleMute}
-          className="bg-gray-800 p-2 rounded text-white hover:bg-gray-700 active:scale-95 transition-transform"
+          className="transition-all active:scale-90 hover:brightness-110"
         >
-          {isMuted ? "Unmute" : "Mute"}
+          <Image
+            src={isMuted ? "/ui/Buttons-unmute.png" : "/ui/Buttons-mute.png"}
+            alt="Volume Toggle"
+            width={38}
+            height={38}
+            style={{ width: "38px", height: "auto" }}
+            className="object-contain"
+            priority
+          />
         </button>
-        {scene !== "MainMenuScene" && (
+
+        {/* PAUSE TOGGLE - Hide on Main Menu */}
+        {!isMainMenu && (
           <button
             onClick={togglePause}
-            className="bg-blue-600 p-2 rounded text-white hover:bg-blue-500 active:scale-95 transition-transform"
+            className="transition-all active:scale-90 hover:brightness-110"
           >
-            {isPaused ? "▶️ Resume" : "⏸️ Pause"}
+            <Image
+              src={
+                isPaused ? "/ui/Buttons-resume.png" : "/ui/Buttons-pause.png"
+              }
+              alt="Pause Toggle"
+              width={38}
+              height={38}
+              style={{ width: "38px", height: "auto" }}
+              className="object-contain"
+              priority
+            />
           </button>
         )}
       </div>
 
-      {isPaused && (
-        <div className="pointer-events-auto bg-black/70 p-8 rounded-xl border-2 border-white/20 flex flex-col gap-4 animate-in fade-in zoom-in duration-200">
-          <h2 className="text-3xl font-bold text-white text-center mb-4 font-mono">
-            Paused
-          </h2>
-          <button
-            onClick={togglePause}
-            className="w-full py-2 bg-green-600 text-white rounded font-bold hover:bg-green-500 active:scale-95 transition-all"
-          >
-            RESUME
-          </button>
-          <button
-            onClick={() => handleAction("replay")}
-            className="w-full py-2 bg-yellow-600 text-white rounded font-bold hover:bg-yellow-500 active:scale-95 transition-all"
-          >
-            RESTART
-          </button>
-          <button
-            onClick={() => handleAction("menu")}
-            className="w-full py-2 bg-red-600 text-white rounded font-bold hover:bg-red-500 active:scale-95 transition-all"
-          >
-            MAIN MENU
-          </button>
+      {/* PAUSE INDICATOR */}
+      {isPaused && !isMainMenu && (
+        <div className="absolute inset-0 flex items-center justify-center bg-black/20 backdrop-blur-[2px]">
+          <div className="bg-black/60 px-6 py-2 rounded-full border border-white/20">
+            <p className="text-white text-xl font-bold tracking-widest">
+              GAME PAUSED
+            </p>
+          </div>
         </div>
       )}
     </div>

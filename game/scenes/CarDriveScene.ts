@@ -1,8 +1,8 @@
 import Phaser from "phaser";
 import AudioManager from "../AudioManager";
 import DialogBox from "../ui/DialogBox";
-import Button from "../ui/Button"; // Import the standardized Button class
-import { IGameProgress, CurrentTask } from "@/lib/types";
+import Button from "../ui/Button";
+import { IGameProgress } from "@/lib/types";
 import GameScene from "./GameScene";
 import { EventBus } from "@/game/events";
 import { checkExistingSolveRecord } from "@/services";
@@ -18,7 +18,7 @@ export default class CarDriveScene extends GameScene {
 
   // --- UI ---
   private dialogBox!: DialogBox;
-  private solveButton!: Button; // Changed from Container to Button class
+  private solveButton!: Button;
 
   // --- INPUTS ---
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
@@ -53,7 +53,6 @@ export default class CarDriveScene extends GameScene {
     graphics.generateTexture("dust", 16, 16);
     graphics.destroy();
 
-    // Create a soft, blurred-looking oval for the shadow
     const shadowGraphics = this.make.graphics({ x: 0, y: 0 });
     shadowGraphics.fillStyle(0x000000, 0.3);
     shadowGraphics.fillEllipse(120, 40, 240, 80);
@@ -68,91 +67,53 @@ export default class CarDriveScene extends GameScene {
       this.keyD = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D);
     }
 
-    // 1. Setup world first
+    // 1. Setup world
     this.setupWorld();
     // 2. Setup cars
     this.setupCars();
     // 3. Setup UI
     this.dialogBox = new DialogBox(this);
-
     // 4. Setup Button
     this.createSolveButton();
 
-    EventBus.on(
-      "problem-update-progress",
-      async (updatedProgress: IGameProgress) => {
-        console.log("Syncing progress from UI update...");
+    // Listen for quiz completion
+    EventBus.on("quiz-completed", (data: { score: number; total: number }) => {
+      console.log(`Quiz completed! Score: ${data.score}/${data.total}`);
+      this.isSolved = true;
 
-        this.savedProgress = updatedProgress;
-        const realProblemId = updatedProgress.gameState.currentTask.taskId;
+      // Immediately handle success sequence
+      this.handlePoliceSuccess();
 
-        if (!realProblemId || realProblemId === "boss_temp_id") return;
+      // Ensure local progress is updated so if they reload, they don't get stuck
+      if (this.savedProgress?.gameState?.eventFlags) {
+        this.savedProgress.gameState.eventFlags.easyQuizCompleted = true;
+      }
+    });
 
-        const solveRecord = await this.checkPointSolved(
-          updatedProgress.userId,
-          realProblemId,
-        );
-
-        this.isSolved = !!solveRecord;
-
-        if (this.isSolved) {
-          this.handlePoliceSuccess();
-        }
-      },
-    );
-
-    // 5. Check progress
+    // 5. Check progress (This handles page reloads/resuming)
     this.checkStoryProgress();
 
     this.cameras.main.fadeIn(1000, 0, 0, 0);
 
-    EventBus.on(
-      "problem-solved",
-      async (data: { currentTask: CurrentTask }) => {
-        await this.updateProgress({
-          gameState: {
-            ...this.savedProgress?.gameState,
-            currentTask: {
-              taskType: data.currentTask.taskType,
-              taskId: data.currentTask.taskId,
-              status: data.currentTask.status ?? "none",
-              attempts: data.currentTask.attempts,
-              timer: data.currentTask.timer,
-              highestHintLevelUsed: data.currentTask.highestHintLevelUsed,
-              hintUsages: data.currentTask.hintUsages,
-            },
-          },
+    EventBus.on("ui-close-quiz", () => {
+      if (!this.isSolved) {
+        AudioManager.getInstance().playMusic("bgm", {
+          loop: true,
+          volume: 0.15,
         });
-      },
-    );
-
-    EventBus.on("resume-after-solve", async () => {
-      await this.updateProgress({
-        gameState: {
-          ...this.savedProgress?.gameState,
-          currentTask: {
-            taskType: "none",
-            taskId: undefined,
-            status: "none",
-            attempts: 0,
-            timer: 0,
-            highestHintLevelUsed: "none",
-            hintUsages: [],
-          },
-        },
-      });
-      this.handlePoliceSuccess();
-    });
-
-    AudioManager.getInstance().playMusic("bgm", {
-      loop: true,
-      volume: 0.15,
+      }
     });
 
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       EventBus.off("problem-update-progress", this.handleProblemUpdate);
       EventBus.off("problem-solved");
-      EventBus.off("resume-after-solve");
+      EventBus.off("ui-close-quiz");
+      EventBus.off("quiz-completed");
+    });
+
+    AudioManager.getInstance().playMusic("bgm", {
+      loop: true,
+      volume: 0.15,
     });
   }
 
@@ -161,10 +122,10 @@ export default class CarDriveScene extends GameScene {
   private setupWorld() {
     this.worldContainer = this.add.container(0, 0);
 
+    // If we previously stopped, put the world at the stop point.
+    // Logic later in checkStoryProgress will determine if we stay stopped or resume.
     if (this.savedProgress?.gameState?.eventFlags?.policeStoppedPlayer) {
       this.worldContainer.x = this.POLICE_TRIGGER_X;
-      this.eventTriggered = true;
-      this.isDriving = false;
     }
 
     const bgNames = ["car_bg_1", "car_bg_2", "car_bg_3", "car_bg_4"];
@@ -190,7 +151,6 @@ export default class CarDriveScene extends GameScene {
   private addSun() {
     const sun = this.add.image(400, 120, "sun").setDisplaySize(150, 160);
     this.worldContainer.add(sun);
-
     this.tweens.add({
       targets: sun,
       scale: sun.scaleX * 1.1,
@@ -206,34 +166,22 @@ export default class CarDriveScene extends GameScene {
     for (let i = 0; i < cloudCount; i++) {
       const x = Phaser.Math.Between(0, 6500);
       const y = Phaser.Math.Between(50, 200);
-
       const cloud = this.add.image(x, y, "car_cloud");
-
       const scale = Phaser.Math.FloatBetween(0.5, 1);
       cloud.setScale(scale);
-
       const depthAlpha = Phaser.Math.Linear(0.4, 0.7, (scale - 0.5) / 0.5);
       cloud.setAlpha(depthAlpha);
-
       if (scale < 0.7) {
         cloud.setTint(0xeeeeff);
       }
-
       cloud.setData("driftSpeed", scale * 0.4);
-
       this.worldContainer.add(cloud);
       this.clouds.push(cloud);
     }
   }
 
-  private async checkPointSolved(userId: string, problemId: string) {
-    const response = await checkExistingSolveRecord(userId, problemId);
-    return response?.data;
-  }
-
   private setupCars() {
     const roadY = 635;
-
     const shadowYOffset = 55;
 
     this.car = this.add.sprite(400, roadY, "car");
@@ -287,9 +235,13 @@ export default class CarDriveScene extends GameScene {
       repeat: -1,
     });
 
-    const isStopped =
-      this.savedProgress?.gameState?.eventFlags?.policeStoppedPlayer;
-    const policeInitialX = isStopped ? 100 : -300;
+    // Check progress specifically to position police car
+    const flags = this.savedProgress?.gameState?.eventFlags;
+    const isStopped = flags?.policeStoppedPlayer;
+    const isCompleted = flags?.easyQuizCompleted;
+
+    // If completed, police are gone. If stopped but not completed, police are visible.
+    const policeInitialX = isStopped && !isCompleted ? 100 : -500;
 
     this.policeCar = this.add.sprite(policeInitialX, roadY, "police_car");
     this.policeCar.setDisplaySize(260, 130);
@@ -299,13 +251,32 @@ export default class CarDriveScene extends GameScene {
     if (this.savedProgress?.gameState) {
       const { eventFlags } = this.savedProgress.gameState;
 
+      // 1. If already at office, skip this scene entirely
       if (eventFlags.arrivedAtOffice) {
         this.scene.start("OfficeScene", this.savedProgress);
         return;
       }
 
+      // 2. NEW LOGIC: If Quiz is completed, resume driving immediately
+      if (eventFlags.easyQuizCompleted) {
+        this.isDriving = true;
+        this.eventTriggered = true; // Prevent police from triggering again
+        this.isSolved = true;
+
+        // Ensure police car is off-screen
+        if (this.policeCar) this.policeCar.x = -500;
+
+        // Ensure we are logically past the trigger point so we don't glitch
+        if (this.worldContainer.x > this.POLICE_TRIGGER_X) {
+          this.worldContainer.x = this.POLICE_TRIGGER_X - 100;
+        }
+        return;
+      }
+
+      // 3. If stopped but NOT completed, trigger standby mode
       if (eventFlags.policeStoppedPlayer) {
         this.isDriving = false;
+        // Check local state just in case
         if (this.isSolved) {
           this.handlePoliceSuccess();
         } else {
@@ -325,6 +296,7 @@ export default class CarDriveScene extends GameScene {
           this.dustEmitter.start();
         }
 
+        // Only trigger police if event hasn't happened yet
         if (
           !this.eventTriggered &&
           this.worldContainer.x <= this.POLICE_TRIGGER_X
@@ -346,7 +318,6 @@ export default class CarDriveScene extends GameScene {
     this.clouds.forEach((cloud) => {
       const speed = cloud.getData("driftSpeed");
       cloud.x -= speed;
-
       if (cloud.x < -200) {
         cloud.x = 6500;
       }
@@ -407,30 +378,35 @@ export default class CarDriveScene extends GameScene {
   }
 
   private handlePoliceSuccess() {
+    // 1. Stop driving initially for the animation
     this.isDriving = false;
-    this.eventTriggered = true;
+    this.eventTriggered = true; // Ensure event is marked as triggered
+
+    // 2. Position cars for the "Leaving" animation
     const roadY = 635;
     this.car.setPosition(400, roadY);
     this.policeCar.setPosition(100, roadY);
 
-    // Use button method to hide
+    // 3. Hide button
     this.solveButton.setVisible(false);
 
+    // 4. Show success dialog
     this.dialogBox.show(
       this.policeCar.x + 50,
       this.policeCar.y - 150,
       "Excellent work. You're free to go!",
     );
 
+    // 5. Animate police leaving, then resume driving
     this.time.delayedCall(3000, () => {
       this.dialogBox.setVisible(false);
       this.tweens.add({
         targets: this.policeCar,
-        x: -400,
+        x: -400, // Move off screen to the left
         duration: 2000,
         ease: "Power2",
         onComplete: () => {
-          this.isDriving = true;
+          this.isDriving = true; // Allow player to drive again
           AudioManager.getInstance().playMusic("bgm", {
             loop: true,
             volume: 0.15,
@@ -472,51 +448,16 @@ export default class CarDriveScene extends GameScene {
   }
 
   private createSolveButton() {
-    // Replaced manual container construction with Button class
     this.solveButton = new Button(this, {
       x: this.SCREEN_WIDTH / 2,
       y: this.SCREEN_HEIGHT / 2,
       width: 150,
-      height: 70,
-      text: "SOLVE CODE >",
-      color: 0xef4444,
+      height: 50,
+      text: "START >",
+      color: 0x2ecc71,
       onClick: async () => {
-        // Prevent double clicks
         this.solveButton.setEnabled(false);
-        AudioManager.getInstance().playSound("speech-blip", { volume: 1.0 });
 
-        const targetTaskId = "69582fb37538b18589a46564";
-        const existingTask = this.savedProgress?.gameState?.currentTask;
-        const isSameTask = existingTask?.taskId === targetTaskId;
-
-        const taskToSave = isSameTask
-          ? { ...existingTask }
-          : {
-              taskType: "code_problem",
-              taskId: targetTaskId,
-              status: "in_progress",
-              attempts: 0,
-              timer: 0,
-            };
-
-        const updatedProgress = {
-          gameState: {
-            ...this.savedProgress?.gameState,
-            currentScene: "CarDriveScene",
-            eventFlags: {
-              ...this.savedProgress?.gameState?.eventFlags,
-              policeStoppedPlayer: true,
-            },
-            currentTask: taskToSave,
-          },
-        };
-
-        console.log(
-          "CarDriveScene click solved:",
-          JSON.stringify(updatedProgress, null, 2),
-        );
-
-        // Save to DB before opening UI
         await this.updateProgress({
           gameState: {
             ...this.savedProgress?.gameState,
@@ -525,32 +466,17 @@ export default class CarDriveScene extends GameScene {
               ...this.savedProgress?.gameState?.eventFlags,
               policeStoppedPlayer: true,
             },
-            currentTask: isSameTask
-              ? { ...existingTask }
-              : {
-                  taskType: "code_problem",
-                  taskId: targetTaskId,
-                  status: "in_progress",
-                  attempts: 0,
-                  timer: 0,
-                  currentActiveIndex: 0,
-                  highestHintLevelUsed: "none",
-                  hintUsages: [],
-                },
           },
         });
 
-        // Re-enable button in case they cancel/close (optional, or rely on event bus)
+        AudioManager.getInstance().stopMusic();
+
         this.solveButton.setEnabled(true);
 
-        EventBus.emit("ui-open-problem", {
-          problemId: "69740e795f4942a9208dc8c4",
-          difficulty: "easy",
-        });
+        EventBus.emit("ui-open-quiz");
       },
     });
 
-    // Initialize hidden
     this.solveButton.setVisible(false).setScale(0);
   }
 

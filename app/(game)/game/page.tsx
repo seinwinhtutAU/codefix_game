@@ -5,6 +5,8 @@ import dynamic from "next/dynamic";
 import { AnimatePresence } from "framer-motion";
 import { EventBus } from "@/game/events";
 import { GameNotificationProps } from "@/game/components/GameNotification";
+import DebuggingQuiz from "@/game/components/DebuggingQuiz";
+import AudioManager from "@/game/AudioManager";
 
 const PhaserGame = dynamic(() => import("@/game/components/PhaserGame"), {
   ssr: false,
@@ -14,27 +16,27 @@ const GameOverlay = dynamic(
   () => import("@/game/components/GameOverlay").then((mod) => mod.GameOverlay),
   {
     ssr: false,
-  }
+  },
 );
 
 const ProblemOverlay = dynamic(
   () =>
     import("@/game/components/ProblemOverlay").then(
-      (mod) => mod.ProblemOverlay
+      (mod) => mod.ProblemOverlay,
     ),
   {
     ssr: false,
-  }
+  },
 );
 
 const GameNotification = dynamic(
   () =>
     import("@/game/components/GameNotification").then(
-      (mod) => mod.GameNotification
+      (mod) => mod.GameNotification,
     ),
   {
     ssr: false,
-  }
+  },
 );
 
 export default function GamePage() {
@@ -44,6 +46,7 @@ export default function GamePage() {
   const [difficulty, setDifficulty] = useState<string | null>(null);
   const [notification, setNotification] =
     useState<GameNotificationProps | null>(null);
+  const [showDebuggingQuiz, setShowDebuggingQuiz] = useState(false); // New state for quiz
 
   useEffect(() => {
     // --- RESET LOGIC ---
@@ -51,6 +54,11 @@ export default function GamePage() {
       setIsResetting(true);
       setActiveProblemId(null);
       setNotification(null);
+      setShowDebuggingQuiz(false);
+    };
+
+    const handlePlayUISound = (soundName: string) => {
+      AudioManager.getInstance().playSound(soundName, { volume: 0.2 });
     };
 
     // --- PROBLEM OVERLAY LOGIC ---
@@ -62,8 +70,12 @@ export default function GamePage() {
       setDifficulty(data.difficulty);
     };
 
+    // --- QUIZ OVERLAY LOGIC ---
+    const handleOpenQuiz = () => {
+      setShowDebuggingQuiz(true);
+    };
+
     // --- NOTIFICATION LOGIC ---
-    // This allows Phaser scenes to trigger popups via EventBus.emit('show-notification', { ... })
     const handleShowNotification = (config: GameNotificationProps) => {
       setNotification(config);
     };
@@ -74,22 +86,28 @@ export default function GamePage() {
 
     EventBus.on("ui-reset-start", handleReset);
     EventBus.on("ui-open-problem", handleOpenProblem);
+    EventBus.on("ui-open-quiz", handleOpenQuiz); // Listen for quiz event
     EventBus.on("show-notification", handleShowNotification);
     EventBus.on("hide-notification", handleHideNotification);
+    EventBus.on("play-ui-sound", handlePlayUISound);
 
     return () => {
       EventBus.off("ui-reset-start", handleReset);
       EventBus.off("ui-open-problem", handleOpenProblem);
+      EventBus.off("ui-open-quiz", handleOpenQuiz);
       EventBus.off("show-notification", handleShowNotification);
       EventBus.off("hide-notification", handleHideNotification);
+      EventBus.off("play-ui-sound", handlePlayUISound);
     };
   }, []);
 
+  const handleQuizComplete = (score: number, total: number) => {
+    console.log(`Quiz completed! Score: ${score}/${total}`);
+    EventBus.emit("quiz-completed", { score, total });
+  };
+
   return (
-    <div className="flex items-center justify-center min-h-screen bg-black p-0 md:p-4">
-      {/* 16:9 RESPONSIVE CONTAINER 
-          Maintains ratio and scales based on screen width up to 1376px
-      */}
+    <div className="flex items-center justify-center min-h-screen bg-[#333333] p-0 md:p-4">
       <div className="relative shadow-2xl border-4 border-gray-800 rounded-lg overflow-hidden w-full max-w-[1376px] aspect-video bg-[#1a1a2e]">
         {/* 1. DATA RESET OVERLAY (Highest Z-Index) */}
         {isResetting && (
@@ -103,7 +121,19 @@ export default function GamePage() {
           </div>
         )}
 
-        {/* 2. REUSABLE NOTIFICATIONS (Popups like Game Over / Level Clear) */}
+        {/* 2. DEBUGGING QUIZ OVERLAY */}
+        {showDebuggingQuiz && !isResetting && (
+          <div className="absolute inset-0 z-[200]">
+            <DebuggingQuiz
+              onClose={() => {
+                setShowDebuggingQuiz(false);
+                EventBus.emit("ui-close-quiz");
+              }}
+            />
+          </div>
+        )}
+
+        {/* 3. REUSABLE NOTIFICATIONS */}
         <AnimatePresence>
           {notification && (
             <GameNotification
@@ -117,8 +147,8 @@ export default function GamePage() {
           )}
         </AnimatePresence>
 
-        {/* 3. CODING CHALLENGE OVERLAY */}
-        {activeProblemId && !isResetting && (
+        {/* 4. CODING CHALLENGE OVERLAY */}
+        {activeProblemId && !isResetting && !showDebuggingQuiz && (
           <div className="absolute inset-0 z-[150]">
             <ProblemOverlay
               problemId={activeProblemId}
@@ -131,23 +161,26 @@ export default function GamePage() {
           </div>
         )}
 
-        {/* 4. HUD / GAME OVERLAY */}
-        {isGameLoaded && !isResetting && !activeProblemId && (
-          <div className="absolute inset-0 z-40 pointer-events-none">
-            <GameOverlay />
-          </div>
-        )}
+        {/* 5. HUD / GAME OVERLAY */}
+        {isGameLoaded &&
+          !isResetting &&
+          !activeProblemId &&
+          !showDebuggingQuiz && (
+            <div className="absolute inset-0 z-40 pointer-events-none">
+              <GameOverlay />
+            </div>
+          )}
 
-        {/* 5. INITIAL ENGINE LOADER */}
-        {!isGameLoaded && !isResetting && (
-          <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-[#1a1a2e] text-white">
+        {/* 6. INITIAL ENGINE LOADER */}
+        {!isGameLoaded && !isResetting && !showDebuggingQuiz && (
+          <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-[#E8FCE8] text-[#3A7D44]">
             <div className="text-2xl font-mono animate-pulse tracking-tighter">
               GAME LOADING...
             </div>
           </div>
         )}
 
-        {/* 6. PHASER GAME CANVAS */}
+        {/* 7. PHASER GAME CANVAS */}
         <div className={`w-full h-full ${isResetting ? "hidden" : "block"}`}>
           <PhaserGame onBooted={() => setIsGameLoaded(true)} />
         </div>

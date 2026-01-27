@@ -3,9 +3,9 @@ import Player from "../objects/Player";
 import AudioManager from "../AudioManager";
 import DialogBox from "../ui/DialogBox";
 import GameScene from "./GameScene";
+import Button from "../ui/Button"; // Standardized Button component
 import { EventBus } from "../events";
 import { IGameProgress } from "@/lib/types";
-import { progress } from "framer-motion";
 
 type WASDKeys = {
   W: Phaser.Input.Keyboard.Key;
@@ -19,7 +19,7 @@ export default class IntroScene extends GameScene {
   private player!: Player;
   private wife!: Phaser.GameObjects.Image;
   private car!: Phaser.GameObjects.Image;
-  private nextButton!: Phaser.GameObjects.Text;
+  private nextButton!: Button; // Changed from Text to Button
 
   // --- SHADOWS ---
   private wifeShadow!: Phaser.GameObjects.Graphics;
@@ -38,7 +38,7 @@ export default class IntroScene extends GameScene {
   preload() {}
 
   create() {
-    // 1. Initialize GameScene (Sets up EventBus listeners for mute/pause/audio)
+    // 1. Initialize GameScene
     super.create();
 
     AudioManager.getInstance().init(this.game);
@@ -57,6 +57,7 @@ export default class IntroScene extends GameScene {
       this.wasd = this.input.keyboard.addKeys("W,A,S,D") as WASDKeys;
     }
 
+    // --- WORLD SETUP ---
     this.add.image(0, 0, "house-bg").setOrigin(0, 0);
 
     this.carShadow = this.add.graphics();
@@ -77,44 +78,27 @@ export default class IntroScene extends GameScene {
     this.wifeShadow.setDepth(1);
     this.car.setDepth(2);
     this.wife.setDepth(2);
-    // this.player.setDepth(2);
 
     this.player = new Player(this, 750, 630);
-
     this.dialogBox = new DialogBox(this);
 
+    // --- BUTTON SETUP (MATCHING HOME SCENE STYLE) ---
     const { width, height } = this.scale;
 
-    // Setup Next Button
-    this.nextButton = this.add
-      .text(width - 150, height - 100, "NEXT >", {
-        fontFamily: '"Press Start 2P", monospace',
-        fontSize: "24px",
-        color: "#ffffff",
-        backgroundColor: "#000000",
-        padding: { x: 20, y: 10 },
-      })
-      .setOrigin(0.5) // Origin to center for better scaling effects
-      .setInteractive({ useHandCursor: true })
-      .setVisible(false);
-
-    // Button PointerDown logic
-    this.nextButton.on("pointerdown", () => {
-      // PLAY UI SOUND via EventBus
-      AudioManager.getInstance().playSound("click", { volume: 0.5 });
-
-      // Visual feedback tween
-      this.tweens.add({
-        targets: this.nextButton,
-        scale: 0.9,
-        duration: 80,
-        yoyo: true,
-        ease: "Cubic.easeOut",
-      });
-
-      this.handleGoodbyeSequence();
+    this.nextButton = new Button(this, {
+      x: width - 150,
+      y: height - 100,
+      text: "NEXT >",
+      color: 0x2ecc71,
+      onClick: () => {
+        this.handleGoodbyeSequence();
+      },
     });
 
+    this.nextButton.setVisible(false);
+    this.nextButton.setAlpha(0);
+
+    // --- START SEQUENCE ---
     this.time.delayedCall(800, () => {
       this.showMorningIntroText(() => {
         this.runIntroSequence();
@@ -131,8 +115,24 @@ export default class IntroScene extends GameScene {
 
   private checkCarProximity() {
     const dist = Math.abs(this.player.x - this.car.x);
-    // Button only appears when player is near the car
-    this.nextButton.setVisible(dist < 80);
+    const isNear = dist < 80;
+
+    // Smooth reveal like HomeScene
+    if (isNear && this.nextButton.alpha === 0) {
+      this.nextButton.setVisible(true);
+      this.tweens.add({
+        targets: this.nextButton,
+        alpha: 1,
+        duration: 300,
+      });
+    } else if (!isNear && this.nextButton.alpha === 1) {
+      this.tweens.add({
+        targets: this.nextButton,
+        alpha: 0,
+        duration: 300,
+        onComplete: () => this.nextButton.setVisible(false),
+      });
+    }
   }
 
   private runIntroSequence() {
@@ -157,8 +157,16 @@ export default class IntroScene extends GameScene {
   }
 
   private async handleGoodbyeSequence() {
+    // Prevent double clicking and movement
     this.canMove = false;
-    this.nextButton.setVisible(false);
+    this.nextButton.setEnabled(false);
+
+    this.tweens.add({
+      targets: this.nextButton,
+      alpha: 0,
+      duration: 200,
+      onComplete: () => this.nextButton.setVisible(false),
+    });
 
     this.dialogBox.show(
       this.player.x,
@@ -183,7 +191,7 @@ export default class IntroScene extends GameScene {
   private async completeIntro() {
     if (!this.savedProgress) return;
 
-    this.emitCarScene(this.savedProgress);
+    await this.emitCarScene(this.savedProgress);
 
     // Transition Logic
     AudioManager.getInstance().stopMusic();
@@ -196,7 +204,7 @@ export default class IntroScene extends GameScene {
     );
   }
 
-  private emitCarScene(progress: IGameProgress) {
+  private async emitCarScene(progress: IGameProgress) {
     const updatedProgress: IGameProgress = {
       ...progress,
       lastLocation: "/game",
@@ -208,7 +216,6 @@ export default class IntroScene extends GameScene {
           introCompleted: true,
         },
         currentTask: {
-          ...progress.gameState.currentTask,
           taskType: "none",
           status: "none",
           taskId: undefined,
@@ -270,7 +277,6 @@ export default class IntroScene extends GameScene {
       ease: "Sine.easeOut",
     });
 
-    // Hold, then fade out
     this.time.delayedCall(3000, () => {
       this.tweens.add({
         targets: [bg, text],

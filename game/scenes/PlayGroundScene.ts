@@ -75,9 +75,6 @@ export default class PlayGroundScene extends GameScene {
       color: 0x2ecc71,
       onClick: async () => {
         this.nextButton.setEnabled(false);
-
-        AudioManager.getInstance().playSound("click", { volume: 0.5 });
-
         await this.savePlaygroundCompletion();
 
         this.transitionToMediumLevel();

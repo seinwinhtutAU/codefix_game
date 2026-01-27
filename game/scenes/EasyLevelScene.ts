@@ -2,7 +2,7 @@ import AudioManager from "../AudioManager";
 import GameScene from "./GameScene";
 import { checkExistingSolveRecord } from "@/services/problem";
 import { EventBus } from "@/game/events";
-import { IGameProgress } from "@/lib/types";
+import { IGameProgress, ProblemSolveRecord } from "@/lib/types";
 
 export interface SolvedPointStatus {
   attempts: number;
@@ -44,6 +44,9 @@ export default class EasyLevelScene extends GameScene {
   private startHereSign!: Phaser.GameObjects.Image;
   private startHereTween?: Phaser.Tweens.Tween;
   private roadProgressGraphics!: Phaser.GameObjects.Graphics;
+  private tooltipContainer!: Phaser.GameObjects.Container;
+  private tooltipText!: Phaser.GameObjects.Text;
+  private solvedRecords: ProblemSolveRecord[] = [];
 
   constructor() {
     super("EasyLevelScene");
@@ -59,7 +62,9 @@ export default class EasyLevelScene extends GameScene {
     this.createParticle();
     this.initSolvedPoints();
     this.drawMapAndPoints();
+    this.solvedRecords = await this.getAllSolvedRecord();
     this.drawStartHere();
+    this.addTooltip();
     this.startHereSign = this.add
       .image(0, 0, "start-here")
       .setDisplaySize(59, 100)
@@ -88,6 +93,27 @@ export default class EasyLevelScene extends GameScene {
     graphics.fillCircle(8, 8, 8);
     graphics.generateTexture("glow-dot", 16, 16);
     graphics.destroy();
+  }
+
+  private addTooltip() {
+    // Create the background box
+    const bg = this.add.graphics();
+    bg.fillStyle(0x000000, 0.8);
+    bg.lineStyle(2, 0xffffff, 1);
+    bg.fillRoundedRect(0, 0, 180, 120, 10);
+    bg.strokeRoundedRect(0, 0, 180, 120, 10);
+
+    // Create the text object
+    this.tooltipText = this.add.text(10, 10, "", {
+      fontFamily: "monospace",
+      fontSize: "14px",
+      color: "#ffffff",
+      lineSpacing: 4,
+    });
+
+    // Wrap them in a container and hide it
+    this.tooltipContainer = this.add.container(0, 0, [bg, this.tooltipText]);
+    this.tooltipContainer.setDepth(100).setVisible(false);
   }
 
   private triggerSolveParticle(x: number, y: number) {
@@ -158,6 +184,7 @@ export default class EasyLevelScene extends GameScene {
   private handleProgressResume = async (progress: IGameProgress) => {
     const { currentTask } = progress.gameState;
 
+    this.solvedRecords = await this.getAllSolvedRecord();
     const index = currentTask.currentActiveIndex ?? 0;
     const completedIndex = index - 1;
     const userId = progress.userId;
@@ -203,6 +230,17 @@ export default class EasyLevelScene extends GameScene {
     audioManager.playMusic("bgm", { volume: 0.15, loop: true });
   }
 
+  private formatTime(seconds: number): string {
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+
+    // Using padStart ensures we see "5:05" instead of "5:5"
+    const minutesString = minutes.toString().padStart(2, "0");
+    const secondsString = remainingSeconds.toString().padStart(2, "0");
+
+    return `${minutesString}:${secondsString}`;
+  }
+
   private drawMapAndPoints() {
     // Clear existing points if they exist
     if (this.mapPoints.length > 0) {
@@ -223,6 +261,7 @@ export default class EasyLevelScene extends GameScene {
         .setDepth(2);
 
       point.on("pointerdown", () => {
+        AudioManager.getInstance().playSound("click", { volume: 0.5 });
         if (index === this.currentPointIndex) {
           EventBus.emit("ui-open-problem", {
             problemId: this.problemIds[index],
@@ -238,6 +277,38 @@ export default class EasyLevelScene extends GameScene {
             repeat: 2,
           });
         }
+      });
+
+      point.on("pointerover", () => {
+        const state = this.getPointState(index);
+
+        // Prepare information strings
+        const statusText = state.toUpperCase();
+        const pointsEarned = this.solvedRecords[index]?.pointsEarned || 0;
+        const totalTime = this.formatTime(
+          this.solvedRecords[index]?.timeSpent || 0,
+        );
+        const attempt = this.solvedRecords[index]?.attempt || 0;
+        this.tooltipText.setText(
+          `Challenge: #${index + 1}\n` +
+            `STATE: ${statusText}\n` +
+            `POINTS: ${pointsEarned}\n` +
+            `TIME: ${totalTime}(m:s)\n` +
+            `ATTEMPT: ${attempt}`,
+        );
+
+        // Position above the point
+        this.tooltipContainer.setPosition(value.x - 90, value.y - 120);
+        this.tooltipContainer.setVisible(true);
+
+        if (index !== this.currentPointIndex)
+          this.tweens.add({ targets: point, scale: 1, duration: 100 });
+      });
+
+      point.on("pointerout", () => {
+        this.tooltipContainer.setVisible(false);
+        if (index !== this.currentPointIndex)
+          this.tweens.add({ targets: point, scale: 0.78, duration: 100 });
       });
 
       this.mapPoints.push(point);
@@ -321,7 +392,7 @@ export default class EasyLevelScene extends GameScene {
       // point.setScale(1);
       point.setAlpha(1);
       point.clearTint();
-      point.disableInteractive();
+      point.setInteractive({ useHandCursor: true });
 
       switch (state) {
         case "solved":
@@ -480,7 +551,12 @@ export default class EasyLevelScene extends GameScene {
       confirmLabel: "NEXT",
       onConfirm: () => {
         EventBus.emit("hide-notification");
-        // Use the helper to ensure progress is saved before switching
+
+        if (this.savedProgress && this.savedProgress.gameState) {
+          this.savedProgress.gameState.eventFlags.easyLevelCompleted = true;
+          this.savedProgress.gameState.currentScene = "HomeScene";
+        }
+
         this.emitLevelCompleted(this.savedProgress);
         this.scene.start("EasyToHomeTransitionScene", this.savedProgress);
       },
@@ -488,15 +564,33 @@ export default class EasyLevelScene extends GameScene {
   }
 
   private checkLevelCompleted(): boolean {
-    let countOfSolved = 0;
-    this.solvedPoints.forEach((status) => {
-      if (status.isSolved) countOfSolved++;
+    let counts = 0;
+    this.solvedRecords.forEach((record) => {
+      if (!!record) {
+        counts += 1;
+      }
     });
 
-    if (countOfSolved === this.solvedPoints.length) {
+    if (counts === this.roadPoints.length) {
       return true;
     }
 
     return false;
+  }
+
+  private async getAllSolvedRecord(): Promise<ProblemSolveRecord[]> {
+    const problemIds = this.problemIds;
+    const userId = this.savedProgress.userId;
+
+    const solveRecords = await Promise.all(
+      problemIds.map(async (id) => {
+        const record = await checkExistingSolveRecord(userId, id);
+        return record?.data;
+      }),
+    );
+
+    return solveRecords.filter(
+      (record): record is ProblemSolveRecord => record !== undefined,
+    );
   }
 }
