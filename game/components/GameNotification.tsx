@@ -158,7 +158,7 @@ export function GameNotification({
                 className="block"
               >
                 <span className="text-yellow-700 text-lg font-bold bg-yellow-100 px-4 py-1.5 rounded-full border-2 border-yellow-200 shadow-sm">
-                  You get ${points}
+                  You get {points} points
                 </span>
               </motion.div>
             )}

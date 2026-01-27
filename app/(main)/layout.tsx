@@ -25,13 +25,9 @@ export default function MainLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
-        <MenuBar />
-        <main className="flex-1">{children}</main>
-      </body>
-    </html>
+    <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+      <MenuBar />
+      <main className="flex-1">{children}</main>
+    </body>
   );
 }

@@ -440,7 +440,7 @@ export default class CarDriveScene extends GameScene {
         this.dialogBox.show(
           this.policeCar.x + 50,
           this.policeCar.y - 150,
-          "Your penalty: Solve this code!",
+          "Your penalty: Start the quiz!",
         );
         this.time.delayedCall(1000, () => this.showSolveButton());
       });

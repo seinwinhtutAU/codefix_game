@@ -53,7 +53,7 @@ export default class MainMenuScene extends GameScene {
     const buttonLabel = isIntroDone ? "CONTINUE" : "START";
 
     // --- MAIN ACTION BUTTON ---
-    new Button(this, {
+    const start = new Button(this, {
       x: width / 2,
       y: height / 2 + 30,
       width: 240,
@@ -75,7 +75,7 @@ export default class MainMenuScene extends GameScene {
 
     // --- NEW: LEVEL SELECT BUTTON ---
     // Positioned below the main button
-    new Button(this, {
+    const level = new Button(this, {
       x: width / 2,
       y: height / 2 + 110,
       width: 240,

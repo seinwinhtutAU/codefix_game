@@ -18,6 +18,7 @@ export interface ButtonConfig {
 export default class Button extends Phaser.GameObjects.Container {
   private bg: Phaser.GameObjects.Graphics;
   private label: Phaser.GameObjects.Text;
+  private hitZone: Phaser.GameObjects.Zone; // <--- The secret weapon
   private config: ButtonConfig;
   private isDisabled = false;
   private baseColor: number;
@@ -26,8 +27,6 @@ export default class Button extends Phaser.GameObjects.Container {
   private static readonly DEFAULT_HEIGHT = 40;
   private static readonly DEFAULT_COLOR = 0x4d90fe;
   private static readonly DISABLED_COLOR = 0xcccccc;
-  private static readonly STROKE_COLOR = 0x000000;
-  private static readonly STROKE_ALPHA = 0.15;
 
   constructor(scene: Phaser.Scene, config: ButtonConfig) {
     super(scene, config.x, config.y);
@@ -39,11 +38,11 @@ export default class Button extends Phaser.GameObjects.Container {
     const w = config.width ?? Button.DEFAULT_WIDTH;
     const h = config.height ?? Button.DEFAULT_HEIGHT;
 
-    // 1. Background
+    // 1. Draw Background (Centered)
     this.bg = scene.add.graphics();
     this.drawButton(this.isDisabled ? Button.DISABLED_COLOR : this.baseColor);
 
-    // 2. Text
+    // 2. Draw Text (Centered)
     this.label = scene.add
       .text(0, 0, config.text, {
         fontFamily: "Arial, sans-serif",
@@ -53,42 +52,34 @@ export default class Button extends Phaser.GameObjects.Container {
         align: "center",
         ...config.textStyle,
       })
-      .setOrigin(0.5);
+      .setOrigin(0.5); // Ensures text is perfectly centered
 
-    this.add([this.bg, this.label]);
-    this.setSize(w, h);
+    // 3. Create a Hit Zone (The Fix)
+    // We create a Zone at (0,0) with the exact width/height.
+    // Zones support origins, so we set it to 0.5 to match the graphics.
+    this.hitZone = scene.add.zone(0, 0, w, h).setOrigin(0.5);
 
-    // ---------------------------------------------------------
-    // 🔥 FIX: Define a Centered Hit Area
-    // ---------------------------------------------------------
-    // By default, setInteractive uses (0,0) as top-left.
-    // Since we draw our graphics centered at (0,0) (using -w/2),
-    // we must offset the hit area to match.
-    const hitArea = new Phaser.Geom.Rectangle(-w / 2, -h / 2, w, h);
+    // Add everything to container
+    this.add([this.bg, this.label, this.hitZone]);
 
-    // 2. Pass a SINGLE config object
-    this.setInteractive({
-      hitArea: hitArea,
-      hitAreaCallback: Phaser.Geom.Rectangle.Contains,
+    // 4. Setup Interaction on the ZONE, not the Container
+    this.hitZone.setInteractive({
+      useHandCursor: !this.isDisabled,
       cursor: this.isDisabled ? "default" : "pointer",
     });
 
-    // 3. Setup Events
-    // We always setup events, but we check 'isDisabled' inside them
-    this.setupPointerEvents();
-    this.setupKeyboardEvents();
+    // 5. Setup Events
+    this.setupEvents();
 
-    // 4. Handle initial state
+    // 6. Handle Initial State
     if (this.isDisabled) {
-      if (this.input) this.input.enabled = false;
+      this.setEnabled(false);
     }
 
     scene.add.existing(this);
   }
 
-  // --- Helper to play sound ---
   private playClickSound() {
-    // Uses the existing AudioManager singleton
     AudioManager.getInstance().playSound("click", { volume: 0.5 });
   }
 
@@ -98,130 +89,84 @@ export default class Button extends Phaser.GameObjects.Container {
 
     this.bg.clear();
     this.bg.fillStyle(color, 1);
-    this.bg.fillRoundedRect(-w / 2, -h / 2, w, h, 6);
+    this.bg.fillRoundedRect(-w / 2, -h / 2, w, h, 8);
 
-    this.bg.lineStyle(1, Button.STROKE_COLOR, Button.STROKE_ALPHA);
-    this.bg.strokeRoundedRect(-w / 2, -h / 2, w, h, 6);
+    // Optional border
+    this.bg.lineStyle(2, 0x000000, 0.1);
+    this.bg.strokeRoundedRect(-w / 2, -h / 2, w, h, 8);
 
     if (pressed) {
-      this.bg.lineStyle(2, 0x000000, 0.25);
-      this.bg.strokeRoundedRect(-w / 2, -h / 2, w, h, 6);
+      this.bg.lineStyle(2, 0x000000, 0.3);
+      this.bg.strokeRoundedRect(-w / 2, -h / 2, w, h, 8);
     }
   }
 
-  private setupPointerEvents() {
-    this.on("pointerover", () => {
+  private setupEvents() {
+    // Note: We listen to 'this.hitZone', NOT 'this'
+
+    this.hitZone.on("pointerover", () => {
       if (this.isDisabled) return;
 
-      this.drawButton(
-        Phaser.Display.Color.ValueToColor(this.baseColor).lighten(15).color,
-      );
-      this.bg.setScale(1.05);
-      this.label.setScale(1.05);
+      const hoverColor = Phaser.Display.Color.ValueToColor(
+        this.baseColor,
+      ).lighten(15).color;
+      this.drawButton(hoverColor);
+      this.setScale(1.05);
       this.config.onHover?.();
     });
 
-    this.on("pointerout", () => {
+    this.hitZone.on("pointerout", () => {
       if (this.isDisabled) return;
 
       this.drawButton(this.baseColor);
-      this.bg.setScale(1);
-      this.label.setScale(1);
+      this.setScale(1);
       this.config.onHoverOut?.();
     });
 
-    this.on("pointerdown", () => {
+    this.hitZone.on("pointerdown", () => {
       if (this.isDisabled) return;
 
       this.playClickSound();
 
-      this.drawButton(
-        Phaser.Display.Color.ValueToColor(this.baseColor).darken(20).color,
-        true,
-      );
+      const pressColor = Phaser.Display.Color.ValueToColor(
+        this.baseColor,
+      ).darken(20).color;
+      this.drawButton(pressColor, true);
 
       this.scene.tweens.add({
-        targets: [this.bg, this.label],
+        targets: this,
         scale: 0.95,
-        duration: 60,
+        duration: 50,
         yoyo: true,
-        ease: "Power2",
+        ease: "Quad.easeInOut",
+        onComplete: () => {
+          if (!this.isDisabled) this.drawButton(this.baseColor);
+        },
       });
 
       this.config.onClick();
     });
   }
 
-  private setupKeyboardEvents() {
-    // Clean up old listeners if they exist to prevent duplicates
-    // (Though usually this is only called once in constructor)
-    const keyEnter = this.scene.input.keyboard?.addKey("ENTER");
-    const keySpace = this.scene.input.keyboard?.addKey("SPACE");
-
-    const handler = (event: KeyboardEvent) => {
-      // Only trigger if this button is "focused" or globally if that's intended.
-      // NOTE: For a UI button, usually you only want keyboard events if it's selected.
-      // If you want GLOBAL enter/space to trigger this, keep as is.
-      // If not, you might need a focus management system.
-      // Assuming global trigger based on your snippet:
-
-      if (this.isDisabled) return;
-
-      this.playClickSound();
-
-      this.drawButton(
-        Phaser.Display.Color.ValueToColor(this.baseColor).darken(20).color,
-        true,
-      );
-
-      this.scene.tweens.add({
-        targets: [this.bg, this.label],
-        scale: 0.95,
-        duration: 60,
-        yoyo: true,
-        ease: "Power2",
-        onComplete: () => this.drawButton(this.baseColor),
-      });
-
-      this.config.onClick();
-    };
-
-    // Using the event emitter pattern from your snippet
-    this.scene.input.keyboard?.on("keydown-ENTER", handler);
-    this.scene.input.keyboard?.on("keydown-SPACE", handler);
-
-    this.once(Phaser.GameObjects.Events.DESTROY, () => {
-      this.scene.input.keyboard?.off("keydown-ENTER", handler);
-      this.scene.input.keyboard?.off("keydown-SPACE", handler);
-    });
-  }
-
-  /**
-   * Enables or disables the button.
-   * FIX: We toggle this.input.enabled instead of removing the component.
-   */
   public setEnabled(enabled: boolean): this {
     this.isDisabled = !enabled;
 
+    // Toggle the Zone's interactivity
     if (enabled) {
+      this.hitZone.setInteractive();
+      this.hitZone.input!.cursor = "pointer";
+
       this.label.setColor("#ffffff");
       this.drawButton(this.baseColor);
-
-      // Re-enable input without destroying the hit area
-      if (this.input) {
-        this.input.enabled = true;
-        this.input.cursor = "pointer";
-      }
+      this.setAlpha(1);
     } else {
+      this.hitZone.disableInteractive();
+
       this.label.setColor("#888888");
       this.drawButton(Button.DISABLED_COLOR);
-
-      // Disable input but keep the component
-      if (this.input) {
-        this.input.enabled = false;
-        this.input.cursor = "default";
-      }
+      this.setAlpha(0.8);
     }
+
     return this;
   }
 

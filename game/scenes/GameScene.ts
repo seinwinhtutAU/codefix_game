@@ -26,7 +26,6 @@ export default class GameScene extends Phaser.Scene {
     EventBus.on("request-current-scene", () => {
       EventBus.emit("ui-scene", this.scene.key);
     });
-
     const gameProgressController = GameProgressController.getInstance();
     gameProgressController.init();
 

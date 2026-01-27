@@ -7,6 +7,7 @@ import { EventBus } from "@/game/events";
 import { GameNotificationProps } from "@/game/components/GameNotification";
 import DebuggingQuiz from "@/game/components/DebuggingQuiz";
 import AudioManager from "@/game/AudioManager";
+import { useRouter } from "next/navigation";
 
 const PhaserGame = dynamic(() => import("@/game/components/PhaserGame"), {
   ssr: false,
@@ -47,6 +48,18 @@ export default function GamePage() {
   const [notification, setNotification] =
     useState<GameNotificationProps | null>(null);
   const [showDebuggingQuiz, setShowDebuggingQuiz] = useState(false); // New state for quiz
+
+  const router = useRouter();
+
+  useEffect(() => {
+    // Check if we are in the browser
+    if (typeof window !== "undefined") {
+      const storedUser = localStorage.getItem("user");
+      if (!storedUser) {
+        router.push("/login");
+      }
+    }
+  }, [router]);
 
   useEffect(() => {
     // --- RESET LOGIC ---

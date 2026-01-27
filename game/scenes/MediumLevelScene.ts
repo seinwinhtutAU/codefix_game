@@ -17,44 +17,39 @@ interface PathPoint {
 
 export default class MediumLevelScene extends GameScene {
   private problemIds: string[] = [
-    "697401975f4942a9208dc6a6",
-    "697401ad5f4942a9208dc6bc",
-    "697401dc5f4942a9208dc707",
-    // "69582fb37538b18589a46564",
-    // "69582fb37538b18589a46564",
-    // "69582fb37538b18589a46564",
-    // "69582fb37538b18589a46564",
-    // "695c13b389e02a7e13dbe5ca",
-    // "695c13b389e02a7e13dbe5ca",
-    // "695c13b389e02a7e13dbe5ca",
+    "697908c24b714f4ebc73b1d1",
+    "697908c44b714f4ebc73b1d6",
+    "697908c54b714f4ebc73b1db",
+    "697908d74b714f4ebc73b1e0",
+    "697908d84b714f4ebc73b1e5",
+    "697908d94b714f4ebc73b1ea",
+    "697908da4b714f4ebc73b1ef",
+    "697908da4b714f4ebc73b1f4",
   ];
 
   private roadPoints = [
     { x: 154, y: 353 },
-    { x: 415, y: 172 },
-    { x: 650, y: 172 },
-    // { x: 865, y: 172 },
-    // { x: 1032, y: 334 },
-    // { x: 835, y: 334 },
-    // { x: 482, y: 385 },
-    // { x: 482, y: 570 },
-    // { x: 700, y: 625 },
-    // { x: 980, y: 625 },
+    { x: 500, y: 172 },
+    { x: 850, y: 172 },
+    { x: 1032, y: 334 },
+    { x: 660, y: 334 },
+    { x: 482, y: 500 },
+    { x: 700, y: 625 },
+    { x: 970, y: 625 },
   ];
 
   private pathPoints: PathPoint[] = [
     { x: 154, y: 353 },
     {
-      x: 415,
+      x: 500,
       y: 172,
       path: [
         { x: 295, y: 354 },
         { x: 300, y: 172 },
       ],
     },
-    { x: 650, y: 172 },
     {
-      x: 865,
+      x: 850,
       y: 172,
     },
     {
@@ -63,17 +58,13 @@ export default class MediumLevelScene extends GameScene {
       path: [{ x: 1032, y: 172 }],
     },
     {
-      x: 835,
+      x: 660,
       y: 334,
     },
-    { x: 482, y: 385, path: [{ x: 480, y: 334 }] },
-    {
-      x: 482,
-      y: 570,
-    },
+    { x: 482, y: 500, path: [{ x: 480, y: 334 }] },
     { x: 700, y: 625, path: [{ x: 484, y: 627 }] },
     {
-      x: 980,
+      x: 970,
       y: 625,
     },
     {
@@ -592,22 +583,81 @@ export default class MediumLevelScene extends GameScene {
     if (this.mediumLevelCompleted) return;
     this.mediumLevelCompleted = true;
 
-    EventBus.emit("show-notification", {
-      type: "LEVEL_UP",
-      title: "Level Up!",
-      message: "New challenges unlocked.",
-      confirmLabel: "NEXT",
-      onConfirm: () => {
-        EventBus.emit("hide-notification");
+    // 1. Play a victory sound
+    AudioManager.getInstance().playSound("level-up", { volume: 0.7 });
 
-        if (this.savedProgress && this.savedProgress.gameState) {
-          this.savedProgress.gameState.eventFlags.mediumLevelCompleted = true;
-          this.savedProgress.gameState.currentScene = "PlayGroundScene";
-        }
+    // 2. Calculate position for bottom right
+    const { width, height } = this.scale;
+    const btnX = width - 150;
+    const btnY = height - 80;
 
-        this.emitLevelCompleted(this.savedProgress);
-        this.scene.start("MediumTransitionScene", this.savedProgress);
-      },
+    // 3. Create a custom Large Yellow Button
+    // Note: Using your existing Button class if it exists,
+    // or creating a quick graphics-based one here:
+    const nextBtnContainer = this.add.container(btnX, btnY).setDepth(1000);
+
+    const bg = this.add.graphics();
+    bg.fillStyle(0xffcc00, 1); // Bright Yellow
+    bg.lineStyle(4, 0xffffff, 1);
+    bg.fillRoundedRect(-100, -35, 200, 70, 15);
+    bg.strokeRoundedRect(-100, -35, 200, 70, 15);
+
+    const txt = this.add
+      .text(0, 0, "NEXT LEVEL ➔", {
+        fontFamily: "monospace",
+        fontSize: "24px",
+        color: "#000000",
+        fontStyle: "bold",
+      })
+      .setOrigin(0.5);
+
+    nextBtnContainer.add([bg, txt]);
+
+    // 4. Interaction
+    bg.setInteractive(
+      new Phaser.Geom.Rectangle(-100, -35, 200, 70),
+      Phaser.Geom.Rectangle.Contains,
+    );
+
+    bg.on("pointerover", () => {
+      bg.setAlpha(0.8);
+      nextBtnContainer.setScale(1.05);
+    });
+
+    bg.on("pointerout", () => {
+      bg.setAlpha(1);
+      nextBtnContainer.setScale(1);
+    });
+
+    bg.on("pointerdown", () => {
+      AudioManager.getInstance().playSound("click", { volume: 0.5 });
+
+      if (this.savedProgress && this.savedProgress.gameState) {
+        this.savedProgress.gameState.eventFlags.mediumLevelCompleted = true;
+        this.savedProgress.gameState.currentScene = "PlayGroundScene";
+      }
+
+      this.emitLevelCompleted(this.savedProgress);
+      this.scene.start("MediumTransitionScene", this.savedProgress);
+    });
+
+    // 5. Entrance Animation (Slide in from the right)
+    nextBtnContainer.setX(width + 200);
+    this.tweens.add({
+      targets: nextBtnContainer,
+      x: btnX,
+      duration: 800,
+      ease: "Back.easeOut",
+    });
+
+    // 6. Subtle Pulse to attract attention
+    this.tweens.add({
+      targets: nextBtnContainer,
+      scale: 1.05,
+      duration: 600,
+      yoyo: true,
+      repeat: -1,
+      ease: "Sine.easeInOut",
     });
   }
 

@@ -18,7 +18,7 @@ export default function SignUpPage() {
   useEffect(() => {
     const storedUser = localStorage.getItem("user");
     if (storedUser) {
-      router.replace("/");
+      router.replace("/game");
     }
   }, [router]);
 
@@ -49,7 +49,7 @@ export default function SignUpPage() {
 
       if (response.ok) {
         localStorage.setItem("user", JSON.stringify(data.user));
-        router.push("/");
+        router.push("/game");
       } else {
         setError(data.message || "Signup failed. Please try again.");
       }

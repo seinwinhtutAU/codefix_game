@@ -13,22 +13,20 @@ export interface BugCount {
 
 export default class BossLevelScene extends GameScene {
   private problemIds: string[] = [
-    "697401975f4942a9208dc6a6",
-    "697401ad5f4942a9208dc6bc",
-    "697401dc5f4942a9208dc707",
-    "697401975f4942a9208dc6a6",
-    "697401975f4942a9208dc6a6",
+    "697908b84b714f4ebc73b1c2",
+    "697908bb4b714f4ebc73b1c7",
+    "697908bc4b714f4ebc73b1cc",
   ];
 
   private selectionButtons: Button[] = [];
   private selectionContainer!: Phaser.GameObjects.Container;
 
   private pointsPos = [
-    { x: 490, y: 100 },
+    // { x: 490, y: 100 },
     { x: 590, y: 100 },
     { x: 690, y: 100 },
     { x: 790, y: 100 },
-    { x: 890, y: 100 },
+    // { x: 890, y: 100 },
   ];
 
   private solvedRecords: ProblemSolveRecord[] = [];
@@ -100,9 +98,9 @@ export default class BossLevelScene extends GameScene {
     const yCenter = 768 / 2 + 50; // Shifted down to avoid overlapping the nodes
 
     const options = [
-      { bugs: 15, bonus: 0, color: 0x7df9ff, label: "STABLE_CORE" }, // Mint Blue
-      { bugs: 20, bonus: 20, color: 0xffff00, label: "CRITICAL_GLITCH" }, // Electric Yellow
-      { bugs: 25, bonus: 30, color: 0xff71ce, label: "SYSTEM_BREACH" }, // Neon Pink
+      { bugs: 15, bonus: 150, color: 0x7df9ff, label: "STABLE_CORE" }, // Mint Blue
+      { bugs: 20, bonus: 200, color: 0xffff00, label: "CRITICAL_GLITCH" }, // Electric Yellow
+      { bugs: 25, bonus: 250, color: 0xff71ce, label: "SYSTEM_BREACH" }, // Neon Pink
     ];
 
     this.selectionContainer = this.add.container(0, 0).setDepth(150);
@@ -170,7 +168,7 @@ export default class BossLevelScene extends GameScene {
         .setOrigin(0.5);
 
       // 5. Bonus Text (Bottom of button)
-      const bonusText = opt.bonus > 0 ? `+${opt.bonus} POINTS` : "BASE POINTS";
+      const bonusText = opt.bonus > 0 ? `${opt.bonus} POINTS` : "150 POINTS";
       const desc = this.add
         .text(xPos, yCenter + 65, bonusText, {
           fontFamily: "monospace",
@@ -344,29 +342,56 @@ export default class BossLevelScene extends GameScene {
       })
       .setOrigin(0.5);
 
-    const content =
-      `--------------------------\n` + // Shortened lines
-      ` > NODE_ID: CHIP_0${index + 1}\n` +
-      ` > BUGS_FOUND: ${bugCount}\n` +
-      ` > POINTS: ${estPoints} XP\n` +
-      ` > TIMER: ${timeLimitFormatted}(m:s)\n` +
-      `--------------------------\n` +
-      ` ATTEMPTS: ${this.solvedRecords[index]?.attempt || 0} ATTEMPTS\n` +
-      ` STATUS: ${this.getPointState(index).toUpperCase()}\n` +
-      ` EARNED_POINTS: ${this.solvedRecords[index]?.pointsEarned || 0}\n` +
-      ` SOLVE_TIME: ${solveTimeFormatted}(m:s)\n` +
-      `--------------------------\n` +
-      ` READY TO DE-BUG?`;
+    const baseY = -pH / 2 + 90;
+    const lineGap = 28;
+    const normalColor = "#ffffff";
+    const highlightColor = "#28a745";
 
-    const details = this.add
-      .text(0, -10, content, {
-        // Shifted up slightly
-        fontFamily: "monospace",
-        fontSize: "15px", // Smaller font for smaller container
-        color: "#fff",
-        lineSpacing: 8,
-      })
-      .setOrigin(0.5);
+    const makeText = (y: number, text: string, color = normalColor) =>
+      this.add
+        .text(0, y, text, {
+          fontFamily: "monospace",
+          fontSize: "15px",
+          color,
+        })
+        .setOrigin(0.5);
+
+    const texts = [
+      makeText(baseY + lineGap * 0, "--------------------------"),
+      makeText(baseY + lineGap * 1, `> NODE_ID: CHIP_0${index + 1}`),
+      makeText(
+        baseY + lineGap * 2,
+        `> BUGS_NUMBER: ${bugCount}`,
+        highlightColor,
+      ),
+      makeText(
+        baseY + lineGap * 3,
+        `> ESTIMATED_POINTS: ${estPoints}`,
+        highlightColor,
+      ),
+      makeText(
+        baseY + lineGap * 4,
+        `> TIMER: ${timeLimitFormatted}(m:s)`,
+        highlightColor,
+      ),
+      makeText(baseY + lineGap * 5, "--------------------------"),
+      makeText(
+        baseY + lineGap * 6,
+        `ATTEMPTS: ${this.solvedRecords[index]?.attempt || 0}`,
+      ),
+      makeText(
+        baseY + lineGap * 7,
+        `STATUS: ${this.getPointState(index).toUpperCase()}`,
+      ),
+      makeText(
+        baseY + lineGap * 8,
+        `EARNED_POINTS: ${this.solvedRecords[index]?.pointsEarned || 0}`,
+        highlightColor,
+      ),
+      makeText(baseY + lineGap * 9, `SOLVE_TIME: ${solveTimeFormatted}(m:s)`),
+      makeText(baseY + lineGap * 10, "--------------------------"),
+      makeText(baseY + lineGap * 11, "READY TO DE-BUG?"),
+    ];
 
     const goNextProblem =
       index === this.currentPointIndex &&
@@ -391,7 +416,7 @@ export default class BossLevelScene extends GameScene {
       startBtn.setVisible(false);
     }
 
-    this.infoPanelContainer.add([bg, title, details, startBtn]);
+    this.infoPanelContainer.add([bg, title, ...texts, startBtn]);
 
     this.infoPanelContainer.setScale(0);
     this.tweens.add({

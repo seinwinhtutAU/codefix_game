@@ -17,7 +17,7 @@ export default function LoginPage() {
   useEffect(() => {
     const storedUser = localStorage.getItem("user");
     if (storedUser) {
-      router.replace("/");
+      router.replace("/game");
     }
   }, [router]);
 
@@ -48,7 +48,7 @@ export default function LoginPage() {
 
       if (response.ok) {
         localStorage.setItem("user", JSON.stringify(data.user));
-        router.push("/");
+        router.push("/game");
       } else {
         setError(data.message || "Invalid email or password");
       }
