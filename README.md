@@ -82,15 +82,6 @@ By completing CodeFix, players will:
 
 ---
 
-## 🚀 Future Improvements
-
-- More difficulty levels (Intermediate / Advanced)
-- Additional story chapters
-- Leaderboard and achievements
-- Support for more programming languages
-
----
-
 ## 📌 Conclusion
 
 CodeFix transforms debugging from a frustrating experience into an engaging learning journey. By combining gameplay, storytelling, and real coding challenges, this project aims to make **debugging approachable, enjoyable, and effective** for Python beginners.
