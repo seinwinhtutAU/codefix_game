@@ -265,7 +265,7 @@ export default class EasyLevelScene extends GameScene {
         if (index === this.currentPointIndex) {
           EventBus.emit("ui-open-problem", {
             problemId: this.problemIds[index],
-            difficulty: "easy",
+            difficulty: "medium",
           });
         } else if (index > this.currentPointIndex) {
           // Shakes the point to show it's locked

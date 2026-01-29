@@ -185,8 +185,36 @@ export function ProblemOverlay({
   } = useUserCodeManager();
 
   // --- TIMER LOGIC ---
-  const [timeLimited, setTimeLimited] = useState(60);
-  const [basePoints, setBasePoints] = useState(100);
+  type Difficulty = "easy" | "medium" | "hard" | "boss";
+
+  const DIFFICULTY_CONFIG: Record<
+    Difficulty,
+    { baseTime: number; basePoints: number }
+  > = {
+    easy: {
+      baseTime: 60,
+      basePoints: 100,
+    },
+    medium: {
+      baseTime: 120,
+      basePoints: 100,
+    },
+    hard: {
+      baseTime: 180,
+      basePoints: 100,
+    },
+    boss: {
+      baseTime: 300,
+      basePoints: 150,
+    },
+  };
+
+  const [timeLimited, setTimeLimited] = useState(
+    DIFFICULTY_CONFIG[difficulty as Difficulty].baseTime,
+  );
+  const [basePoints, setBasePoints] = useState(
+    DIFFICULTY_CONFIG[difficulty as Difficulty].basePoints,
+  );
 
   const currentBugCount = progress?.bugCounts?.find(
     (b) => b.problemId === problemId,
