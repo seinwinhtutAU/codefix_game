@@ -1,36 +1,96 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 🐞 CodeFix – Learn Debugging Through Play
 
-## Getting Started
+**CodeFix** is a senior project designed to help **Python beginners** learn the fundamentals of **debugging** through an interactive **story-driven game**. Instead of learning debugging only through theory, players actively solve bugs, answer quizzes, and fix code while progressing through a short narrative game.
 
-First, run the development server:
+🔗 **Live Demo:**  
+👉 https://codefix-game.up.railway.app
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+---
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 🎮 Project Overview
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+CodeFix combines **game mechanics** with **programming challenges** to create a fun and engaging learning experience. Players take the role of a problem solver who must debug broken Python code to move forward in the story.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+The game focuses on:
 
-## Learn More
+- Understanding common Python errors
+- Learning how to read error messages
+- Practicing logical thinking and debugging strategies
+- Building confidence for beginners in Python programming
 
-To learn more about Next.js, take a look at the following resources:
+Each challenge is carefully designed to be approachable for learners with little to no prior debugging experience.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+---
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## ✨ Key Features
 
-## Deploy on Vercel
+- 🧩 **Debugging Challenges**
+  - Python code problems with intentional bugs
+  - Real execution results for better understanding
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- ❓ **Quiz Questions**
+  - Reinforce concepts related to debugging and Python basics
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- 💡 **Hint System**
+  - Players can use hints when stuck
+  - Encourages learning without giving instant solutions
+
+- ⏱️ **Time & Attempt System**
+  - Adds light challenge and motivation
+  - Rewards efficient problem solving
+
+- 🎭 **Story-Based Gameplay**
+  - Progress through a short narrative instead of isolated exercises
+
+---
+
+## 🎯 Target Audience
+
+- Python **beginners**
+- Students learning programming fundamentals
+- Learners who struggle with debugging concepts
+- Anyone who prefers **learning by doing** rather than reading only
+
+---
+
+## 🛠️ Technology Stack
+
+### Frontend & Game
+
+- **Phaser** – 2D game framework for gameplay and interaction
+- **Next.js** – Frontend UI and server-side logic
+
+### Backend
+
+- **Next.js (API Routes)** – Game logic, user progress, and data handling
+- **FastAPI** – Secure execution of Python code submitted by players
+
+### Deployment
+
+- **Railway**
+
+---
+
+## 🧠 Learning Outcomes
+
+By completing CodeFix, players will:
+
+- Understand basic Python errors and bugs
+- Learn how to approach debugging step by step
+- Gain confidence in reading and fixing code
+- Develop problem-solving and logical thinking skills
+
+---
+
+## 🚀 Future Improvements
+
+- More difficulty levels (Intermediate / Advanced)
+- Additional story chapters
+- Leaderboard and achievements
+- Support for more programming languages
+
+---
+
+## 📌 Conclusion
+
+CodeFix transforms debugging from a frustrating experience into an engaging learning journey. By combining gameplay, storytelling, and real coding challenges, this project aims to make **debugging approachable, enjoyable, and effective** for Python beginners.
