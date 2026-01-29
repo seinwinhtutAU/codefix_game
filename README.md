@@ -63,7 +63,7 @@ Each challenge is carefully designed to be approachable for learners with little
 ### Backend
 
 - **Next.js (API Routes)** – Game logic, user progress, and data handling
-- **FastAPI** – Secure execution of Python code submitted by players
+- **FastAPI** – Execution of Python code submitted by players
 
 ### Deployment
 
