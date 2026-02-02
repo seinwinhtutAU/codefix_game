@@ -31,26 +31,14 @@ export default class LevelScene extends GameScene {
     const { width, height } = this.cameras.main;
 
     // 1. Background
-    this.add.image(width / 2, height / 2, "menu-bg").setTint(0xf8fafc);
-    this.add.grid(
-      width / 2,
-      height / 2,
-      width,
-      height,
-      40,
-      40,
-      0xffffff,
-      0,
-      0xe2e8f0,
-      0.2,
-    );
+    this.add.image(width / 2, height / 2, "level-bg").setTint(0xf8fafc);
 
     // 2. Title
     this.add
       .text(width / 2, 50, "GAME LOG", {
         fontFamily: "Gluten",
         fontSize: "42px",
-        color: "#FF85A1",
+        color: "#4a90e2",
       })
       .setOrigin(0.5)
       .setStroke("#FFF", 6)
@@ -138,7 +126,7 @@ export default class LevelScene extends GameScene {
       width: 160,
       height: 40,
       text: "BACK",
-      color: 0xff85a1,
+      color: 0x4a90e2,
       textStyle: { fontFamily: "Arial", fontSize: "14px", fontStyle: "bold" },
       onClick: () => {
         this.cameras.main.fadeOut(300);
@@ -253,7 +241,7 @@ export default class LevelScene extends GameScene {
       .text(-90, -8, "TOTAL POINTS", {
         fontFamily: "Arial",
         fontSize: "9px",
-        color: "#94a3b8",
+        color: "#4A90E2",
         fontStyle: "bold",
       })
       .setOrigin(0.5);
@@ -261,7 +249,7 @@ export default class LevelScene extends GameScene {
       .text(-90, 8, `${totalPoints}`, {
         fontFamily: "Arial",
         fontSize: "14px",
-        color: "#ff85a1",
+        color: "#4A90E2",
         fontStyle: "bold",
       })
       .setOrigin(0.5);
@@ -270,7 +258,7 @@ export default class LevelScene extends GameScene {
       .text(90, -8, "TOTAL TIME", {
         fontFamily: "Arial",
         fontSize: "9px",
-        color: "#94a3b8",
+        color: "#4A90E2",
         fontStyle: "bold",
       })
       .setOrigin(0.5);
@@ -278,7 +266,7 @@ export default class LevelScene extends GameScene {
       .text(90, 8, this.formatTime(totalTime), {
         fontFamily: "Arial",
         fontSize: "14px",
-        color: "#64748b",
+        color: "#4A90E2",
         fontStyle: "bold",
       })
       .setOrigin(0.5);
@@ -323,7 +311,7 @@ export default class LevelScene extends GameScene {
     const colors = {
       locked: { bg: 0xf1f5f9, border: 0xcbd5e1, text: 0x94a3b8 },
       completed: { bg: 0xf0fdf4, border: 0x86efac, text: 0x166534 },
-      current: { bg: 0xffffff, border: 0xff85a1, text: 0x334155 },
+      current: { bg: 0xffffff, border: 0x4a90e2, text: 0x334155 },
     };
 
     const theme = isLocked
@@ -373,7 +361,7 @@ export default class LevelScene extends GameScene {
     }
     if (isCurrent) {
       statusStr = "ACTIVE";
-      statusColor = "#e11d48";
+      statusColor = "#4A90E2";
     }
 
     const statusText = this.add.text(-(cardW / 2) + 20, 60, statusStr, {

@@ -20,17 +20,18 @@ export default class PreloadScene extends Phaser.Scene {
     const { width, height } = this.cameras.main;
 
     /* 🌱 CUTE GREEN BACKGROUND */
-    this.cameras.main.setBackgroundColor("#E8FCE8");
+    this.cameras.main.setBackgroundColor("#93D4FF");
 
     /* 🌈 SOFT GRADIENT LAYER */
     const bg = this.add.graphics();
-    bg.fillGradientStyle(0xe8fce8, 0xe8fce8, 0xb8efcb, 0xb8efcb, 1);
+    bg.fillGradientStyle(0xeaf4ff, 0xeaf4ff, 0xb5d9ff, 0xb5d9ff, 1);
+
     bg.fillRect(0, 0, width, height);
     bg.setDepth(-10);
 
     /* 📦 PROGRESS BOX (container) */
     this.progressBox = this.add.graphics();
-    this.progressBox.fillStyle(0xffffff, 0.9);
+    this.progressBox.fillStyle(0x7fbfff, 0.9);
     this.progressBox.fillRoundedRect(
       width / 2 - 200, // centered
       height / 2 - 20, // vertically centered
@@ -46,14 +47,14 @@ export default class PreloadScene extends Phaser.Scene {
       .text(width / 2, height / 2 - 60, "LOADING ASSETS...", {
         fontFamily: "monospace",
         fontSize: "18px",
-        color: "#4A7C59",
+        color: "#2C5D9E",
       })
       .setOrigin(0.5);
 
-    /* 📊 PROGRESS BAR */
+    /* 📊 PROGRESS BAR 0x4a90e2 */
     this.load.on("progress", (value: number) => {
       this.progressBar.clear();
-      this.progressBar.fillStyle(0x6bcf9d, 1);
+      this.progressBar.fillStyle(0x4a90e2, 1);
       this.progressBar.fillRoundedRect(
         width / 2 - 195, // small inset from box
         height / 2 - 17,
@@ -105,7 +106,7 @@ export default class PreloadScene extends Phaser.Scene {
     this.load.audio("victory", "/audio/victory.mp3");
     this.load.audio("gameover", "/audio/gameover.mp3");
 
-    this.load.image("menu-bg", "/intro/menu-bg.png");
+    // this.load.image("menu-bg", "/intro/menu-bg.png");
 
     this.load.spritesheet("player_walk", "player/walk/walk_spritesheet1.png", {
       frameWidth: 438,
@@ -135,6 +136,8 @@ export default class PreloadScene extends Phaser.Scene {
     this.load.image("level-office-home", "/office_home.png");
     this.load.image("level-park", "/park.png");
     this.load.image("level-core", "/system_core.png");
+    this.load.image("menu-bg", "/menu-bg.png");
+    this.load.image("level-bg", "/level-bg.png");
   }
 
   create() {
@@ -146,7 +149,7 @@ export default class PreloadScene extends Phaser.Scene {
     this.progressBar.destroy();
     this.progressBox.destroy();
 
-    this.loadingText.setText("READY 🌟 CLICK TO START").setColor("#3A7D44");
+    this.loadingText.setText("READY 🌟 CLICK TO START").setColor("#1E4FA3");
 
     this.input.once("pointerdown", () => {
       if (this.sound instanceof Phaser.Sound.WebAudioSoundManager) {

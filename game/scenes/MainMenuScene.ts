@@ -27,25 +27,25 @@ export default class MainMenuScene extends GameScene {
     AudioManager.getInstance().init(this.game);
     AudioManager.getInstance().playMusic("bgm", { loop: true, volume: 0.15 });
 
-    // --- GAME TITLE ---
-    const title = this.add
-      .text(width / 2, height / 2 - 140, "GO GOAL", {
-        fontFamily: "Gluten",
-        fontSize: "84px",
-        color: "#FF85A1",
-      })
-      .setOrigin(0.5)
-      .setStroke("#FFF", 12);
+    // // --- GAME TITLE ---
+    // const title = this.add
+    //   .text(width / 2, height / 2 - 140, "GO GOAL", {
+    //     fontFamily: "Gluten",
+    //     fontSize: "84px",
+    //     color: "#FF85A1",
+    //   })
+    //   .setOrigin(0.5)
+    //   .setStroke("#FFF", 12);
 
-    // Subtle floating animation
-    this.tweens.add({
-      targets: title,
-      y: height / 2 - 160,
-      duration: 2000,
-      ease: "Sine.easeInOut",
-      yoyo: true,
-      repeat: -1,
-    });
+    // // Subtle floating animation
+    // this.tweens.add({
+    //   targets: title,
+    //   y: height / 2 - 160,
+    //   duration: 2000,
+    //   ease: "Sine.easeInOut",
+    //   yoyo: true,
+    //   repeat: -1,
+    // });
 
     // --- PROGRESS LOGIC ---
     const isIntroDone =
@@ -59,7 +59,7 @@ export default class MainMenuScene extends GameScene {
       width: 240,
       height: 60,
       text: buttonLabel,
-      color: 0xff85a1, // Theme Pink
+      color: 0x4a90e2,
       textStyle: {
         fontFamily: "Gluten",
         fontSize: "24px",
@@ -81,7 +81,7 @@ export default class MainMenuScene extends GameScene {
       width: 240,
       height: 60,
       text: "LEVELS",
-      color: 0xffb3c6, // Softer pink for secondary action
+      color: 0x4a90e2, // Softer pink for secondary action
       textStyle: {
         fontFamily: "Gluten",
         fontSize: "24px",
