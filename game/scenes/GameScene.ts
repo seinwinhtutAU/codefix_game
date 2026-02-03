@@ -4,7 +4,6 @@ import { EventBus } from "../events";
 import { IGameProgress } from "@/lib/types";
 import { initGameAudioEvents } from "../GameAudioController";
 import GameProgressController from "../GameProgressController";
-import AudioManager from "../AudioManager";
 
 export default class GameScene extends Phaser.Scene {
   // Use a static property or registry to keep data alive across scenes

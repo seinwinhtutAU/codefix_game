@@ -14,7 +14,7 @@ export default class HomeScene extends GameScene {
 
   create() {
     // Immediate transition if already completed
-    if (this.savedProgress?.gameState?.eventFlags?.mediumIntroCompleted) {
+    if (this.savedProgress?.gameState?.eventFlags?.hardIntroCompleted) {
       this.scene.start("PlayGroundScene", this.savedProgress);
       return;
     }
@@ -23,10 +23,7 @@ export default class HomeScene extends GameScene {
     this.initAudio();
 
     // 1. Setup Background
-    this.add
-      .image(0, 0, "medium_home")
-      .setDisplaySize(1376, 768)
-      .setOrigin(0, 0);
+    this.add.image(0, 0, "hard_home").setDisplaySize(1376, 768).setOrigin(0, 0);
 
     // 2. Setup UI Components
     this.dialogBox = new DialogBox(this);
@@ -236,7 +233,7 @@ export default class HomeScene extends GameScene {
         currentScene: "HomeScene",
         eventFlags: {
           ...progress.gameState.eventFlags,
-          mediumIntroCompleted: true,
+          hardIntroCompleted: true,
         },
         currentTask: {
           taskType: "none",

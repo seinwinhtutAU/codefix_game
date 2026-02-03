@@ -77,7 +77,7 @@ export default class LevelScene extends GameScene {
         difficulty: "MEDIUM",
         imageKey: "level-office-home",
         unlocked: !!flags?.easyQuizCompleted,
-        completed: !!flags?.easyLevelCompleted,
+        completed: !!flags?.mediumLevelCompleted,
         points: stats.medium.points,
         time: stats.medium.time,
       },
@@ -86,8 +86,8 @@ export default class LevelScene extends GameScene {
         label: "THE PARK",
         difficulty: "HARD",
         imageKey: "level-park",
-        unlocked: !!flags?.easyLevelCompleted,
-        completed: !!flags?.mediumLevelCompleted,
+        unlocked: !!flags?.mediumLevelCompleted,
+        completed: !!flags?.hardLevelCompleted,
         points: stats.hard.points,
         time: stats.hard.time,
       },
@@ -96,7 +96,7 @@ export default class LevelScene extends GameScene {
         label: "SYSTEM CORE",
         difficulty: "BOSS",
         imageKey: "level-core",
-        unlocked: !!flags?.mediumLevelCompleted,
+        unlocked: !!flags?.hardLevelCompleted,
         completed: !!flags?.bossLevelCompleted,
         points: stats.boss.points,
         time: stats.boss.time,
@@ -515,16 +515,16 @@ export default class LevelScene extends GameScene {
       this.scene.start("EndingScene", this.savedProgress);
     else if (flags?.warningCompleted)
       this.scene.start("BossLevelScene", this.savedProgress);
-    else if (flags?.mediumLevelCompleted)
+    else if (flags?.hardLevelCompleted)
       this.scene.start("WarningScene", this.savedProgress);
     else if (flags?.playgroundCompleted)
-      this.scene.start("MediumLevelScene", this.savedProgress);
-    else if (flags?.mediumIntroCompleted)
+      this.scene.start("HardLevelScene", this.savedProgress);
+    else if (flags?.hardIntroCompleted)
       this.scene.start("PlayGroundScene", this.savedProgress);
-    else if (flags?.easyLevelCompleted)
+    else if (flags?.mediumLevelCompleted)
       this.scene.start("HomeScene", this.savedProgress);
     else if (flags?.officeCompleted)
-      this.scene.start("EasyLevelScene", this.savedProgress);
+      this.scene.start("MediumLevelScene", this.savedProgress);
     else if (flags?.arrivedAtOffice)
       this.scene.start("OfficeScene", this.savedProgress);
     else if (flags?.introCompleted)

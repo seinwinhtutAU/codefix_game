@@ -27,26 +27,6 @@ export default class MainMenuScene extends GameScene {
     AudioManager.getInstance().init(this.game);
     AudioManager.getInstance().playMusic("bgm", { loop: true, volume: 0.15 });
 
-    // // --- GAME TITLE ---
-    // const title = this.add
-    //   .text(width / 2, height / 2 - 140, "GO GOAL", {
-    //     fontFamily: "Gluten",
-    //     fontSize: "84px",
-    //     color: "#FF85A1",
-    //   })
-    //   .setOrigin(0.5)
-    //   .setStroke("#FFF", 12);
-
-    // // Subtle floating animation
-    // this.tweens.add({
-    //   targets: title,
-    //   y: height / 2 - 160,
-    //   duration: 2000,
-    //   ease: "Sine.easeInOut",
-    //   yoyo: true,
-    //   repeat: -1,
-    // });
-
     // --- PROGRESS LOGIC ---
     const isIntroDone =
       this.savedProgress?.gameState?.eventFlags?.introCompleted;
@@ -129,16 +109,16 @@ export default class MainMenuScene extends GameScene {
       this.scene.start("BossLevelScene", this.savedProgress);
     else if (flags?.warningCompleted)
       this.scene.start("BossLevelScene", this.savedProgress);
-    else if (flags?.mediumLevelCompleted)
+    else if (flags?.hardLevelCompleted)
       this.scene.start("WarningScene", this.savedProgress);
     else if (flags?.playgroundCompleted)
       this.scene.start("MediumLevelScene", this.savedProgress);
-    else if (flags?.mediumIntroCompleted)
+    else if (flags?.hardIntroCompleted)
       this.scene.start("PlayGroundScene", this.savedProgress);
-    else if (flags?.easyLevelCompleted)
+    else if (flags?.mediumLevelCompleted)
       this.scene.start("HomeScene", this.savedProgress);
     else if (flags?.officeCompleted)
-      this.scene.start("EasyLevelScene", this.savedProgress);
+      this.scene.start("MediumLevelScene", this.savedProgress);
     else if (flags?.arrivedAtOffice)
       this.scene.start("OfficeScene", this.savedProgress);
     else this.scene.start("CarDriveScene", this.savedProgress);

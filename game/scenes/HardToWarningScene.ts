@@ -1,14 +1,9 @@
 import GameScene from "./GameScene";
 import AudioManager from "../AudioManager";
 
-export default class MediumTransitionScene extends GameScene {
+export default class HardToWarningScene extends GameScene {
   constructor() {
-    super("MediumTransitionScene");
-  }
-
-  preload() {
-    this.load.image("intro_car", "/intro/car_1.png");
-    this.load.audio("bgm", "/audio/bgm.mp3");
+    super("HardToWarningScene");
   }
 
   create() {
@@ -47,7 +42,7 @@ export default class MediumTransitionScene extends GameScene {
     groundLine.setAlpha(0.3); // Make it a bit subtle/transparent
 
     // 4. Add Car
-    const car = this.add.sprite(-200, 500, "intro_car");
+    const car = this.add.sprite(-200, 500, "car");
     car.setScale(0.4);
 
     // 5. Create Exhaust Particles

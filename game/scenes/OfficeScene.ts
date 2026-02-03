@@ -17,7 +17,7 @@ export default class OfficeScene extends GameScene {
     super.create();
 
     if (this.savedProgress?.gameState?.eventFlags?.officeCompleted) {
-      this.scene.start("EasyLevelScene", this.savedProgress);
+      this.scene.start("MediumLevelScene", this.savedProgress);
       return;
     }
 
@@ -112,7 +112,7 @@ export default class OfficeScene extends GameScene {
       userId: this.savedProgress.userId,
       lastLocation: "/game",
       gameState: {
-        currentScene: "EasyLevelScene",
+        currentScene: "MediumLevelScene",
         eventFlags: {
           ...this.savedProgress.gameState?.eventFlags,
           officeCompleted: true,
@@ -143,7 +143,7 @@ export default class OfficeScene extends GameScene {
       Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE,
       () => {
         AudioManager.getInstance().stopMusic();
-        this.scene.start("EasyLevelScene", this.savedProgress ?? undefined);
+        this.scene.start("MediumLevelScene", this.savedProgress ?? undefined);
       },
     );
   }

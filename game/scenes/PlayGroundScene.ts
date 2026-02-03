@@ -35,15 +35,9 @@ export default class PlayGroundScene extends GameScene {
     super("PlayGroundScene");
   }
 
-  preload() {
-    this.load.image("play_ground_bg1", "/medium/bg1.png");
-    this.load.image("play_ground_bg2", "/medium/bg2.png");
-    this.load.image("park_building", "/medium/building1.png");
-  }
-
   create() {
     if (this.savedProgress?.gameState?.eventFlags?.playgroundCompleted) {
-      this.scene.start("MediumLevelScene", this.savedProgress);
+      this.scene.start("HardLevelScene", this.savedProgress);
       return;
     }
 
@@ -71,13 +65,13 @@ export default class PlayGroundScene extends GameScene {
     this.nextButton = new Button(this, {
       x: width - 150,
       y: height - 80,
-      text: "NEXT >",
+      text: "NEXT >>",
       color: 0x2ecc71,
       onClick: async () => {
         this.nextButton.setEnabled(false);
         await this.savePlaygroundCompletion();
 
-        this.transitionToMediumLevel();
+        this.transitionToHardLevel();
       },
     });
 
@@ -316,7 +310,7 @@ export default class PlayGroundScene extends GameScene {
       ...this.savedProgress,
       gameState: {
         ...this.savedProgress.gameState,
-        currentScene: "MediumLevelScene",
+        currentScene: "HardLevelScene",
         eventFlags: {
           ...this.savedProgress.gameState.eventFlags,
           playgroundCompleted: true,
@@ -339,10 +333,10 @@ export default class PlayGroundScene extends GameScene {
     EventBus.emit("progress-updated", progress);
   }
 
-  private transitionToMediumLevel() {
+  private transitionToHardLevel() {
     this.cameras.main.fadeOut(1000, 0, 0, 0);
     this.cameras.main.once("camerafadeoutcomplete", () => {
-      this.scene.start("MediumLevelScene", this.savedProgress);
+      this.scene.start("HardLevelScene", this.savedProgress);
     });
   }
 }

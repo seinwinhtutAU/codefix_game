@@ -51,7 +51,6 @@ export default class PreloadScene extends Phaser.Scene {
       })
       .setOrigin(0.5);
 
-    /* 📊 PROGRESS BAR 0x4a90e2 */
     this.load.on("progress", (value: number) => {
       this.progressBar.clear();
       this.progressBar.fillStyle(0x4a90e2, 1);
@@ -64,35 +63,29 @@ export default class PreloadScene extends Phaser.Scene {
       );
     });
 
-    /* 🔽 ASSETS */
+    // Character
+    this.load.image("wife", "/player/idle/wife.png");
+    this.load.image("player_idle", "/player/idle/player.png");
+    this.load.spritesheet("player_walk", "player/walk/walk_spritesheet1.png", {
+      frameWidth: 438,
+      frameHeight: 505,
+    });
 
-    this.load.image("house-bg", "/intro/house-bg.png");
-    this.load.image("wife", "/player/idle/wife1.png");
-    this.load.image("car", "/intro/car_1.png");
-    this.load.image("police_car", "/intro/police1.png");
-    this.load.image("office-bg", "/intro/office_bg.png");
+    // Easy Level
+    this.load.image("house-bg", "/easy/house-bg.png");
+    this.load.image("car", "/easy/car.png");
+    this.load.image("police_car", "/easy/police_car.png");
+    this.load.image("office-bg", "/easy/office_bg.png");
+    this.load.image("sun", "/easy/bg/sun.png");
+    this.load.image("car_building", "/easy/bg/building.png");
+    this.load.image("red_light", "/easy/bg/red_light.png");
+    this.load.image("car_bg_1", "/easy/bg/bg1.png");
+    this.load.image("car_bg_2", "/easy/bg/bg2.png");
+    this.load.image("car_bg_3", "/easy/bg/bg1.png");
+    this.load.image("car_bg_4", "/easy/bg/bg1.png");
+    this.load.image("car_cloud", "/easy/bg/cloud.png");
 
-    this.load.image("sun", "/intro/bg/sun1.png");
-
-    this.load.image("building1", "/intro/building/building1.png");
-    this.load.image("building2", "/intro/building/building2.png");
-    this.load.image("building3", "/intro/building/building3.png");
-    this.load.image("building4", "/intro/building/building4.png");
-    this.load.image("building5", "/intro/building/building5.png");
-    this.load.image("car_building", "/intro/bg/building2.png");
-    this.load.image("red_light", "/intro/building/red_light.png");
-
-    this.load.image("car_bg_1", "/intro/bg/bg1_1.png");
-    this.load.image("car_bg_2", "/intro/bg/bg1_2.png");
-    this.load.image("car_bg_3", "/intro/bg/bg1_1.png");
-    this.load.image("car_bg_4", "/intro/bg/bg1_1.png");
-    this.load.image("car_cloud", "/intro/bg/cloud.png");
-
-    this.load.image("player_idle", "/player/idle/stand2.png");
-    for (let i = 1; i <= 3; i++) {
-      this.load.image(`player_walk_${i}`, `/player/walk/walk_${i}.png`);
-    }
-
+    // Audio
     this.load.audio("bgm", "/audio/bgm.mp3");
     this.load.audio("menu-bgm", "/audio/bgm.mp3");
     this.load.audio("drive-bgm", "/audio/bgm.mp3");
@@ -106,32 +99,29 @@ export default class PreloadScene extends Phaser.Scene {
     this.load.audio("victory", "/audio/victory.mp3");
     this.load.audio("gameover", "/audio/gameover.mp3");
 
-    // this.load.image("menu-bg", "/intro/menu-bg.png");
-
-    this.load.spritesheet("player_walk", "player/walk/walk_spritesheet1.png", {
-      frameWidth: 438,
-      frameHeight: 505,
-    });
-
-    this.load.image("dialog-box", "player/dialog.png");
-
-    this.load.image("easy-map", "/easy/level_map/easy_map.png");
-    this.load.image("easy-point-current", "/easy/level_map/point_current.png");
-    this.load.image("easy-point-lock", "/easy/level_map/point_lock.png");
-    this.load.image("easy-point-skip", "/easy/level_map/point_skip.png");
-    this.load.image("start-here", "/easy/level_map/start_here1.png");
-
+    // Medium level
+    this.load.image("medium-map", "/medium/map.png");
+    this.load.image("point-current", "/medium/point_current.png");
+    this.load.image("point-lock", "/medium/point_lock.png");
+    this.load.image("point-skip", "/medium/point_skip.png");
+    this.load.image("start-here", "/medium/start_here.png");
     for (let i = 1; i <= 10; i++) {
-      this.load.image(`easy-point-${i}`, `easy/level_map/point_${i}.png`);
+      this.load.image(`point-${i}`, `/medium/point_${i}.png`);
     }
 
-    this.load.image("medium-map", "/medium/level_map/map.png");
-    this.load.image("medium_home", "/medium/home1.png");
+    // Hard level
+    this.load.image("hard-map", "/hard/map.png");
+    this.load.image("hard_home", "/hard/home.png");
+    this.load.image("play_ground_bg1", "/easy/bg/bg1.png");
+    this.load.image("play_ground_bg2", "/easy/bg/bg2.png");
+    this.load.image("park_building", "/hard/building.png");
 
+    // Boss Level
     this.load.image("boss-bg", "/boss/boss_bg.png");
-    this.load.image("warning-bg", "/boss/warning_bg1.png");
-    this.load.image("boss-warning", "/boss/warning1.png");
+    this.load.image("warning-bg", "/boss/warning_bg.png");
+    this.load.image("boss-warning", "/boss/warning.png");
 
+    // Menu, level
     this.load.image("level-police-red-light", "/police_red_light.png");
     this.load.image("level-office-home", "/office_home.png");
     this.load.image("level-park", "/park.png");

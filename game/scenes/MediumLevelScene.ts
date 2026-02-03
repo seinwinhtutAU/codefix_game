@@ -9,75 +9,33 @@ export interface SolvedPointStatus {
   isSolved: boolean;
 }
 
-interface PathPoint {
-  x: number;
-  y: number;
-  path?: { x: number; y: number }[];
-}
-
 export default class MediumLevelScene extends GameScene {
   private problemIds: string[] = [
-    "697908c24b714f4ebc73b1d1",
-    "697908c44b714f4ebc73b1d6",
-    "697908c54b714f4ebc73b1db",
-    "697908d74b714f4ebc73b1e0",
-    "697908d84b714f4ebc73b1e5",
-    "697908d94b714f4ebc73b1ea",
-    "697908da4b714f4ebc73b1ef",
-    "697908da4b714f4ebc73b1f4",
+    "698244b2d1ac6c9b7fd9230b",
+    "69824563d1ac6c9b7fd92396",
+    "697401dc5f4942a9208dc707",
+    "69740e795f4942a9208dc8c4",
+    "6976a8965f4942a9208dea8f",
+    "697908e24b714f4ebc73b1f9",
+    "697908e34b714f4ebc73b1fe",
+    "697908e44b714f4ebc73b203",
+    "697909f24b714f4ebc73b209",
+    "697909f34b714f4ebc73b20e",
   ];
 
   private roadPoints = [
-    { x: 154, y: 353 },
-    { x: 500, y: 172 },
-    { x: 850, y: 172 },
-    { x: 1032, y: 334 },
-    { x: 660, y: 334 },
-    { x: 482, y: 500 },
-    { x: 700, y: 625 },
-    { x: 970, y: 625 },
+    { x: 225, y: 300 },
+    { x: 255, y: 400 },
+    { x: 255, y: 550 },
+    { x: 366, y: 640 },
+    { x: 550, y: 640 },
+    { x: 740, y: 640 },
+    { x: 885, y: 550 },
+    { x: 885, y: 400 },
+    { x: 980, y: 315 },
+    { x: 1100, y: 315 },
   ];
 
-  private pathPoints: PathPoint[] = [
-    { x: 154, y: 353 },
-    {
-      x: 500,
-      y: 172,
-      path: [
-        { x: 295, y: 354 },
-        { x: 300, y: 172 },
-      ],
-    },
-    {
-      x: 850,
-      y: 172,
-    },
-    {
-      x: 1032,
-      y: 334,
-      path: [{ x: 1032, y: 172 }],
-    },
-    {
-      x: 660,
-      y: 334,
-    },
-    { x: 482, y: 500, path: [{ x: 480, y: 334 }] },
-    { x: 700, y: 625, path: [{ x: 484, y: 627 }] },
-    {
-      x: 970,
-      y: 625,
-    },
-    {
-      x: 1376,
-      y: 481,
-      path: [
-        { x: 1121, y: 621 },
-        { x: 1121, y: 482 },
-      ],
-    },
-  ];
-
-  private solvedRecords: ProblemSolveRecord[] = [];
   private currentPointIndex = 0;
   private mapPoints: Phaser.GameObjects.Image[] = [];
   private solvedPoints: SolvedPointStatus[] = [];
@@ -88,14 +46,14 @@ export default class MediumLevelScene extends GameScene {
   private roadProgressGraphics!: Phaser.GameObjects.Graphics;
   private tooltipContainer!: Phaser.GameObjects.Container;
   private tooltipText!: Phaser.GameObjects.Text;
+  private solvedRecords: ProblemSolveRecord[] = [];
 
   constructor() {
     super("MediumLevelScene");
   }
-
   async create() {
     if (this.savedProgress?.gameState?.eventFlags?.mediumLevelCompleted) {
-      this.scene.start("BossLevelScene", this.savedProgress);
+      this.scene.start("HomeScene", this.savedProgress);
       return;
     }
     super.create();
@@ -107,6 +65,11 @@ export default class MediumLevelScene extends GameScene {
     this.solvedRecords = await this.getAllSolvedRecord();
     this.drawStartHere();
     this.addTooltip();
+    this.startHereSign = this.add
+      .image(0, 0, "start-here")
+      .setDisplaySize(59, 100)
+      .setDepth(10)
+      .setVisible(false);
     await this.updateAllSolvePoint();
 
     if (this.checkLevelCompleted()) {
@@ -123,6 +86,14 @@ export default class MediumLevelScene extends GameScene {
   }
 
   update() {}
+
+  private createParticle() {
+    const graphics = this.make.graphics({ x: 0, y: 0 });
+    graphics.fillStyle(0xffffff, 1);
+    graphics.fillCircle(8, 8, 8);
+    graphics.generateTexture("glow-dot", 16, 16);
+    graphics.destroy();
+  }
 
   private addTooltip() {
     // Create the background box
@@ -143,14 +114,6 @@ export default class MediumLevelScene extends GameScene {
     // Wrap them in a container and hide it
     this.tooltipContainer = this.add.container(0, 0, [bg, this.tooltipText]);
     this.tooltipContainer.setDepth(100).setVisible(false);
-  }
-
-  private createParticle() {
-    const graphics = this.make.graphics({ x: 0, y: 0 });
-    graphics.fillStyle(0xffffff, 1);
-    graphics.fillCircle(8, 8, 8);
-    graphics.generateTexture("glow-dot", 16, 16);
-    graphics.destroy();
   }
 
   private triggerSolveParticle(x: number, y: number) {
@@ -177,46 +140,45 @@ export default class MediumLevelScene extends GameScene {
     });
   }
 
-  private drawCustomPath(
-    graphics: Phaser.GameObjects.Graphics,
-    points: PathPoint[],
-  ) {
-    graphics.beginPath();
-    graphics.moveTo(points[0].x, points[0].y);
-
-    for (let i = 1; i < points.length; i++) {
-      const curr = points[i];
-
-      // If the user provided manual turn points, follow them
-      if (curr.path && curr.path.length > 0) {
-        curr.path.forEach((turn) => {
-          graphics.lineTo(turn.x, turn.y);
-        });
-      }
-
-      // Always end at the actual target coordinate
-      graphics.lineTo(curr.x, curr.y);
-    }
-    graphics.strokePath();
-  }
-
   private drawRoadProgress() {
+    // 1. Initialize or clear the graphics object
     if (!this.roadProgressGraphics) {
       this.roadProgressGraphics = this.add.graphics();
       this.roadProgressGraphics.setDepth(1); // Above map, below points
     }
     this.roadProgressGraphics.clear();
 
+    // 2. We only draw if we have at least one solved point
     if (this.currentPointIndex === 0) return;
 
-    const activePoints = this.pathPoints.slice(0, this.currentPointIndex + 1);
-
+    // 3. Set the style for the "Glow"
+    // Outer glow (thicker, lower alpha)
     this.roadProgressGraphics.lineStyle(15, 0xffcc00, 0.3);
-    this.drawCustomPath(this.roadProgressGraphics, activePoints);
+    this.drawPathSegments();
 
     // Inner core (thinner, higher alpha)
     this.roadProgressGraphics.lineStyle(7, 0xffff00, 0.8);
-    this.drawCustomPath(this.roadProgressGraphics, activePoints);
+    this.drawPathSegments();
+  }
+
+  private drawPathSegments() {
+    this.roadProgressGraphics.beginPath();
+
+    this.roadProgressGraphics.moveTo(
+      this.roadPoints[0].x,
+      this.roadPoints[0].y,
+    );
+
+    for (let i = 1; i <= this.currentPointIndex; i++) {
+      if (i < this.roadPoints.length) {
+        this.roadProgressGraphics.lineTo(
+          this.roadPoints[i].x,
+          this.roadPoints[i].y,
+        );
+      }
+    }
+
+    this.roadProgressGraphics.strokePath();
   }
 
   private handleProgressResume = async (progress: IGameProgress) => {
@@ -294,17 +256,16 @@ export default class MediumLevelScene extends GameScene {
 
     this.roadPoints.forEach((value, index) => {
       const point = this.add
-        .image(value.x, value.y, "easy-point-lock")
+        .image(value.x, value.y, "point-lock")
         .setDisplaySize(100, 100)
         .setDepth(2);
 
       point.on("pointerdown", () => {
         AudioManager.getInstance().playSound("click", { volume: 0.5 });
-
         if (index === this.currentPointIndex) {
           EventBus.emit("ui-open-problem", {
             problemId: this.problemIds[index],
-            difficulty: "hard",
+            difficulty: "medium",
           });
         } else if (index > this.currentPointIndex) {
           // Shakes the point to show it's locked
@@ -435,19 +396,20 @@ export default class MediumLevelScene extends GameScene {
 
       switch (state) {
         case "solved":
-          point.setTexture(`easy-point-${index + 1}`);
+          point.setTexture(`point-${index + 1}`);
           this.animateSolvedPoint(point);
           break;
         case "skipped":
-          point.setTexture(`easy-point-skip`);
+          point.setTexture(`point-skip`);
           break;
         case "current":
-          point.setTexture(`easy-point-current`);
+          // point.setTint(0xffff00);
+          point.setTexture(`point-current`);
           point.setInteractive({ useHandCursor: true });
           this.animateCurrentPoint(point);
           break;
         default:
-          point.setTexture(`easy-point-lock`);
+          point.setTexture(`point-lock`);
           point.setInteractive({ useHandCursor: true });
           point.setTint(0xdddddd);
       }
@@ -459,7 +421,6 @@ export default class MediumLevelScene extends GameScene {
     if (currentPos && this.startHereSign) {
       const targetX = currentPos.x - 3;
       const targetY = currentPos.y - 32;
-
       this.startHereSign.setPosition(targetX, targetY);
       this.startHereSign.setDisplaySize(43, 70);
       this.startHereSign.setVisible(true);
@@ -520,7 +481,7 @@ export default class MediumLevelScene extends GameScene {
     EventBus.emit("progress-updated", {
       ...progress,
       gameState: {
-        currentScene: "BossLevelScene",
+        currentScene: "HomeScene",
         eventFlags: {
           ...progress.gameState.eventFlags,
           mediumLevelCompleted: true,
@@ -634,11 +595,11 @@ export default class MediumLevelScene extends GameScene {
 
       if (this.savedProgress && this.savedProgress.gameState) {
         this.savedProgress.gameState.eventFlags.mediumLevelCompleted = true;
-        this.savedProgress.gameState.currentScene = "PlayGroundScene";
+        this.savedProgress.gameState.currentScene = "HomeScene";
       }
 
       this.emitLevelCompleted(this.savedProgress);
-      this.scene.start("MediumTransitionScene", this.savedProgress);
+      this.scene.start("MediumToHomeScene", this.savedProgress);
     });
 
     // 5. Entrance Animation (Slide in from the right)

@@ -139,9 +139,6 @@ export default class CarDriveScene extends GameScene {
 
     this.addClouds();
 
-    const building = this.add.image(0, 30, "car_building").setOrigin(0, 0);
-    this.worldContainer.add(building);
-
     this.addSun();
 
     const red_light = this.add.image(3200, 480, "red_light");
