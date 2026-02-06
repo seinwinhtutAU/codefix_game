@@ -35,14 +35,14 @@ export interface ProblemByLevelResponse {
 }
 
 export async function fetchProblem(
-  problemId: string
+  problemId: string,
 ): Promise<ProblemResponse> {
   const response = await fetch(`/api/problems/id/${problemId}`);
   return response.json();
 }
 
 export async function fetchProblemsByLevel(
-  level: string
+  level: string,
 ): Promise<ProblemByLevelResponse> {
   const response = await fetch(`/api/problems/level/${level}`);
   return response.json();
@@ -50,7 +50,7 @@ export async function fetchProblemsByLevel(
 
 export async function fetchUserCode(
   userId: string,
-  problemId: string
+  problemId: string,
 ): Promise<UserCodeResponse> {
   const response = await fetch(`/api/code/${userId}/${problemId}`);
   return response.json();
@@ -87,11 +87,11 @@ export async function fetchAllProblems(): Promise<{
 
 export async function checkExistingSolveRecord(
   userId: string,
-  problemId: string
+  problemId: string,
 ): Promise<SolveRecordResponse | null> {
   try {
     const response = await fetch(
-      `/api/solve-record?userId=${userId}&problemId=${problemId}`
+      `/api/solve-record?userId=${userId}&problemId=${problemId}`,
     );
     const data = await response.json();
     return data.success ? data || null : null;
@@ -103,7 +103,7 @@ export async function checkExistingSolveRecord(
 
 export async function saveUserCode(
   userId: string,
-  problem: Problem
+  problem: Problem,
 ): Promise<void> {
   if (!problem || !userId || userId === "null") return;
 
@@ -113,11 +113,14 @@ export async function saveUserCode(
       existingCode.success && existingCode.files.length > 0;
 
     const method = hasExistingCode ? "PUT" : "POST";
+    console.log("saveUserCode method " + method);
     const payload = {
       files: hasExistingCode
         ? problem.userCodeFiles
         : buildInitialUserCode(problem.files),
     };
+
+    console.log("saveUserCode payload: ", payload);
 
     const response = await fetch(`/api/code/${userId}/${problem._id}`, {
       method,
@@ -135,18 +138,18 @@ export async function saveUserCode(
 }
 
 export async function saveSolveRecord(
-  solveRecord: SolveRecordRequest
+  solveRecord: SolveRecordRequest,
 ): Promise<boolean> {
   try {
     console.log("solveRecord: ", JSON.stringify(solveRecord, null, 2));
     const existingRecord = await checkExistingSolveRecord(
       solveRecord.userId,
-      solveRecord.problemId
+      solveRecord.problemId,
     );
 
     console.log(
       "SolveRecordResponse: ",
-      JSON.stringify(existingRecord, null, 2)
+      JSON.stringify(existingRecord, null, 2),
     );
 
     if (existingRecord?.data == null) {
@@ -171,7 +174,7 @@ export async function saveSolveRecord(
 }
 
 function buildInitialUserCode(
-  files: ProblemFile[]
+  files: ProblemFile[],
 ): TreeNode<{ content?: string }>[] {
   return files.map((file) => ({
     name: file.name,

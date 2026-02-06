@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
       if (missingFields.length > 0) {
         return NextResponse.json(
           { error: `Missing required fields: ${missingFields.join(", ")}` },
-          { status: 400 }
+          { status: 400 },
         );
       }
     }
@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
             body.files,
             ProblemFile,
             null,
-            problemMetadata
+            problemMetadata,
           )
         : Promise.resolve([]),
       body.solutionFiles?.length
@@ -67,7 +67,7 @@ export async function POST(req: NextRequest) {
             body.solutionFiles,
             SolutionFile,
             null,
-            problemMetadata
+            problemMetadata,
           )
         : Promise.resolve([]),
     ]);
@@ -95,7 +95,7 @@ export async function GET() {
       .lean<IProblem[]>();
 
     const problemsWithFiles = await Promise.all(
-      problems.map((problem) => enrichProblemWithFiles(problem))
+      problems.map((problem) => enrichProblemWithFiles(problem)),
     );
 
     return NextResponse.json({
@@ -121,7 +121,7 @@ async function enrichProblemWithFiles(problem: IProblem) {
         problemId: doc.problemId.toString(),
         content: doc.content,
         mode: doc.mode,
-      })
+      }),
     ),
     buildProblemFiles<SolutionFileNode, ISolutionFile>(
       SolutionFile,
@@ -129,7 +129,7 @@ async function enrichProblemWithFiles(problem: IProblem) {
       (doc) => ({
         problemId: doc.problemId.toString(),
         content: doc.content,
-      })
+      }),
     ),
   ]);
 
@@ -159,7 +159,7 @@ export async function DELETE(req: NextRequest) {
             error: "Invalid difficulty value",
             validDifficulties: validDifficulties,
           },
-          { status: 400 }
+          { status: 400 },
         );
       }
 
@@ -170,14 +170,14 @@ export async function DELETE(req: NextRequest) {
             error: `Confirmation required. Add ?confirm=true to delete all ${difficulty} problems`,
             warning: `This will delete ALL ${difficulty} problems, their files, and user code data`,
           },
-          { status: 400 }
+          { status: 400 },
         );
       }
 
       // Delete problems by difficulty
       const result = await deleteProblemsByDifficulty(
         difficulty.toLowerCase(),
-        mode
+        mode,
       );
 
       return NextResponse.json({
@@ -196,7 +196,7 @@ export async function DELETE(req: NextRequest) {
           warning:
             "This will delete ALL problems, their files, and user code data",
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -215,7 +215,7 @@ export async function DELETE(req: NextRequest) {
 
 async function deleteProblemsByDifficulty(
   difficulty: string,
-  mode?: string | null
+  mode?: string | null,
 ) {
   // Build query for difficulty
   const query = {
@@ -296,4 +296,71 @@ async function deleteAllProblems() {
     deletedSovledRecords: deletedSovledRecords.deletedCount,
     deletedProblemGuides: deletedProblemGuides.deletedCount,
   };
+}
+
+export async function PATCH(req: NextRequest) {
+  try {
+    await dbConnect();
+
+    const url = new URL(req.url);
+    const id = url.searchParams.get("id"); // Get ID from /api/problems?id=...
+
+    if (!id) {
+      return NextResponse.json(
+        { error: "Problem ID is required for updates" },
+        { status: 400 },
+      );
+    }
+
+    const body: Partial<CreateProblemRequest> = await req.json();
+
+    // 1. Update the main Problem document
+    const updatedProblem = await Problem.findByIdAndUpdate(
+      id,
+      { $set: body },
+      { new: true, runValidators: true },
+    );
+
+    if (!updatedProblem) {
+      return NextResponse.json({ error: "Problem not found" }, { status: 404 });
+    }
+
+    const problemMetadata = {
+      problemId: updatedProblem._id.toString(),
+      mode: updatedProblem.mode,
+    };
+
+    // 2. Optional: Handle file updates if provided in the body
+    // Note: This logic assumes you want to replace existing files with new ones
+    if (body.files || body.solutionFiles) {
+      if (body.files) {
+        await ProblemFile.deleteMany({ problemId: id });
+        await saveFiles<ProblemFileNode, IProblemFile>(
+          body.files,
+          ProblemFile,
+          null,
+          problemMetadata,
+        );
+      }
+      if (body.solutionFiles) {
+        await SolutionFile.deleteMany({ problemId: id });
+        await saveFiles<SolutionFileNode, ISolutionFile>(
+          body.solutionFiles,
+          SolutionFile,
+          null,
+          problemMetadata,
+        );
+      }
+    }
+
+    // 3. Return the enriched updated problem
+    const finalProblem = await enrichProblemWithFiles(updatedProblem);
+
+    return NextResponse.json({
+      success: true,
+      problem: finalProblem,
+    });
+  } catch (error) {
+    return createErrorResponse(error);
+  }
 }

@@ -5,7 +5,7 @@ export function useUIState() {
   const [showExplorer, setShowExplorer] = useState(true);
   const [showHints, setShowHints] = useState(false);
   const [showOutput, setShowOutput] = useState(false);
-  const [showTestCases, setShowTestCases] = useState(true);
+  const [showTestCases, setShowTestCases] = useState(false);
   return {
     showProblem,
     setShowProblem,

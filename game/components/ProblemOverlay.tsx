@@ -111,6 +111,11 @@ export function ProblemOverlay({
   // --- 3. DATABASE SYNC ---
   useEffect(() => {
     if (!progress) return;
+    console.log(
+      "Updated progress in Overlay: ",
+      JSON.stringify(progress, null, 2),
+    );
+    console.log("hintUsages: ", JSON.stringify(hintUsages, null, 2));
     const updateProgress = async () => {
       try {
         await fetch("/api/game-progress", {
@@ -183,6 +188,20 @@ export function ProblemOverlay({
     isCurrentFileModified,
     isAnyFileModified,
   } = useUserCodeManager();
+
+  const hasHydratedHintsRef = useRef(false);
+
+  useEffect(() => {
+    if (!progress) return;
+    if (hasHydratedHintsRef.current) return;
+
+    const storedHints = progress.gameState?.currentTask?.hintUsages ?? [];
+
+    setHintUsages(storedHints);
+    hasHydratedHintsRef.current = true;
+
+    console.log("Hydrated hintUsages from progress:", storedHints);
+  }, [progress, setHintUsages]);
 
   // --- TIMER LOGIC ---
   type Difficulty = "easy" | "medium" | "hard" | "boss";
@@ -437,6 +456,7 @@ export function ProblemOverlay({
   );
 
   useEffect(() => {
+    if (!progress) return;
     if (
       JSON.stringify(hintUsages) ===
       JSON.stringify(progress?.gameState?.currentTask?.hintUsages)
@@ -446,14 +466,15 @@ export function ProblemOverlay({
 
     setProgress((prev) => {
       if (!prev?.gameState?.currentTask) return prev;
+      const newHighestLevel = getHighestHintLevelUsed(hintUsages);
       return {
         ...prev,
         gameState: {
           ...prev.gameState,
           currentTask: {
             ...prev.gameState.currentTask,
-            highestHintLevelUsed: getHighestHintLevelUsed(hintUsages),
-            hintUsages: hintUsages,
+            highestHintLevelUsed: newHighestLevel,
+            hintUsages: [...hintUsages],
           },
         },
       };
@@ -779,9 +800,7 @@ export function ProblemOverlay({
               <ProblemDescription
                 problem={problem}
                 isOpen={showProblem}
-                totalTimeSpent={totalTimeSpent}
                 userId={userId}
-                hasCompleted={hasCompleted}
               />
             </motion.div>
           )}
@@ -912,6 +931,7 @@ export function ProblemOverlay({
               onClose={() => setShowHints(false)}
               onResize={setHintsPanelWidth}
               defaultWidth={300}
+              hintUsages={hintUsages}
             />
           )}
 

@@ -146,67 +146,61 @@ export default class LevelScene extends GameScene {
       boss: { points: 0, time: 0 },
     };
 
-    const records = await this.getAllSolvedRecord();
+    const rawRecords = await this.getAllSolvedRecord();
 
+    // 1. Group by problemId to only take the best/latest score per unique problem
+    const uniqueRecordsMap = new Map<string, ProblemSolveRecord>();
+    rawRecords.forEach((record) => {
+      const existing = uniqueRecordsMap.get(record.problemId);
+      // Keep the record with the highest points
+      if (!existing || record.pointsEarned > existing.pointsEarned) {
+        uniqueRecordsMap.set(record.problemId, record);
+      }
+    });
+
+    const records = Array.from(uniqueRecordsMap.values());
+
+    // 2. Fetch and aggregate
     await Promise.all(
       records.map(async (record) => {
-        if (!record) return;
-
         try {
           const problemData = await fetchProblem(record.problemId);
           const problem = problemData.problem;
-          const difficulty =
-            problem?.difficulty || problem?.difficulty || "easy";
+          const diffKey = problem?.difficulty?.toLowerCase();
 
-          let levelKey = "easy";
-          if (difficulty === "medium") levelKey = "medium";
-          if (difficulty === "hard") levelKey = "hard";
-
-          if (stats[levelKey]) {
-            stats[levelKey].points += record.pointsEarned;
-            stats[levelKey].time += record.timeSpent;
+          if (diffKey && stats[diffKey]) {
+            stats[diffKey].points += record.pointsEarned;
+            stats[diffKey].time += record.timeSpent;
           }
         } catch (e) {
           console.warn(
-            `Failed to fetch problem ${record?.problemId || "unknown"}`,
-            e,
+            `Record skip: Problem ${record.problemId} metadata missing.`,
           );
         }
       }),
     );
 
+    // 3. Static Bonus
     if (this.savedProgress?.gameState?.eventFlags?.easyQuizCompleted) {
       stats.easy.points += 100;
     }
 
-    return {
-      easy: { points: stats.easy.points, time: stats.easy.time },
-      medium: {
-        points: stats.medium.points,
-        time: stats.medium.time,
-      },
-      hard: { points: stats.hard.points, time: stats.hard.time },
-      boss: { points: stats.boss.points, time: stats.boss.time },
-    };
+    return stats;
   }
 
   private async getAllSolvedRecord(): Promise<ProblemSolveRecord[]> {
-    const allProblemIds = [
-      "697401975f4942a9208dc6a6",
-      "697401ad5f4942a9208dc6bc",
-      "697401dc5f4942a9208dc707",
-    ];
     const userId = this.savedProgress.userId;
-    const solveRecords = await Promise.all(
-      allProblemIds.map(async (id) => {
-        const record = await checkExistingSolveRecord(userId, id);
-        return record?.data;
-      }),
-    );
+    try {
+      const response = await fetch(`/api/solve-record?userId=${userId}`);
+      if (!response.ok) throw new Error("Failed to fetch records");
 
-    return solveRecords.filter(
-      (record): record is ProblemSolveRecord => record != null,
-    );
+      const result = await response.json();
+      // Assuming your API returns the array in a 'data' field or as the root
+      return Array.isArray(result) ? result : result.data || [];
+    } catch (e) {
+      console.error("Error fetching solve records:", e);
+      return [];
+    }
   }
 
   // --- UI HELPERS ---

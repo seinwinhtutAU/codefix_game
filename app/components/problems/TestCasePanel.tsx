@@ -12,6 +12,7 @@ import {
   Minus,
   X,
   ListChecks,
+  Maximize2,
 } from "lucide-react";
 import { ExecutionResult } from "@/lib/types";
 import { useState, useRef, useEffect } from "react";
@@ -39,6 +40,7 @@ export default function TestCasePanel({
 }: Props) {
   const [height, setHeight] = useState(defaultHeight);
   const [isResizing, setIsResizing] = useState(false);
+  const [isFullScreen, setIsFullScreen] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
   const detailsRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -65,29 +67,31 @@ export default function TestCasePanel({
   const { testResults, passedTests, totalTests } = executionResult || {};
   const allPassed = passedTests === totalTests && totalTests && totalTests > 0;
 
-  // Handle resize logic
+  useEffect(() => {
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setIsFullScreen(false);
+    };
+    window.addEventListener("keydown", handleEsc);
+    return () => window.removeEventListener("keydown", handleEsc);
+  }, []);
+
   const handleResizeStart = (e: React.MouseEvent) => {
     e.preventDefault();
     setIsResizing(true);
-
     const startY = e.clientY;
     const startHeight = height;
-
     const handleMouseMove = (moveEvent: MouseEvent) => {
       const deltaY = startY - moveEvent.clientY;
       const newHeight = startHeight + deltaY;
       const clampedHeight = Math.min(Math.max(newHeight, minHeight), maxHeight);
-
       setHeight(clampedHeight);
       onResize?.(clampedHeight);
     };
-
     const handleMouseUp = () => {
       setIsResizing(false);
       document.removeEventListener("mousemove", handleMouseMove);
       document.removeEventListener("mouseup", handleMouseUp);
     };
-
     document.addEventListener("mousemove", handleMouseMove);
     document.addEventListener("mouseup", handleMouseUp);
   };
@@ -108,7 +112,6 @@ export default function TestCasePanel({
 
   const toggleExpand = (index: number) => {
     setExpandedIndex(expandedIndex === index ? null : index);
-
     if (detailsRef.current && expandedIndex !== index) {
       setTimeout(() => {
         detailsRef.current?.scrollIntoView({
@@ -129,96 +132,9 @@ export default function TestCasePanel({
     ));
   };
 
-  if (!isVisible) return null;
-
-  // --- EMPTY STATE (No tests run yet) ---
-  if (!isTestMode) {
+  const renderContent = (isModal: boolean = false) => {
     return (
-      <div
-        ref={panelRef}
-        className="bg-white border border-slate-200 rounded-2xl flex flex-col relative shadow-sm transition-all"
-        style={{ height: `${height}px` }}
-      >
-        {/* Resize Handle */}
-        <div
-          className="absolute top-0 left-0 right-0 h-3 cursor-row-resize z-10 hover:bg-slate-50 group flex items-center justify-center transition-colors"
-          onMouseDown={handleResizeStart}
-          onDoubleClick={() => {
-            setHeight(defaultHeight);
-            onResize?.(defaultHeight);
-          }}
-        >
-          <div className="w-8 h-1 rounded-full bg-slate-200 group-hover:bg-indigo-300 transition-colors" />
-        </div>
-
-        {onClose && (
-          <button
-            onClick={onClose}
-            className="absolute top-3 right-3 z-20 p-1.5 hover:bg-rose-50 rounded-lg text-slate-400 hover:text-rose-400 transition-colors"
-          >
-            <X size={16} />
-          </button>
-        )}
-
-        <div className="pt-3 flex flex-col flex-1">
-          {/* Header */}
-          <div className="px-4 py-2 border-b border-slate-100 flex items-center gap-3">
-            <div className="p-1.5 bg-slate-50 rounded-lg border border-slate-100 text-slate-500">
-              <ListChecks size={16} />
-            </div>
-            <h3 className="text-sm font-bold text-slate-700">Test Results</h3>
-          </div>
-
-          {/* Empty Content */}
-          <div className="flex-1 overflow-auto p-8">
-            <div className="flex flex-col items-center justify-center h-full text-center rounded-xl bg-slate-50/50 border border-slate-100 border-dashed m-2">
-              <div className="mb-3 p-3 bg-white rounded-full shadow-sm border border-slate-100">
-                <Terminal size={24} className="text-slate-300" />
-              </div>
-              <h4 className="text-sm font-bold text-slate-600 mb-1">
-                {isSubmitting ? "Running Tests..." : "No Results Available"}
-              </h4>
-              <p className="text-xs text-slate-400 max-w-xs">
-                {isSubmitting
-                  ? "Evaluating your code against test cases..."
-                  : "Click 'Decrypt' or 'Run Test' to verify your solution."}
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // --- RESULTS STATE ---
-  return (
-    <div
-      ref={panelRef}
-      className="bg-white border border-slate-200 rounded-2xl flex flex-col relative shadow-sm overflow-hidden"
-      style={{ height: `${height}px` }}
-    >
-      {/* Resize Handle */}
-      <div
-        className="absolute top-0 left-0 right-0 h-3 cursor-row-resize z-10 hover:bg-slate-50 group flex items-center justify-center transition-colors"
-        onMouseDown={handleResizeStart}
-        onDoubleClick={() => {
-          setHeight(defaultHeight);
-          onResize?.(defaultHeight);
-        }}
-      >
-        <div className="w-8 h-1 rounded-full bg-slate-200 group-hover:bg-indigo-300 transition-colors" />
-      </div>
-
-      {onClose && (
-        <button
-          onClick={onClose}
-          className="absolute top-3 right-3 z-20 p-1.5 hover:bg-rose-50 rounded-lg text-slate-400 hover:text-rose-400 transition-colors"
-        >
-          <X size={16} />
-        </button>
-      )}
-
-      <div className="pt-3 flex flex-col flex-1 min-h-0">
+      <div className={`flex flex-col flex-1 min-h-0 ${!isModal ? "pt-3" : ""}`}>
         {/* Header */}
         <div className="px-4 py-2 border-b border-slate-100 flex-shrink-0 bg-white">
           <div className="flex items-center justify-between">
@@ -227,8 +143,6 @@ export default function TestCasePanel({
                 <ListChecks size={16} />
               </div>
               <h3 className="text-sm font-bold text-slate-700">Test Results</h3>
-
-              {/* Score Badge */}
               <div
                 className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold border flex items-center gap-1.5 ${
                   allPassed
@@ -245,7 +159,7 @@ export default function TestCasePanel({
           </div>
         </div>
 
-        {/* Tab List (Horizontal Scroll) */}
+        {/* Tab List */}
         <div className="px-4 py-2 border-b border-slate-100 bg-slate-50/50 flex-shrink-0">
           <div className="flex items-center gap-2">
             <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider whitespace-nowrap">
@@ -283,7 +197,7 @@ export default function TestCasePanel({
 
         {/* Details Area */}
         <div
-          ref={detailsRef}
+          ref={isModal ? null : detailsRef}
           className="flex-1 overflow-auto p-4 min-h-0 bg-white"
         >
           {isSubmitting ? (
@@ -301,22 +215,16 @@ export default function TestCasePanel({
               {(() => {
                 const test = testResults[expandedIndex];
                 const hasError = test.error && test.error.trim().length > 0;
-
                 return (
                   <div
                     className={`border rounded-2xl overflow-hidden shadow-sm ${test.passed ? "border-emerald-100 bg-emerald-50/30" : "border-rose-100 bg-rose-50/30"}`}
                   >
-                    {/* Test Header */}
                     <div
                       className={`px-4 py-3 border-b flex justify-between items-center ${test.passed ? "bg-emerald-50/50 border-emerald-100" : "bg-rose-50/50 border-rose-100"}`}
                     >
                       <div className="flex items-center gap-3">
                         <div
-                          className={`w-6 h-6 rounded-full flex items-center justify-center shadow-sm ${
-                            test.passed
-                              ? "bg-emerald-500 text-white"
-                              : "bg-rose-500 text-white"
-                          }`}
+                          className={`w-6 h-6 rounded-full flex items-center justify-center shadow-sm ${test.passed ? "bg-emerald-500 text-white" : "bg-rose-500 text-white"}`}
                         >
                           {test.passed ? (
                             <Check size={14} strokeWidth={3} />
@@ -337,9 +245,7 @@ export default function TestCasePanel({
                         <Minus size={14} />
                       </button>
                     </div>
-
                     <div className="p-4 space-y-4">
-                      {/* INPUT */}
                       {test.input && (
                         <div>
                           <p className="text-[10px] uppercase tracking-wider text-slate-400 mb-1.5 font-bold">
@@ -350,9 +256,8 @@ export default function TestCasePanel({
                           </div>
                         </div>
                       )}
-
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {/* EXPECTED OUTPUT */}
+                      {/* Fixed horizontal layout for output boxes */}
+                      <div className="grid grid-cols-2 gap-4">
                         <div>
                           <p className="text-[10px] uppercase tracking-wider text-emerald-600/70 mb-1.5 font-bold">
                             Expected Output
@@ -361,8 +266,6 @@ export default function TestCasePanel({
                             {test.expectedOutput}
                           </div>
                         </div>
-
-                        {/* ACTUAL OUTPUT */}
                         <div>
                           <p
                             className={`text-[10px] uppercase tracking-wider mb-1.5 font-bold ${test.passed ? "text-emerald-600/70" : "text-rose-600/70"}`}
@@ -370,11 +273,7 @@ export default function TestCasePanel({
                             Actual Output
                           </p>
                           <div
-                            className={`rounded-xl px-3 py-2 font-mono text-sm border whitespace-pre-wrap shadow-sm bg-white ${
-                              test.passed
-                                ? "border-emerald-100 text-emerald-800"
-                                : "border-rose-100 text-rose-800"
-                            }`}
+                            className={`rounded-xl px-3 py-2 font-mono text-sm border whitespace-pre-wrap shadow-sm bg-white ${test.passed ? "border-emerald-100 text-emerald-800" : "border-rose-100 text-rose-800"}`}
                           >
                             {test.actualOutput || (
                               <span className="italic text-slate-300">
@@ -384,8 +283,6 @@ export default function TestCasePanel({
                           </div>
                         </div>
                       </div>
-
-                      {/* ERROR MESSAGE */}
                       {hasError && (
                         <div>
                           <p className="text-[10px] uppercase tracking-wider text-rose-500 mb-1.5 font-bold flex items-center gap-1">
@@ -402,7 +299,6 @@ export default function TestCasePanel({
               })()}
             </div>
           ) : (
-            // --- NO SELECTION STATE ---
             <div className="flex flex-col items-center justify-center h-full text-center opacity-60">
               <div className="bg-slate-50 p-3 rounded-full mb-3">
                 <AlertCircle size={24} className="text-slate-400" />
@@ -417,6 +313,111 @@ export default function TestCasePanel({
           )}
         </div>
       </div>
-    </div>
+    );
+  };
+
+  if (!isVisible) return null;
+
+  if (!isTestMode) {
+    return (
+      <div
+        ref={panelRef}
+        className="bg-white border border-slate-200 rounded-2xl flex flex-col relative shadow-sm transition-all"
+        style={{ height: `${height}px` }}
+      >
+        <div
+          className="absolute top-0 left-0 right-0 h-3 cursor-row-resize z-10 hover:bg-slate-50 group flex items-center justify-center transition-colors"
+          onMouseDown={handleResizeStart}
+        >
+          <div className="w-8 h-1 rounded-full bg-slate-200 group-hover:bg-indigo-300 transition-colors" />
+        </div>
+        {onClose && (
+          <button
+            onClick={onClose}
+            className="absolute top-3 right-3 z-20 p-1.5 hover:bg-rose-50 rounded-lg text-slate-400 hover:text-rose-400 transition-colors"
+          >
+            <X size={16} />
+          </button>
+        )}
+        <div className="pt-3 flex flex-col flex-1">
+          <div className="px-4 py-2 border-b border-slate-100 flex items-center gap-3">
+            <div className="p-1.5 bg-slate-50 rounded-lg border border-slate-100 text-slate-500">
+              <ListChecks size={16} />
+            </div>
+            <h3 className="text-sm font-bold text-slate-700">Test Results</h3>
+          </div>
+          <div className="flex-1 overflow-auto p-8">
+            <div className="flex flex-col items-center justify-center h-full text-center rounded-xl bg-slate-50/50 border border-slate-100 border-dashed m-2">
+              <div className="mb-3 p-3 bg-white rounded-full shadow-sm border border-slate-100">
+                <Terminal size={24} className="text-slate-300" />
+              </div>
+              <h4 className="text-sm font-bold text-slate-600 mb-1">
+                {isSubmitting ? "Running Tests..." : "No Results Available"}
+              </h4>
+              <p className="text-xs text-slate-400 max-w-xs">
+                {isSubmitting
+                  ? "Evaluating your code..."
+                  : "Click 'Decrypt' or 'Run Test' to verify your solution."}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <div
+        ref={panelRef}
+        className="bg-white border border-slate-200 rounded-2xl flex flex-col relative shadow-sm overflow-hidden"
+        style={{ height: `${height}px` }}
+      >
+        <div
+          className="absolute top-0 left-0 right-0 h-3 cursor-row-resize z-10 hover:bg-slate-50 group flex items-center justify-center transition-colors"
+          onMouseDown={handleResizeStart}
+        >
+          <div className="w-8 h-1 rounded-full bg-slate-200 group-hover:bg-indigo-300 transition-colors" />
+        </div>
+        <div className="absolute top-3 right-3 z-20 flex items-center gap-1">
+          <button
+            onClick={() => setIsFullScreen(true)}
+            className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600 transition-colors"
+          >
+            <Maximize2 size={16} />
+          </button>
+          {onClose && (
+            <button
+              onClick={onClose}
+              className="p-1.5 hover:bg-rose-50 rounded-lg text-slate-400 hover:text-rose-400 transition-colors"
+            >
+              <X size={16} />
+            </button>
+          )}
+        </div>
+        {renderContent(false)}
+      </div>
+
+      {isFullScreen && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 md:p-8">
+          <div
+            className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
+            onClick={() => setIsFullScreen(false)}
+          />
+          <div className="relative bg-white w-full max-w-5xl h-[85vh] rounded-3xl shadow-2xl overflow-hidden flex flex-col border border-slate-200">
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50 shrink-0">
+              <h3 className="font-bold text-slate-800">Test Case Details</h3>
+              <button
+                onClick={() => setIsFullScreen(false)}
+                className="p-2 hover:bg-slate-200 rounded-full text-slate-500 transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            {renderContent(true)}
+          </div>
+        </div>
+      )}
+    </>
   );
 }

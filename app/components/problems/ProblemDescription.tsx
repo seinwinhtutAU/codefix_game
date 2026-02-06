@@ -1,26 +1,24 @@
 "use client";
 
-import { useState, useRef, useEffect, ReactNode } from "react";
+import { useState, useRef, useEffect, ReactNode, useCallback } from "react";
 import { Problem } from "@/lib/types";
 import {
-  ChevronDown,
-  ChevronUp,
-  Lock,
   Target,
   Zap,
-  Tag,
   BookOpen,
+  GripHorizontal,
+  ChevronUp,
+  ChevronDown,
+  Maximize2,
+  X,
 } from "lucide-react";
 import ReactMarkdown, { Components } from "react-markdown";
 import rehypeHighlight from "rehype-highlight";
-import { checkExistingSolveRecord } from "@/services";
 
 interface Props {
   problem: Problem;
   isOpen: boolean;
-  totalTimeSpent?: number; // Kept in interface but unused visually as requested
   userId: string;
-  hasCompleted?: boolean;
 }
 
 const CodeBlock = ({
@@ -44,7 +42,6 @@ const CodeBlock = ({
       "___MARK_START___$1___MARK_END___",
     );
     const parts = processed.split(/(___MARK_START___|___MARK_END___)/);
-
     return parts
       .map((part, index) => {
         if (part === "___MARK_START___" || part === "___MARK_END___")
@@ -83,239 +80,275 @@ const CodeBlock = ({
 
   return (
     <div className="relative group my-3">
-      <div
-        className="relative"
-        onCopy={(e) => e.preventDefault()}
-        onCut={(e) => e.preventDefault()}
-        onContextMenu={(e) => e.preventDefault()}
-      >
-        <pre className="bg-slate-800 text-slate-50 rounded-xl p-4 overflow-x-auto select-none cursor-not-allowed shadow-inner border border-slate-700/50">
-          <code
-            className={`${className} text-xs md:text-sm font-mono leading-relaxed`}
-          >
+      <div className="relative">
+        <pre className="bg-slate-800 text-slate-50 rounded-xl p-4 overflow-x-auto shadow-inner border border-slate-700/50">
+          <code className={`${className} text-[12px] font-mono leading-normal`}>
             {renderContent()}
           </code>
         </pre>
       </div>
-
       <div className="absolute top-2 right-2 flex items-center gap-1 bg-white/10 backdrop-blur-md text-slate-300 text-[10px] px-2 py-1 rounded-full border border-white/10 shadow-sm">
-        <Lock size={10} />
-        <span className="font-medium">Protected</span>
+        <span className="font-medium opacity-80 uppercase tracking-tight">
+          Code
+        </span>
       </div>
     </div>
   );
 };
 
-export default function ProblemDescription({
-  problem,
-  isOpen,
-  userId,
-  hasCompleted,
-}: Props) {
-  const [isExpanded, setIsExpanded] = useState(false);
-  const [canExpand, setCanExpand] = useState(false);
-  const contentRef = useRef<HTMLDivElement>(null);
+export default function ProblemDescription({ problem, isOpen }: Props) {
+  const [contentHeight, setContentHeight] = useState(180);
+  const [isDragging, setIsDragging] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isFullScreen, setIsFullScreen] = useState(false);
 
-  // Difficulty Badge Logic
+  const contentRef = useRef<HTMLDivElement>(null);
+  const dragStartY = useRef(0);
+  const startHeight = useRef(180);
+
+  const MIN_HEIGHT = 120;
+  const MAX_HEIGHT = 1200;
+
+  // Handle ESC key to close full screen
+  useEffect(() => {
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setIsFullScreen(false);
+    };
+    window.addEventListener("keydown", handleEsc);
+    return () => window.removeEventListener("keydown", handleEsc);
+  }, []);
+
   const getDifficultyColor = (diff: string = "easy") => {
     switch (diff.toLowerCase()) {
       case "hard":
         return "bg-rose-50 text-rose-600 border-rose-200";
       case "medium":
         return "bg-amber-50 text-amber-600 border-amber-200";
-      case "easy":
       default:
         return "bg-emerald-50 text-emerald-600 border-emerald-200";
     }
   };
 
-  // Check if content is long enough to show "More"
-  useEffect(() => {
-    const checkCanExpand = () => {
-      if (contentRef.current) {
-        const isLong = contentRef.current.scrollHeight > 140; // Slightly reduced threshold
-        setCanExpand(isLong);
-      }
-    };
+  const handleDoubleClick = () => {
+    if (contentRef.current) {
+      const fullHeight = contentRef.current.scrollHeight + 30;
+      setContentHeight(Math.min(fullHeight, MAX_HEIGHT));
+    }
+  };
 
-    checkCanExpand();
-    const resizeObserver = new ResizeObserver(checkCanExpand);
-    if (contentRef.current) resizeObserver.observe(contentRef.current);
-    return () => resizeObserver.disconnect();
-  }, [problem.description]);
+  const handleDragStart = (e: React.MouseEvent | React.TouchEvent) => {
+    setIsDragging(true);
+    const clientY = "touches" in e ? e.touches[0].clientY : e.clientY;
+    dragStartY.current = clientY;
+    startHeight.current = contentHeight;
+    document.body.style.cursor = "ns-resize";
+    document.body.style.userSelect = "none";
+  };
+
+  const handleDragMove = useCallback(
+    (e: MouseEvent | TouchEvent) => {
+      if (!isDragging) return;
+      const clientY =
+        "touches" in e
+          ? (e as TouchEvent).touches[0].clientY
+          : (e as MouseEvent).clientY;
+      const deltaY = clientY - dragStartY.current;
+      setContentHeight(
+        Math.max(
+          MIN_HEIGHT,
+          Math.min(MAX_HEIGHT, startHeight.current + deltaY),
+        ),
+      );
+    },
+    [isDragging],
+  );
+
+  const handleDragEnd = useCallback(() => {
+    setIsDragging(false);
+    document.body.style.cursor = "default";
+    document.body.style.userSelect = "auto";
+  }, []);
+
+  useEffect(() => {
+    if (isDragging) {
+      window.addEventListener("mousemove", handleDragMove);
+      window.addEventListener("mouseup", handleDragEnd);
+      window.addEventListener("touchmove", handleDragMove, { passive: false });
+      window.addEventListener("touchend", handleDragEnd);
+    }
+    return () => {
+      window.removeEventListener("mousemove", handleDragMove);
+      window.removeEventListener("mouseup", handleDragEnd);
+      window.removeEventListener("touchmove", handleDragMove);
+      window.removeEventListener("touchend", handleDragEnd);
+    };
+  }, [isDragging, handleDragMove, handleDragEnd]);
 
   if (!isOpen) return null;
 
   const markdownComponents: Components = {
-    code({ className, children, ...props }) {
-      return (
-        <CodeBlock className={className} {...props}>
-          {children}
-        </CodeBlock>
-      );
-    },
-    // ... (其他 markdown 组件保持不变)
-    mark({ children, ...props }) {
-      return (
-        <span className="relative inline-block font-mono mx-0.5" {...props}>
-          <span className="text-rose-500 font-semibold bg-rose-50 px-2 py-0.5 rounded">
-            {children}
-          </span>
-          <span className="absolute -bottom-1 left-0 right-0 h-0.5 from-transparent via-rose-400 to-transparent"></span>
-        </span>
-      );
-    },
-    h1({ children, ...props }) {
-      return (
-        <h1 className="text-xl font-bold text-slate-800 mt-4 mb-3" {...props}>
-          {children}
-        </h1>
-      );
-    },
-    h2({ children, ...props }) {
-      return (
-        <h2 className="text-lg font-bold text-slate-800 mt-4 mb-2" {...props}>
-          {children}
-        </h2>
-      );
-    },
-    h3({ children, ...props }) {
-      return (
-        <h3 className="text-base font-bold text-slate-800 mt-3 mb-2" {...props}>
-          {children}
-        </h3>
-      );
-    },
-    p({ children, ...props }) {
-      return (
-        <p className="text-slate-600 mb-3 leading-relaxed text-sm" {...props}>
-          {children}
-        </p>
-      );
-    },
-    ul({ children, ...props }) {
-      return (
-        <ul className="text-slate-600 mb-3 ml-5 list-disc text-sm" {...props}>
-          {children}
-        </ul>
-      );
-    },
-    ol({ children, ...props }) {
-      return (
-        <ol
-          className="text-slate-600 mb-3 ml-5 list-decimal text-sm"
-          {...props}
-        >
-          {children}
-        </ol>
-      );
-    },
-    li({ children, ...props }) {
-      return (
-        <li className="mb-1 pl-1" {...props}>
-          {children}
-        </li>
-      );
-    },
-    blockquote({ children, ...props }) {
-      return (
-        <blockquote
-          className="border-l-4 border-indigo-400 pl-4 my-4 italic text-slate-500 bg-slate-50 py-2 pr-2 rounded-r-lg text-sm"
-          {...props}
-        >
-          {children}
-        </blockquote>
-      );
-    },
-    strong({ children, ...props }) {
-      return (
-        <strong className="font-bold text-slate-800" {...props}>
-          {children}
-        </strong>
-      );
-    },
+    code: ({ className, children, ...props }) => (
+      <CodeBlock className={className} {...props}>
+        {children}
+      </CodeBlock>
+    ),
+    h2: ({ children }) => (
+      <h2 className="text-base font-bold text-slate-800 mt-5 first:mt-0 mb-2 flex items-center gap-2 border-b border-slate-100 pb-1 italic">
+        {children}
+      </h2>
+    ),
+    p: ({ children }) => (
+      <p className="text-slate-600 mb-3 leading-relaxed text-sm">{children}</p>
+    ),
+    ol: ({ children }) => (
+      <ol className="text-slate-600 mb-3 ml-6 list-decimal text-sm space-y-1.5 font-medium">
+        {children}
+      </ol>
+    ),
+    ul: ({ children }) => (
+      <ul className="text-slate-600 mb-3 ml-6 list-disc text-sm space-y-1.5">
+        {children}
+      </ul>
+    ),
+    li: ({ children }) => (
+      <li className="pl-1 marker:text-indigo-400 marker:font-bold">
+        {children}
+      </li>
+    ),
+    strong: ({ children }) => (
+      <strong className="font-bold text-slate-900 bg-slate-50 px-0.5 rounded">
+        {children}
+      </strong>
+    ),
   };
 
   return (
-    <div className="bg-white/90 backdrop-blur-md border border-white/50 rounded-2xl shadow-[0_4px_20px_-2px_rgba(0,0,0,0.05)] transition-all duration-300 w-full overflow-hidden flex flex-col">
-      {/* 1. Header Area: Meta Info (Tags, Difficulty) */}
-      <div className="px-5 pt-4 pb-2 flex flex-wrap items-center gap-2 border-b border-transparent">
-        {/* Difficulty Badge */}
-        <div
-          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[10px] font-bold uppercase tracking-wide ${getDifficultyColor(
-            problem.difficulty,
-          )}`}
-        >
-          <Zap size={10} fill="currentColor" />
-          <span>{problem.difficulty || "Easy"}</span>
-        </div>
-
-        {/* Category / Task Type Badge (Example) */}
-        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-600 border border-indigo-100 text-[10px] font-bold uppercase tracking-wide">
-          <Target size={10} />
-          <span>Challenge</span>
-        </div>
-
-        {/* Optional: Add tags if problem has them */}
-        {/* {problem.tags?.map(tag => (
-           <div key={tag} className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-50 text-slate-500 border border-slate-100 text-[10px]">
-             <Tag size={10} />
-             {tag}
-           </div>
-        ))} */}
-
-        {/* Decorative "Read" Icon on far right */}
-        <div className="ml-auto text-slate-300">
-          <BookOpen size={16} />
-        </div>
-      </div>
-
-      {/* 2. Content Area */}
-      <div className="px-5 pb-5 relative">
-        <div
-          ref={contentRef}
-          className={`text-sm text-slate-600 leading-relaxed transition-all duration-500 ease-in-out overflow-hidden ${
-            isExpanded
-              ? "max-h-[60vh] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent"
-              : "max-h-24"
-          }`}
-        >
-          {/* Main Description */}
-          <ReactMarkdown
-            rehypePlugins={[rehypeHighlight]}
-            components={markdownComponents}
+    <>
+      <div className="bg-white/90 backdrop-blur-md border border-white/50 rounded-2xl shadow-[0_2px_15px_-3px_rgba(0,0,0,0.07)] transition-all w-full overflow-hidden flex flex-col relative">
+        {/* Header */}
+        <div className="px-4 py-2 flex items-center gap-2 border-b border-slate-100/50 bg-slate-50/30">
+          <div
+            className={`flex items-center gap-1 px-2 py-0.5 rounded-full border text-[9px] font-bold uppercase tracking-wider ${getDifficultyColor(problem.difficulty)}`}
           >
-            {problem.description}
-          </ReactMarkdown>
+            <Zap size={8} fill="currentColor" />
+            <span>{problem.difficulty || "Easy"}</span>
+          </div>
+          <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-600 border border-indigo-100 text-[9px] font-bold uppercase">
+            <Target size={8} />
+            <span>Challenge</span>
+          </div>
+
+          <div className="ml-auto flex items-center gap-1">
+            <button
+              onClick={() => setIsFullScreen(true)}
+              className="p-1 hover:bg-slate-200/50 rounded text-slate-400 hover:text-slate-600 transition-colors"
+              title="See All (Full Screen)"
+            >
+              <Maximize2 size={14} />
+            </button>
+            <button
+              onClick={() => setIsCollapsed(!isCollapsed)}
+              className="p-1 hover:bg-slate-200/50 rounded text-slate-400 hover:text-slate-600 transition-colors"
+              title={isCollapsed ? "Show description" : "Hide description"}
+            >
+              {isCollapsed ? (
+                <ChevronDown size={16} />
+              ) : (
+                <ChevronUp size={16} />
+              )}
+            </button>
+            <div className="text-slate-300 ml-1">
+              <BookOpen size={14} />
+            </div>
+          </div>
         </div>
 
-        {/* 3. Expand/Collapse Trigger */}
-        {canExpand && (
-          <>
-            {/* Fade Overlay when collapsed */}
-            {!isExpanded && (
-              <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-white via-white/90 to-transparent pointer-events-none" />
-            )}
-
-            {/* Toggle Button */}
+        {/* Content Area */}
+        {!isCollapsed && (
+          <div className="px-5 relative group/container">
             <div
-              className={`flex justify-center relative z-10 ${isExpanded ? "mt-4" : "mt-1"}`}
+              ref={contentRef}
+              style={{ height: `${contentHeight}px` }}
+              className={`text-sm text-slate-600 leading-relaxed overflow-y-auto pr-2 pt-4 pb-8 scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent ${isDragging ? "select-none" : ""}`}
             >
-              <button
-                onClick={() => setIsExpanded(!isExpanded)}
-                className="group flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-slate-400 bg-white px-4 py-1.5 rounded-full border border-slate-100 shadow-sm hover:shadow-md hover:text-indigo-500 hover:border-indigo-100 transition-all active:scale-95"
+              <ReactMarkdown
+                rehypePlugins={[rehypeHighlight]}
+                components={markdownComponents}
               >
-                <span>{isExpanded ? "Show Less" : "Read More"}</span>
-                <div
-                  className={`transition-transform duration-300 ${isExpanded ? "rotate-180" : ""}`}
-                >
-                  <ChevronDown size={12} strokeWidth={3} />
-                </div>
-              </button>
+                {problem.description}
+              </ReactMarkdown>
             </div>
-          </>
+
+            <div
+              onMouseDown={handleDragStart}
+              onTouchStart={handleDragStart}
+              onDoubleClick={handleDoubleClick}
+              className={`
+                absolute bottom-0 left-0 right-0 h-5 cursor-ns-resize flex flex-col items-center justify-center
+                transition-all z-20 border-t border-transparent
+                ${isDragging ? "bg-indigo-50/80 border-indigo-100" : "hover:bg-slate-50/80"}
+              `}
+              title="Drag to resize or Double-click to expand"
+            >
+              <div
+                className={`w-10 h-1 rounded-full transition-colors ${isDragging ? "bg-indigo-400" : "bg-slate-200 group-hover/container:bg-slate-300"}`}
+              />
+              <GripHorizontal
+                size={12}
+                className={`mt-0.5 transition-opacity ${isDragging ? "opacity-100 text-indigo-500" : "opacity-0 group-hover/container:opacity-100 text-slate-300"}`}
+              />
+            </div>
+
+            {!isDragging && (
+              <div className="absolute bottom-5 left-0 right-0 h-6 bg-gradient-to-t from-white/90 to-transparent pointer-events-none" />
+            )}
+          </div>
         )}
       </div>
-    </div>
+
+      {/* Full Screen Modal */}
+      {isFullScreen && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 md:p-8">
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
+            onClick={() => setIsFullScreen(false)}
+          />
+
+          {/* Modal Container */}
+          <div className="relative bg-white w-full max-w-4xl max-h-[90vh] rounded-3xl shadow-2xl overflow-hidden flex flex-col border border-slate-200">
+            {/* Modal Header */}
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+              <div className="flex items-center gap-3">
+                <div
+                  className={`px-2 py-0.5 rounded-full border text-[10px] font-bold uppercase tracking-wider ${getDifficultyColor(problem.difficulty)}`}
+                >
+                  {problem.difficulty || "Easy"}
+                </div>
+                <h3 className="font-bold text-slate-800 tracking-tight">
+                  Task Description
+                </h3>
+              </div>
+              <button
+                onClick={() => setIsFullScreen(false)}
+                className="p-2 hover:bg-slate-200 rounded-full text-slate-500 transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Modal Scrollable Content */}
+            <div className="p-8 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-200">
+              <ReactMarkdown
+                rehypePlugins={[rehypeHighlight]}
+                components={markdownComponents}
+              >
+                {problem.description}
+              </ReactMarkdown>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }

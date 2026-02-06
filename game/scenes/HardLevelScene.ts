@@ -17,7 +17,7 @@ interface PathPoint {
 
 export default class HardLevelScene extends GameScene {
   private problemIds: string[] = [
-    "697908c24b714f4ebc73b1d1",
+    "6982fbfbd1ac6c9b7fd92fdb",
     "697908c44b714f4ebc73b1d6",
     "697908c54b714f4ebc73b1db",
     "697908d74b714f4ebc73b1e0",
@@ -320,14 +320,27 @@ export default class HardLevelScene extends GameScene {
 
       point.on("pointerover", () => {
         const state = this.getPointState(index);
-
-        // Prepare information strings
+        let pointsEarned = 0;
+        let totalTime = this.formatTime(0);
+        let attempt = 0;
         const statusText = state.toUpperCase();
-        const pointsEarned = this.solvedRecords[index]?.pointsEarned || 0;
-        const totalTime = this.formatTime(
-          this.solvedRecords[index]?.timeSpent || 0,
-        );
-        const attempt = this.solvedRecords[index]?.attempt || 0;
+
+        console.log("tool tip: ", JSON.stringify(this.savedProgress, null, 2));
+        switch (state) {
+          case "current":
+            totalTime = this.formatTime(
+              this.savedProgress.gameState.currentTask?.timer || 0,
+            );
+            attempt = this.savedProgress.gameState.currentTask?.attempts || 0;
+            break;
+          default:
+            pointsEarned = this.solvedRecords[index]?.pointsEarned || 0;
+            totalTime = this.formatTime(
+              this.solvedRecords[index]?.timeSpent || 0,
+            );
+            attempt = this.solvedRecords[index]?.attempt || 0;
+        }
+
         this.tooltipText.setText(
           `Challenge: #${index + 1}\n` +
             `STATE: ${statusText}\n` +
@@ -510,6 +523,7 @@ export default class HardLevelScene extends GameScene {
           attempts: 0,
           highestHintLevelUsed: "none",
           hintUsages: [],
+          timer: 0,
         },
       },
       bugCounts: [],

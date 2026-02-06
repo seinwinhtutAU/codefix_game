@@ -63,7 +63,7 @@ export function useExecutor({
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(request),
-        }
+        },
       );
 
       const data = await response.json();
@@ -103,14 +103,13 @@ export function useExecutor({
         })),
       };
 
-      const response = await fetch(
-        "https://fastapi-code.up.railway.app/api/execute/test",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(request),
-        }
-      );
+      console.log("test cases: ", JSON.stringify(request, null, 2));
+
+      const response = await fetch("http://0.0.0.0:8000/api/execute/test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(request),
+      });
 
       const data = await response.json();
       const result = formatTestExecutionResult(data);
@@ -161,7 +160,7 @@ export function useExecutor({
 
           console.log(
             "Saving solve record:",
-            JSON.stringify(newRecord, null, 2)
+            JSON.stringify(newRecord, null, 2),
           );
 
           const saveResponse = await fetch("/api/solve-record", {
@@ -217,7 +216,7 @@ export function useExecutor({
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(request),
-          }
+          },
         );
 
         const data = await response.json();
@@ -241,7 +240,7 @@ export function useExecutor({
         setIsContinuing(false);
       }
     },
-    [isContinuing]
+    [isContinuing],
   );
 
   return {
