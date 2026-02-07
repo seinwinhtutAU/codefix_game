@@ -47,6 +47,8 @@ export default class MediumLevelScene extends GameScene {
   private tooltipContainer!: Phaser.GameObjects.Container;
   private tooltipText!: Phaser.GameObjects.Text;
   private solvedRecords: ProblemSolveRecord[] = [];
+  private loadingContainer!: Phaser.GameObjects.Container;
+  private loadingText!: Phaser.GameObjects.Text;
 
   constructor() {
     super("MediumLevelScene");
@@ -58,6 +60,7 @@ export default class MediumLevelScene extends GameScene {
     }
     super.create();
 
+    this.createLoadingUI();
     this.initAudio();
     this.createParticle();
     this.initSolvedPoints();
@@ -182,33 +185,37 @@ export default class MediumLevelScene extends GameScene {
   }
 
   private handleProgressResume = async (progress: IGameProgress) => {
-    const { currentTask } = progress.gameState;
+    try {
+      const { currentTask } = progress.gameState;
 
-    this.solvedRecords = await this.getAllSolvedRecord();
-    const index = currentTask.currentActiveIndex ?? 0;
-    const completedIndex = index - 1;
-    const userId = progress.userId;
+      this.solvedRecords = await this.getAllSolvedRecord();
+      const index = currentTask.currentActiveIndex ?? 0;
+      const completedIndex = index - 1;
+      const userId = progress.userId;
 
-    const solveRecord = await this.checkPointSolved(
-      userId,
-      this.problemIds[completedIndex],
-    );
+      const solveRecord = await this.checkPointSolved(
+        userId,
+        this.problemIds[completedIndex],
+      );
 
-    const attempts = solveRecord?.attempt ?? 0;
-    const isSolved = solveRecord ? true : false;
+      const attempts = solveRecord?.attempt ?? 0;
+      const isSolved = solveRecord ? true : false;
 
-    this.updateSolvedPoint(completedIndex, attempts, isSolved);
+      this.updateSolvedPoint(completedIndex, attempts, isSolved);
 
-    const currentUpdated = this.updateCurrentPointIndex(completedIndex);
-    if (currentUpdated && this.currentPointIndex < this.mapPoints.length) {
-      this.emitTaskStarted(progress);
+      const currentUpdated = this.updateCurrentPointIndex(completedIndex);
+      if (currentUpdated && this.currentPointIndex < this.mapPoints.length) {
+        this.emitTaskStarted(progress);
+      }
+
+      if (!this.mediumLevelCompleted && this.checkLevelCompleted()) {
+        this.handleLevelTransition();
+      }
+
+      this.updatePointUI();
+    } finally {
+      this.hideLoading();
     }
-
-    if (!this.mediumLevelCompleted && this.checkLevelCompleted()) {
-      this.handleLevelTransition();
-    }
-
-    this.updatePointUI();
   };
 
   private async checkPointSolved(userId: string, problemId: string) {
@@ -528,22 +535,26 @@ export default class MediumLevelScene extends GameScene {
   }
 
   private async updateAllSolvePoint() {
+    this.showLoading("SYNCING PROGRESS...");
     const userId = this.savedProgress.userId;
 
-    // 1. Map all IDs to a list of promises
-    const promises = this.problemIds.map(async (id, index) => {
-      const solveRecord = await this.checkPointSolved(userId, id);
-      const attempts = solveRecord?.attempt ?? 0;
-      const isSolved = !!solveRecord;
+    try {
+    } finally {
+      const promises = this.problemIds.map(async (id, index) => {
+        const solveRecord = await this.checkPointSolved(userId, id);
+        const attempts = solveRecord?.attempt ?? 0;
+        const isSolved = !!solveRecord;
 
-      this.solvedPoints[index] = { attempts, isSolved };
-    });
+        this.solvedPoints[index] = { attempts, isSolved };
+      });
 
-    await Promise.all(promises);
+      await Promise.all(promises);
 
-    this.calculateCurrentIndex();
+      this.calculateCurrentIndex();
 
-    this.updatePointUI();
+      this.updatePointUI();
+      this.hideLoading();
+    }
   }
 
   private calculateCurrentIndex() {
@@ -664,5 +675,43 @@ export default class MediumLevelScene extends GameScene {
     return solveRecords.filter(
       (record): record is ProblemSolveRecord => record !== undefined,
     );
+  }
+
+  private createLoadingUI() {
+    const { width, height } = this.scale;
+
+    // Semi-transparent background covering the whole screen
+    const bg = this.add.graphics();
+    bg.fillStyle(0x000000, 0.7);
+    bg.fillRect(0, 0, width, height);
+
+    this.loadingText = this.add
+      .text(width / 2, height / 2, "FETCHING RECORDS...", {
+        fontFamily: "monospace",
+        fontSize: "24px",
+        color: "#ffffff",
+      })
+      .setOrigin(0.5);
+
+    // Subtle pulse animation for the text
+    this.tweens.add({
+      targets: this.loadingText,
+      alpha: 0.5,
+      duration: 800,
+      yoyo: true,
+      repeat: -1,
+    });
+
+    this.loadingContainer = this.add.container(0, 0, [bg, this.loadingText]);
+    this.loadingContainer.setDepth(2000).setVisible(false); // Ensure it's on top of everything
+  }
+
+  private showLoading(text: string = "LOADING...") {
+    if (this.loadingText) this.loadingText.setText(text);
+    if (this.loadingContainer) this.loadingContainer.setVisible(true);
+  }
+
+  private hideLoading() {
+    if (this.loadingContainer) this.loadingContainer.setVisible(false);
   }
 }

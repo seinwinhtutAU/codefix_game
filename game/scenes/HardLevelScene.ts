@@ -18,12 +18,12 @@ interface PathPoint {
 export default class HardLevelScene extends GameScene {
   private problemIds: string[] = [
     "6982fbfbd1ac6c9b7fd92fdb",
-    "697908c44b714f4ebc73b1d6",
-    "697908c54b714f4ebc73b1db",
-    "697908d74b714f4ebc73b1e0",
-    "697908d84b714f4ebc73b1e5",
-    "697908d94b714f4ebc73b1ea",
-    "697908da4b714f4ebc73b1ef",
+    "698766b9e2f85ce0fedafefa",
+    "698766d0e2f85ce0fedafeff",
+    "69876719e2f85ce0fedaff06",
+    "6987673fe2f85ce0fedaff0b",
+    "6987674fe2f85ce0fedaff13",
+    "6987675ce2f85ce0fedaff18",
     "697908da4b714f4ebc73b1f4",
   ];
 
@@ -88,6 +88,8 @@ export default class HardLevelScene extends GameScene {
   private roadProgressGraphics!: Phaser.GameObjects.Graphics;
   private tooltipContainer!: Phaser.GameObjects.Container;
   private tooltipText!: Phaser.GameObjects.Text;
+  private loadingContainer!: Phaser.GameObjects.Container;
+  private loadingText!: Phaser.GameObjects.Text;
 
   constructor() {
     super("HardLevelScene");
@@ -100,6 +102,7 @@ export default class HardLevelScene extends GameScene {
     }
     super.create();
 
+    this.createLoadingUI();
     this.initAudio();
     this.createParticle();
     this.initSolvedPoints();
@@ -220,33 +223,37 @@ export default class HardLevelScene extends GameScene {
   }
 
   private handleProgressResume = async (progress: IGameProgress) => {
-    const { currentTask } = progress.gameState;
+    try {
+      const { currentTask } = progress.gameState;
 
-    this.solvedRecords = await this.getAllSolvedRecord();
-    const index = currentTask.currentActiveIndex ?? 0;
-    const completedIndex = index - 1;
-    const userId = progress.userId;
+      this.solvedRecords = await this.getAllSolvedRecord();
+      const index = currentTask.currentActiveIndex ?? 0;
+      const completedIndex = index - 1;
+      const userId = progress.userId;
 
-    const solveRecord = await this.checkPointSolved(
-      userId,
-      this.problemIds[completedIndex],
-    );
+      const solveRecord = await this.checkPointSolved(
+        userId,
+        this.problemIds[completedIndex],
+      );
 
-    const attempts = solveRecord?.attempt ?? 0;
-    const isSolved = solveRecord ? true : false;
+      const attempts = solveRecord?.attempt ?? 0;
+      const isSolved = solveRecord ? true : false;
 
-    this.updateSolvedPoint(completedIndex, attempts, isSolved);
+      this.updateSolvedPoint(completedIndex, attempts, isSolved);
 
-    const currentUpdated = this.updateCurrentPointIndex(completedIndex);
-    if (currentUpdated && this.currentPointIndex < this.mapPoints.length) {
-      this.emitTaskStarted(progress);
+      const currentUpdated = this.updateCurrentPointIndex(completedIndex);
+      if (currentUpdated && this.currentPointIndex < this.mapPoints.length) {
+        this.emitTaskStarted(progress);
+      }
+
+      if (!this.hardLevelCompleted && this.checkLevelCompleted()) {
+        this.handleLevelTransition();
+      }
+
+      this.updatePointUI();
+    } finally {
+      this.hideLoading();
     }
-
-    if (!this.hardLevelCompleted && this.checkLevelCompleted()) {
-      this.handleLevelTransition();
-    }
-
-    this.updatePointUI();
   };
 
   private async checkPointSolved(userId: string, problemId: string) {
@@ -568,22 +575,26 @@ export default class HardLevelScene extends GameScene {
   }
 
   private async updateAllSolvePoint() {
+    this.showLoading("SYNCING PROGRESS...");
     const userId = this.savedProgress.userId;
 
-    // 1. Map all IDs to a list of promises
-    const promises = this.problemIds.map(async (id, index) => {
-      const solveRecord = await this.checkPointSolved(userId, id);
-      const attempts = solveRecord?.attempt ?? 0;
-      const isSolved = !!solveRecord;
+    try {
+      const promises = this.problemIds.map(async (id, index) => {
+        const solveRecord = await this.checkPointSolved(userId, id);
+        const attempts = solveRecord?.attempt ?? 0;
+        const isSolved = !!solveRecord;
 
-      this.solvedPoints[index] = { attempts, isSolved };
-    });
+        this.solvedPoints[index] = { attempts, isSolved };
+      });
 
-    await Promise.all(promises);
+      await Promise.all(promises);
 
-    this.calculateCurrentIndex();
+      this.calculateCurrentIndex();
 
-    this.updatePointUI();
+      this.updatePointUI();
+    } finally {
+      this.hideLoading();
+    }
   }
 
   private calculateCurrentIndex() {
@@ -704,5 +715,43 @@ export default class HardLevelScene extends GameScene {
     return solveRecords.filter(
       (record): record is ProblemSolveRecord => record !== undefined,
     );
+  }
+
+  private createLoadingUI() {
+    const { width, height } = this.scale;
+
+    // Semi-transparent background covering the whole screen
+    const bg = this.add.graphics();
+    bg.fillStyle(0x000000, 0.7);
+    bg.fillRect(0, 0, width, height);
+
+    this.loadingText = this.add
+      .text(width / 2, height / 2, "FETCHING RECORDS...", {
+        fontFamily: "monospace",
+        fontSize: "24px",
+        color: "#ffffff",
+      })
+      .setOrigin(0.5);
+
+    // Subtle pulse animation for the text
+    this.tweens.add({
+      targets: this.loadingText,
+      alpha: 0.5,
+      duration: 800,
+      yoyo: true,
+      repeat: -1,
+    });
+
+    this.loadingContainer = this.add.container(0, 0, [bg, this.loadingText]);
+    this.loadingContainer.setDepth(2000).setVisible(false); // Ensure it's on top of everything
+  }
+
+  private showLoading(text: string = "LOADING...") {
+    if (this.loadingText) this.loadingText.setText(text);
+    if (this.loadingContainer) this.loadingContainer.setVisible(true);
+  }
+
+  private hideLoading() {
+    if (this.loadingContainer) this.loadingContainer.setVisible(false);
   }
 }
