@@ -186,7 +186,7 @@ export default function GamePage() {
 
         {/* 6. INITIAL ENGINE LOADER */}
         {!isGameLoaded && !isResetting && !showDebuggingQuiz && (
-          <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-[#E8FCE8] text-[#3A7D44]">
+          <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-[#b9e6f6] text-[#327bd5]">
             <div className="text-2xl font-mono animate-pulse tracking-tighter">
               GAME LOADING...
             </div>

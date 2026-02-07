@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
           message:
             "Missing required fields: userId, problemId, and timeSpent are mandatory.",
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -55,7 +55,7 @@ export async function POST(req: NextRequest) {
           success: false,
           message: "Invalid userId format.",
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -65,7 +65,7 @@ export async function POST(req: NextRequest) {
           success: false,
           message: "Invalid problemId format.",
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -82,7 +82,7 @@ export async function POST(req: NextRequest) {
           message: "Solve record already exists for this user and problem.",
           data: existingRecord,
         },
-        { status: 409 }
+        { status: 409 },
       );
     }
 
@@ -111,7 +111,7 @@ export async function POST(req: NextRequest) {
         message: "Record created successfully",
         data: newRecord,
       },
-      { status: 201 }
+      { status: 201 },
     );
   } catch (error) {
     const e = error instanceof Error ? error : new Error("Unknown error");
@@ -119,7 +119,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json(
       { success: false, message: e.message || "Failed to create record." },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -145,7 +145,7 @@ export async function GET(req: NextRequest) {
       if (!mongoose.Types.ObjectId.isValid(userIdParam)) {
         return NextResponse.json<SolveRecordResponse>(
           { success: false, data: null },
-          { status: 400 }
+          { status: 400 },
         );
       }
       filter.userId = new mongoose.Types.ObjectId(userIdParam);
@@ -155,7 +155,7 @@ export async function GET(req: NextRequest) {
       if (!mongoose.Types.ObjectId.isValid(problemIdParam)) {
         return NextResponse.json<SolveRecordResponse>(
           { success: false, data: null },
-          { status: 400 }
+          { status: 400 },
         );
       }
       filter.problemId = new mongoose.Types.ObjectId(problemIdParam);
@@ -163,16 +163,23 @@ export async function GET(req: NextRequest) {
 
     let result;
 
-    // ✅ Case 1: No filters → fetch all records
-    if (!userIdParam && !problemIdParam) {
-      result = await ProblemSolveRecord.find().sort({ completedAt: -1 });
-    }
-    // ✅ Case 2: With filters → fetch only one (latest)
-    else {
+    if (userIdParam && problemIdParam) {
       result = await ProblemSolveRecord.findOne(filter).sort({
         completedAt: -1,
       });
+    } else {
+      result = await ProblemSolveRecord.find().sort({ completedAt: -1 });
     }
+    // // ✅ Case 1: No filters → fetch all records
+    // if (!userIdParam && !problemIdParam) {
+    //   result = await ProblemSolveRecord.find().sort({ completedAt: -1 });
+    // }
+    // // ✅ Case 2: With filters → fetch only one (latest)
+    // else {
+    //   result = await ProblemSolveRecord.findOne(filter).sort({
+    //     completedAt: -1,
+    //   });
+    // }
 
     return NextResponse.json<SolveRecordResponse>({
       success: true,
@@ -182,7 +189,7 @@ export async function GET(req: NextRequest) {
     console.error("Error fetching problem solve record:", error);
     return NextResponse.json<SolveRecordResponse>(
       { success: false, data: null },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -208,7 +215,7 @@ export async function DELETE(req: NextRequest) {
           message: `Successfully deleted ${deletedResult.deletedCount} solve records`,
           data: { deletedCount: deletedResult.deletedCount },
         },
-        { status: 200 }
+        { status: 200 },
       );
     }
 
@@ -220,12 +227,12 @@ export async function DELETE(req: NextRequest) {
             success: false,
             message: "Invalid recordId format",
           },
-          { status: 400 }
+          { status: 400 },
         );
       }
 
       const deletedRecord = await ProblemSolveRecord.findByIdAndDelete(
-        new mongoose.Types.ObjectId(recordIdParam)
+        new mongoose.Types.ObjectId(recordIdParam),
       );
 
       if (!deletedRecord) {
@@ -234,7 +241,7 @@ export async function DELETE(req: NextRequest) {
             success: false,
             message: "Solve record not found",
           },
-          { status: 404 }
+          { status: 404 },
         );
       }
 
@@ -244,7 +251,7 @@ export async function DELETE(req: NextRequest) {
           message: "Solve record deleted successfully",
           data: deletedRecord,
         },
-        { status: 200 }
+        { status: 200 },
       );
     }
 
@@ -256,7 +263,7 @@ export async function DELETE(req: NextRequest) {
             success: false,
             message: "Invalid userId format",
           },
-          { status: 400 }
+          { status: 400 },
         );
       }
 
@@ -266,7 +273,7 @@ export async function DELETE(req: NextRequest) {
             success: false,
             message: "Invalid problemId format",
           },
-          { status: 400 }
+          { status: 400 },
         );
       }
 
@@ -281,7 +288,7 @@ export async function DELETE(req: NextRequest) {
           message: `Successfully deleted ${deletedResult.deletedCount} solve record(s) for this user and problem`,
           data: { deletedCount: deletedResult.deletedCount },
         },
-        { status: 200 }
+        { status: 200 },
       );
     }
 
@@ -293,7 +300,7 @@ export async function DELETE(req: NextRequest) {
             success: false,
             message: "Invalid userId format",
           },
-          { status: 400 }
+          { status: 400 },
         );
       }
 
@@ -307,7 +314,7 @@ export async function DELETE(req: NextRequest) {
           message: `Successfully deleted ${deletedResult.deletedCount} solve record(s) for user`,
           data: { deletedCount: deletedResult.deletedCount },
         },
-        { status: 200 }
+        { status: 200 },
       );
     }
 
@@ -319,7 +326,7 @@ export async function DELETE(req: NextRequest) {
             success: false,
             message: "Invalid problemId format",
           },
-          { status: 400 }
+          { status: 400 },
         );
       }
 
@@ -333,7 +340,7 @@ export async function DELETE(req: NextRequest) {
           message: `Successfully deleted ${deletedResult.deletedCount} solve record(s) for problem`,
           data: { deletedCount: deletedResult.deletedCount },
         },
-        { status: 200 }
+        { status: 200 },
       );
     }
 
@@ -345,7 +352,7 @@ export async function DELETE(req: NextRequest) {
           "Please provide at least one parameter: recordId, userId, problemId, or confirmAll=true",
         note: "To delete all records, use ?confirmAll=true",
       },
-      { status: 400 }
+      { status: 400 },
     );
   } catch (error) {
     const e = error instanceof Error ? error : new Error("Unknown error");
@@ -356,7 +363,7 @@ export async function DELETE(req: NextRequest) {
         success: false,
         message: e.message || "Failed to delete record",
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
