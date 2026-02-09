@@ -11,16 +11,16 @@ export interface SolvedPointStatus {
 
 export default class MediumLevelScene extends GameScene {
   private problemIds: string[] = [
-    "698244b2d1ac6c9b7fd9230b",
-    "69824563d1ac6c9b7fd92396",
-    "697401dc5f4942a9208dc707",
-    "69740e795f4942a9208dc8c4",
-    "6976a8965f4942a9208dea8f",
-    "697908e24b714f4ebc73b1f9",
-    "697908e34b714f4ebc73b1fe",
-    "697908e44b714f4ebc73b203",
-    "697909f24b714f4ebc73b209",
-    "697909f34b714f4ebc73b20e",
+    "69876d03e2f85ce0fedb008d",
+    "6987b9c5e2f85ce0fedb2673",
+    "6987b9cde2f85ce0fedb267b",
+    "6987b9d4e2f85ce0fedb2680",
+    "6987b9dae2f85ce0fedb2685",
+    "6987b9e0e2f85ce0fedb268a",
+    "6987b9f1e2f85ce0fedb268f",
+    "6987b9f8e2f85ce0fedb2694",
+    "6987b9fee2f85ce0fedb2699",
+    "6987ba05e2f85ce0fedb269e",
   ];
 
   private roadPoints = [

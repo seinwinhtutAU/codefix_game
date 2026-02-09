@@ -21,7 +21,8 @@ interface UseExecutorProps {
   setHasCompleted: (completed: boolean) => void;
   level: string;
   attempt: number;
-  timeLimited: number; // second
+  bugCounts: number;
+  timeLimited: number;
 }
 
 export function useExecutor({
@@ -34,6 +35,7 @@ export function useExecutor({
   setHasCompleted,
   level,
   attempt,
+  bugCounts,
   timeLimited,
 }: UseExecutorProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -130,6 +132,8 @@ export function useExecutor({
 
         if (hintUsages.length == 0) {
           pointsEarned = 100;
+          const bugFactor = Math.max(0, bugCounts - 10);
+          pointsEarned = pointsEarned + bugFactor * 10;
         } else {
           for (const hintUsage of hintUsages) {
             if (hintUsage.hintLevel == "small") {

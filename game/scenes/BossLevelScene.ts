@@ -12,10 +12,28 @@ export interface BugCount {
 }
 
 export default class BossLevelScene extends GameScene {
+  private problemMatrix: Record<number, Record<number, string>> = {
+    0: {
+      15: "6987f766e2f85ce0fedb499f",
+      20: "698889fa7bf5b7d35e79ffc8",
+      25: "69888a037bf5b7d35e79ffd0",
+    },
+    1: {
+      15: "698890e17bf5b7d35e7a0024",
+      20: "698890ea7bf5b7d35e7a002d",
+      25: "698890f17bf5b7d35e7a0036",
+    },
+    2: {
+      15: "698898df7bf5b7d35e7a027f",
+      20: "698899387bf5b7d35e7a0291",
+      25: "698898ee7bf5b7d35e7a0288",
+    },
+  };
+
   private problemIds: string[] = [
-    "697908b84b714f4ebc73b1c2",
-    "697908bb4b714f4ebc73b1c7",
-    "697908bc4b714f4ebc73b1cc",
+    "6987f766e2f85ce0fedb499f",
+    "698890e17bf5b7d35e7a0024",
+    "698898df7bf5b7d35e7a027f",
   ];
 
   private selectionButtons: Button[] = [];
@@ -42,7 +60,7 @@ export default class BossLevelScene extends GameScene {
   private minBugs: number = 10;
   private maxBugs: number = 20;
   private basePoints: number = 100;
-  private baseTimer: number = 60;
+  private baseTimer: number = 3600;
   private timerIncrementPerBug: number = 120;
   private pointIncrementPerBug: number = 10;
   private progressGraphics!: Phaser.GameObjects.Graphics;
@@ -60,12 +78,47 @@ export default class BossLevelScene extends GameScene {
     super.create();
 
     this.initAudio();
+    if (
+      this.savedProgress.bugCounts &&
+      this.savedProgress.bugCounts.length > 0
+    ) {
+      for (let i = 0; i < this.problemIds.length; i++) {
+        // Double check index exists to prevent crashes
+        if (this.savedProgress.bugCounts[i]) {
+          console.log(
+            "this.savedProgress.bugCounts[i]",
+            this.savedProgress.bugCounts[i],
+          );
+          const bugCount = this.savedProgress.bugCounts[i].bugCount;
+          this.updateProbemId(i, bugCount);
+        }
+      }
+      this.syncBugCountsWithProgress(
+        this.savedProgress.bugCounts,
+        this.savedProgress.bugCounts.length - 1,
+      );
+    } else {
+      console.warn("No bugCounts found, but continuing to draw scene...");
+    }
+
+    console.log("Bug Counts before drawing: ", this.bugCounts);
+    console.log("ProblemIds: ", this.problemIds);
+
     this.add.image(0, 0, "boss-bg").setOrigin(0, 0);
     this.createNotificationText();
     this.drawPoints();
     this.solvedRecords = await this.getAllSolvedRecord();
     this.updateCurrentPointIndex(this.savedProgress);
-    this.getAllBugCounts();
+    // this.getAllBugCounts();
+    if (
+      this.savedProgress.bugCounts &&
+      this.savedProgress.bugCounts.length > 0
+    ) {
+      this.syncBugCountsWithProgress(
+        this.savedProgress.bugCounts,
+        this.currentPointIndex,
+      );
+    }
 
     if (this.currentBugCount === 0) {
       this.createBugCountInput();
@@ -73,7 +126,7 @@ export default class BossLevelScene extends GameScene {
       this.showChallengeInfo(this.currentBugCount, this.currentPointIndex);
     }
 
-    console.log("BossLevelScene bug counts: ", this.bugCounts);
+    console.log("Bug Counts after drawing: ", this.bugCounts);
     console.log("BossLevelScene Current Point Index: ", this.currentPointIndex);
     console.log("BossLevelScene currentBugCount: ", this.currentBugCount);
     this.updatePointsUI();
@@ -81,11 +134,6 @@ export default class BossLevelScene extends GameScene {
     if (this.checkLevelCompleted()) {
       this.handleLevelTransition();
     }
-  }
-
-  // --- Mock functions to be implemented later ---
-  private getProblemId(): string[] {
-    return this.problemIds;
   }
 
   private createBugCountInput() {
@@ -187,7 +235,13 @@ export default class BossLevelScene extends GameScene {
     this.savedProgress = progress;
     this.solvedRecords = await this.getAllSolvedRecord();
     this.updateCurrentPointIndex(progress);
-    this.getAllBugCounts();
+    // this.getAllBugCounts()
+    if (this.savedProgress.bugCounts && this.savedProgress.bugCounts.length > 0)
+      this.syncBugCountsWithProgress(
+        this.savedProgress.bugCounts,
+        this.currentPointIndex,
+      );
+
     this.updatePointsUI();
     this.createBugCountInput();
 
@@ -237,8 +291,16 @@ export default class BossLevelScene extends GameScene {
       .setDepth(100);
   }
 
+  private updateProbemId(pointIndex: number, bugCount: number): void {
+    if (bugCount == 0) return;
+    this.problemIds[pointIndex] = this.problemMatrix[pointIndex][bugCount];
+    console.log(`${pointIndex} ${this.problemMatrix[pointIndex][bugCount]}`);
+    console.log("updateProbemId: ", this.problemIds[pointIndex]);
+  }
+
   private confirmBugCount(bugCount: number): void {
     this.currentBugCount = bugCount;
+    this.updateProbemId(this.currentPointIndex, this.currentBugCount);
     this.updateBugCount(bugCount);
     this.emitBugCountSubmitted(this.savedProgress);
 
@@ -268,6 +330,14 @@ export default class BossLevelScene extends GameScene {
         bugCount: updateBugCount,
       });
     }
+  }
+
+  private syncBugCountsWithProgress(bugCounts: BugCount[], pointIndex: number) {
+    this.bugCounts = bugCounts;
+    this.currentBugCount = this.bugCounts[pointIndex]?.bugCount || 0;
+
+    console.log("sync: bugCounts ", this.bugCounts);
+    console.log("sync: currentBugCounts ", this.currentBugCount);
   }
 
   private formatTime(seconds: number): string {
@@ -429,6 +499,7 @@ export default class BossLevelScene extends GameScene {
 
   private openProblemOverlay(bugs: number, time: number) {
     console.log(`Battle Started! Bugs: ${bugs}, Time: ${time}s`);
+    console.log("openoverlay: ", this.problemIds[this.currentPointIndex]);
     EventBus.emit("ui-open-problem", {
       problemId: this.problemIds[this.currentPointIndex],
       difficulty: "boss",
@@ -628,9 +699,9 @@ export default class BossLevelScene extends GameScene {
 
     const isSolved = !!this.solvedRecords[index];
     const attempts = this.solvedRecords[index]?.attempt || 0;
-    console.log(
-      `Getting state for point ${index}: isSolved=${isSolved}, attempts=${attempts}`,
-    );
+    // console.log(
+    //   `Getting state for point ${index}: isSolved=${isSolved}, attempts=${attempts}`,
+    // );
     if (attempts >= this.maxAttempt) return "skipped";
     if (isSolved) return "solved";
     if (index === this.currentPointIndex) return "current";
@@ -724,11 +795,10 @@ export default class BossLevelScene extends GameScene {
   }
 
   private async getAllSolvedRecord(): Promise<ProblemSolveRecord[]> {
-    const problemIds = this.getProblemId();
     const userId = this.savedProgress.userId;
 
     const solveRecords = await Promise.all(
-      problemIds.map(async (id) => {
+      this.problemIds.map(async (id) => {
         const record = await checkExistingSolveRecord(userId, id);
         return record?.data;
       }),
@@ -739,21 +809,21 @@ export default class BossLevelScene extends GameScene {
     );
   }
 
-  private getAllBugCounts() {
-    const savedBugCounts = this.savedProgress.bugCounts || [];
-    this.bugCounts = this.problemIds.map((problemId) => {
-      const savedCount = savedBugCounts.find(
-        (bc) => bc.problemId === problemId,
-      );
-      return {
-        problemId,
-        bugCount: savedCount ? savedCount.bugCount : 0,
-      };
-    });
+  // private getAllBugCounts() {
+  //   const savedBugCounts = this.savedProgress.bugCounts || [];
+  //   this.bugCounts = this.problemIds.map((problemId) => {
+  //     const savedCount = savedBugCounts.find(
+  //       (bc) => bc.problemId === problemId,
+  //     );
+  //     return {
+  //       problemId,
+  //       bugCount: savedCount ? savedCount.bugCount : 0,
+  //     };
+  //   });
 
-    this.currentBugCount =
-      this.bugCounts[this.currentPointIndex]?.bugCount || 0;
-  }
+  //   this.currentBugCount =
+  //     this.bugCounts[this.currentPointIndex]?.bugCount || 0;
+  // }
 
   private initAudio() {
     const audioManager = AudioManager.getInstance();

@@ -215,16 +215,16 @@ export function ProblemOverlay({
       basePoints: 100,
     },
     medium: {
-      baseTime: 120,
+      baseTime: 1200,
       basePoints: 100,
     },
     hard: {
-      baseTime: 180,
+      baseTime: 1800,
       basePoints: 100,
     },
     boss: {
-      baseTime: 300,
-      basePoints: 150,
+      baseTime: 3600,
+      basePoints: 100,
     },
   };
 
@@ -242,13 +242,16 @@ export function ProblemOverlay({
   const minBugs: number = 10;
   const timerIncrementPerBug: number = 120;
   const pointIncrementPerBug: number = 10;
-  const BASE_TIME_LIMIT = 60;
-  const BASE_POINTS = 100;
 
   const calculateTimeAndPoints = (bugCount: number) => {
-    const bugFactor = bugCount - minBugs;
-    const calculatedTime = bugFactor * timerIncrementPerBug + BASE_TIME_LIMIT;
-    const calculatedPoints = bugFactor * pointIncrementPerBug + BASE_POINTS;
+    const config = DIFFICULTY_CONFIG[difficulty as Difficulty];
+
+    const bugFactor = Math.max(0, bugCount - minBugs);
+
+    const calculatedTime = config.baseTime + bugFactor * timerIncrementPerBug;
+    const calculatedPoints =
+      config.basePoints + bugFactor * pointIncrementPerBug;
+
     return { calculatedTime, calculatedPoints };
   };
 
@@ -284,6 +287,7 @@ export function ProblemOverlay({
     setHasCompleted,
     level,
     attempt: attempts,
+    bugCounts: currentBugCount?.bugCount ?? 0,
     timeLimited: timeLimited,
   });
 
@@ -750,7 +754,7 @@ export function ProblemOverlay({
                   : "bg-slate-50 text-slate-400 border-slate-100"
               }`}
             >
-              {hasCompleted ? "SOLVED" : "CODING"}
+              {hasCompleted ? "SOLVED" : "DEBUGGIN"}
             </span>
 
             <div className="flex items-center gap-4 text-slate-500">

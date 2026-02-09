@@ -1,0 +1,58 @@
+{
+  "mode": "learning",
+  "title": "Task 3 - Shopping Cart Management System",
+  "description": "## Task Description\n\n**Purpose**: Manage shopping cart items and generate a purchase summary.\n\nThe system manages **products** in a shopping cart, including their **prices and quantities**, and generates a purchase summary.\n\nIt:\n- Calculates the **subtotal** of all items\n- Computes **tax** on the subtotal using an **8% tax rate**\n- Applies a **10% discount**\n- Calculates the **final total cost**\n- Produces a cart summary with **total items**, **average item price**, **most expensive**, and **cheapest product**\n\n```text\n=== SHOPPING CART SYSTEM ===\n\nCart Items:\nApple: $2.50 x 3 = $7.50\nBanana: $1.20 x 5 = $6.00\nMilk: $3.80 x 2 = $7.60\nBread: $2.00 x 1 = $2.00\n\nSubtotal: $23.10\nDiscount (10%): $2.31\nTax (8%): $1.85\nTotal: $22.64\n\nCart Summary:\nTotal Items: 11\nAverage Item Price: $2.10\nMost Expensive: Milk ($3.80)\nCheapest: Banana ($1.20)\n```",
+  "difficulty": "boss",
+  "order": 3,
+  "expectedOutput": "",
+  "testCases": [
+    {
+      "input": "",
+      "expectedOutput": "=== SHOPPING CART SYSTEM ===\n\nCart Items:\nApple: $2.50 x 3 = $7.50\nBanana: $1.20 x 5 = $6.00\nMilk: $3.80 x 2 = $7.60\nBread: $2.00 x 1 = $2.00\n\nSubtotal: $23.10\nDiscount (10%): $2.31\nTax (8%): $1.85\nTotal: $22.64\n\nCart Summary:\nTotal Items: 11\nAverage Item Price: $2.10\nMost Expensive: Milk ($3.80)\nCheapest: Banana ($1.20)"
+    }
+  ],
+  "hints": {
+    "small": [
+      "Check how item totals are calculated.",
+      "Look closely at loop variables.",
+      "Verify how values are returned from functions."
+    ],
+    "medium": [
+      "Subtotal uses the wrong variable.",
+      "Discount calculation logic is incorrect.",
+      "Tax function does not return a value.",
+      "Most expensive and cheapest comparisons are reversed."
+    ],
+    "big": [
+      "Use price * quantity when calculating item totals.",
+      "Loop over the correct cart variable.",
+      "Return calculated tax from the tax function.",
+      "Count quantities, not prices, for total items.",
+      "Fix min/max comparison logic for item prices.",
+      "Average price should divide by total quantity, not item count."
+    ]
+  },
+  "files": [
+    {
+      "name": "main.py",
+      "type": "file",
+      "data": {
+        "content": "import cart\nfrom discount import calculate_discount\n\ncart_items = [\n    {\"name\": \"Apple\", \"price\": 2.5, \"quantity\": 3},\n    {\"name\": \"Banana\", \"price\": 1.2, \"quantity\": 5},\n    {\"name\": \"Milk\", \"price\": 3.8, \"quantity\": 2},\n    {\"name\": \"Bread\", \"price\": 2.0, \"quantity\": 1}\n]\n\nprint(\"=== SHOPPING CART SYSTEM ===\")\nprint()\n\ncart.display_cart(cart_items)\n\nsubtotal = cart.calculate_subtotal()\nprint(f\"\\nSubtotal: ${subtotal:.2f}\")\n\ndiscount_rate = 0.10\ndiscount_amount = calculate_discount(subtotal)\nprint(f\"Discount ({discount_rate*100}%): ${discount_amount:.2f}\")\n\ntax_rate = 0.08\ntax_amount = cart.calculate_tax(subtotal - discount_amount)\nprint(f\"Tax ({tax_rate*100}%): ${tax_amount:.2f}\")\n\nfinal_total = subtotal - discount_amount + tax_amount\nprint(f\"Total: ${final_total:.2f}\")\n\nprint()\n\nsummary = cart.get_cart_summary(cart_items)\n\nprint(\"Cart Summary:\")\nprint(f\"Total Items: {summary['total_items']}\")\nprint(f\"Average Item Price: ${summary['avg_price']:.2f}\")\nprint(f\"Most Expensive: {summary['most_expensive']['name']} (${summary['most_expensive']['price']:.2f})\")\nprint(f\"Cheapest: {summary['cheapest']['name']} (${summary['cheapest']['price']:.2f})\")"
+      }
+    },
+    {
+      "name": "cart.py",
+      "type": "file",
+      "data": {
+        "content": "def display_cart(items):\n    print(\"Cart Items:\")\n    for item in items:\n        item_total = calculate_item_total(item[\"quantity\"], item[\"price\"])\n        print(f\"{item['name']}: ${item['price']:.2f} x {item['quantity']} = ${item_total:.2f}\")\n\ndef calculate_item_total(price, quantity):\n    total = price + quantity\n    return total\n\ndef calculate_subtotal(items):\n    subtotal = 0\n    for item in cart_items:\n        subtotal += calculate_item_total(item[\"price\"], item[\"quantity\"])\n    return subtotal\n\ndef calculate_tax(amount, rate=0.08):\n    tax = amount * rate\n\ndef get_cart_summary(cart):\n    total_items = 0\n    total_value = 0\n    most_expensive = {\"name\": \"\", \"price\": 0}\n    cheapest = {\"name\": \"\", \"price\": 1000}\n\n    for item in cart:\n        total_items += item[\"price\"]\n        item_value = item[\"price\"] * item[\"quantity\"]\n        total_value += item_value\n\n        if item[\"price\"] < most_expensive[\"price\"]:\n            most_expensive = {\"name\": item[\"name\"], \"price\": item[\"price\"]}\n\n        if item[\"price\"] > cheapest[\"price\"]:\n            cheapest = {\"name\": item[\"name\"], \"price\": item[\"price\"]}\n\n    avg_price = total_value / total_items\n\n    return {\n        \"total_items\": total_items,\n        \"avg_price\": avg_price,\n        \"most_expensive\": most_expensive,\n        \"cheapest\": cheapest\n    }"
+      }
+    },
+    {
+      "name": "discount.py",
+      "type": "file",
+      "data": {
+        "content": "def apply_discount(amount, rate=0.10):\n    discount = amount / rate\n    return discount\n\ndef calculate_discount(amount):\n    rate = validate_discount(amount)\n    return apply_discount(amount, rate)\n\ndef get_discount_rate():\n    return 0.10\n\ndef validate_discount(amount):\n    if amount < 100:\n        return 0.20\n    else:\n        return 0.10"
+      }
+    }
+  ]
+}
