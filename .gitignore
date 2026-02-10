@@ -40,3 +40,5 @@ Thumbs.db
 # IDEs
 .vscode/
 .idea/
+
+level-json/

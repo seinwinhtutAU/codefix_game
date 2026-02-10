@@ -64,7 +64,10 @@ export default class LevelScene extends GameScene {
 
   private async loadAndAggregateStats() {
     // Add static bonus for easy completion
-    if (this.savedProgress?.gameState?.eventFlags?.easyQuizCompleted) {
+    if (
+      this.savedProgress?.gameState?.eventFlags?.easyQuizCompleted &&
+      this.stats.easy.points == 0
+    ) {
       this.stats.easy.points += 500;
     }
 

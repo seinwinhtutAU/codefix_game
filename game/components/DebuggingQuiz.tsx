@@ -15,105 +15,10 @@ import {
 } from "lucide-react";
 import { EventBus } from "@/game/events";
 import { GameNotification } from "@/game/components/GameNotification";
-import { getPlayerProgress } from "@/services/game"; // Import service
-import { useUserId } from "@/hooks"; // Import hook
-import { IGameProgress } from "@/lib/types"; // Import types
-
-// --- TYPES ---
-type Option = {
-  id: string;
-  text: string;
-};
-
-type Question = {
-  id: string;
-  title: string;
-  description: string;
-  codeSnippet: string;
-  language: "python" | "javascript";
-  options: Option[];
-  correctOptionId: string;
-  explanation: string;
-};
-
-// --- MOCK DATA (Debugging Scenarios) ---
-const QUESTIONS: Question[] = [
-  {
-    id: "q1",
-    title: "Index Out of Bounds",
-    description:
-      "The following Python code crashes. What is the cause of the `IndexError`?",
-    codeSnippet: `numbers = [10, 20, 30]
-# Trying to print the last element
-print(numbers[3])`,
-    language: "python",
-    options: [
-      { id: "A", text: "The list `numbers` is empty." },
-      {
-        id: "B",
-        text: "List indices start at 0, so the last index is 2, not 3.",
-      },
-      { id: "C", text: "You cannot print integers directly in Python." },
-      {
-        id: "D",
-        text: "The syntax for accessing lists uses parentheses `()`, not brackets `[]`.",
-      },
-    ],
-    correctOptionId: "B",
-    explanation:
-      "Correct! In Python (and most languages), lists are 0-indexed. For a list of length 3, the valid indices are 0, 1, and 2. Accessing `numbers[3]` tries to get the 4th element, which doesn't exist.",
-  },
-  {
-    id: "q2",
-    title: "Infinite Loop",
-    description:
-      "This code is supposed to count down, but it runs forever. Why?",
-    codeSnippet: `count = 10
-while count > 0:
-    print(count)
-    count = count + 1`,
-    language: "python",
-    options: [
-      { id: "A", text: "The `while` condition should be `count < 0`." },
-      { id: "B", text: "The variable `count` is initialized incorrectly." },
-      {
-        id: "C",
-        text: "The code increments `count` instead of decrementing it.",
-      },
-      {
-        id: "D",
-        text: "The `print` statement prevents the loop from finishing.",
-      },
-    ],
-    correctOptionId: "C",
-    explanation:
-      "Spot on! Logic error. To count *down*, you need to subtract from `count` (`count -= 1`). By adding 1, `count` keeps getting larger (11, 12, 13...), so it stays > 0 forever.",
-  },
-  {
-    id: "q3",
-    title: "Variable Scope",
-    description: "Why does this code throw a `NameError`?",
-    codeSnippet: `def calculate_total():
-    tax = 0.05
-    return 100 * tax
-
-# Trying to print the tax rate
-print(tax)`,
-    language: "python",
-    options: [
-      {
-        id: "A",
-        text: "`tax` is defined inside the function, so it's not accessible outside.",
-      },
-      { id: "B", text: "The function `calculate_total` was never called." },
-      { id: "C", text: "Variable names cannot be only 3 letters long." },
-      { id: "D", text: "You must use `global` to print variables." },
-    ],
-    correctOptionId: "A",
-    explanation:
-      "Exactly. This is a Scope issue. Variables defined inside a function are 'local' to that function. The main program doesn't know what `tax` is.",
-  },
-];
+import { getPlayerProgress } from "@/services/game";
+import { useUserId } from "@/hooks";
+import { IGameProgress } from "@/lib/types";
+import { QUESTIONS } from "./quiz_data";
 
 interface DebuggingQuizProps {
   onClose?: () => void;
@@ -264,7 +169,7 @@ export default function DebuggingQuiz({
           type="SUCCESS"
           title="QUIZ COMPLETED!"
           message={`You scored ${score} out of ${QUESTIONS.length}`}
-          points={score * 100}
+          points={500}
           onConfirm={handleQuizNotificationConfirm}
           confirmLabel={isSaving ? "SAVING..." : "BACK TO GAME"}
         />
