@@ -6,6 +6,10 @@ import mongoose from "mongoose";
 
 export const dynamic = "force-dynamic";
 
+// ============================================================================
+// Types & Defaults
+// ============================================================================
+
 type IncomingHint = Omit<HintUsage, "hintId">;
 
 interface GameProgressRequest {
@@ -31,7 +35,6 @@ interface GameProgressRequest {
   }[];
 }
 
-// 2. CLEANUP: Define default state here to keep the GET function clean
 const DEFAULT_GAME_STATE = {
   lastLocation: "/game",
   gameState: {
@@ -53,6 +56,10 @@ const DEFAULT_GAME_STATE = {
   bugCounts: [],
 };
 
+// ============================================================================
+// HTTP Methods
+// ============================================================================
+
 export async function GET(req: Request) {
   try {
     await dbConnect();
@@ -60,20 +67,32 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
     const userId = searchParams.get("userId");
 
+    /**
+     * CASE 1: Fetch ALL Progress
+     * Used by the Admin Dashboard to see all students' live status.
+     */
     if (!userId) {
-      return NextResponse.json(
-        { error: "User ID is required" },
-        { status: 400 },
-      );
+      const allProgress = await GameProgressModel.find({})
+        .sort({ updatedAt: -1 }) // Show most recent activity first
+        .lean();
+
+      return NextResponse.json({
+        success: true,
+        data: allProgress,
+      });
     }
 
-    const progress = await GameProgressModel.findOne({ userId });
+    /**
+     * CASE 2: Fetch Specific User Progress
+     * Used by the Phaser game client to load a player's save.
+     */
+    const progress = await GameProgressModel.findOne({ userId }).lean();
 
-    // --- TEACHER'S FIX: Return empty/default state instead of 404 ---
+    // If no progress exists, return the default starting state
     if (!progress) {
       return NextResponse.json({
-        userId: userId, // Include the ID so Phaser knows who it is
-        ...DEFAULT_GAME_STATE, // Spread the default values defined above
+        userId: userId,
+        ...DEFAULT_GAME_STATE,
       });
     }
 
@@ -89,7 +108,6 @@ export async function POST(req: Request) {
   try {
     await dbConnect();
 
-    // Type the incoming JSON as our specific interface
     const body: GameProgressRequest = await req.json();
     const { userId, lastLocation, gameState, bugCounts } = body;
 
@@ -100,8 +118,9 @@ export async function POST(req: Request) {
       );
     }
 
-    const hintUsages = body.gameState.currentTask.hintUsages;
-    const processedHintUsages: HintUsage[] = (hintUsages || []).map((hint) => ({
+    // Process hints to ensure they have ObjectIds and proper Dates
+    const hintUsages = body.gameState?.currentTask?.hintUsages;
+    const processedHintUsages = (hintUsages || []).map((hint) => ({
       ...hint,
       hintId: new mongoose.Types.ObjectId(),
       usedAt: hint.usedAt ? new Date(hint.usedAt) : new Date(),
@@ -113,9 +132,10 @@ export async function POST(req: Request) {
         ...gameState,
         currentTask: {
           ...gameState.currentTask,
-          hintUsages: processedHintUsages, // Use processed hints
+          hintUsages: processedHintUsages,
         },
       },
+      // Ensure problemIds in bugCounts are cast to ObjectId for DB consistency
       bugCounts: bugCounts
         ? bugCounts.map((bug) => ({
             problemId: new mongoose.Types.ObjectId(bug.problemId),

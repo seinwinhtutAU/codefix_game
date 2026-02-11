@@ -7,94 +7,47 @@ import {
   fetchAllProblems,
   User,
 } from "@/services";
+import { fetchAllGameProgress } from "@/services/game";
 import {
   Problem,
   ProblemSolveRecord,
   DifficultyLevel,
   HintUsage,
+  IGameProgress,
 } from "@/lib/types";
 import {
-  Filter,
   Users,
   BookOpen,
-  X,
-  AlertCircle,
   Clock,
   Award,
   Lightbulb,
-  Calendar,
   Loader2,
-  User as UserIcon,
   Download,
+  LayoutDashboard,
+  Activity,
 } from "lucide-react";
 import * as XLSX from "xlsx";
-import Link from "next/link";
-import { type } from "os";
+import ProblemsList from "./ProblemList";
+import UsersList from "./UserList";
+import GameProgressList from "./GameProgressList";
 
 // ============================================================================
 // Types
 // ============================================================================
 
+type ViewState = "dashboard" | "problems" | "users" | "progress";
+
 interface SolveRecordFilters {
   problemId: string;
   userId: string;
-  isSolved: "all" | "solved" | "unsolved";
   level: DifficultyLevel | "all";
 }
+
+const DIFFICULTIES: DifficultyLevel[] = ["easy", "medium", "hard", "boss"];
 
 // ============================================================================
 // Sub-Components
 // ============================================================================
-
-const LoadingState = () => (
-  <div className="min-h-screen flex items-center justify-center">
-    <div className="text-center">
-      <Loader2 className="w-12 h-12 animate-spin text-blue-500 mx-auto mb-4" />
-      <p className="text-gray-600">Loading solve records...</p>
-    </div>
-  </div>
-);
-
-const ErrorState = ({
-  error,
-  onRetry,
-}: {
-  error: string;
-  onRetry: () => void;
-}) => (
-  <div className="min-h-screen flex items-center justify-center p-4">
-    <div className="max-w-md text-center">
-      <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
-      <h2 className="text-xl font-semibold text-gray-800 mb-2">
-        Error Loading Data
-      </h2>
-      <p className="text-gray-600 mb-4">{error}</p>
-      <button
-        onClick={onRetry}
-        className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
-      >
-        Retry
-      </button>
-    </div>
-  </div>
-);
-
-const DifficultyBadge = ({ difficulty }: { difficulty: string }) => {
-  const colors: Record<string, string> = {
-    easy: "bg-green-100 text-green-800 border-green-200",
-    medium: "bg-yellow-100 text-yellow-800 border-yellow-200",
-    hard: "bg-orange-100 text-orange-800 border-orange-200",
-    boss: "bg-red-100 text-red-800 border-red-200",
-  };
-
-  return (
-    <span
-      className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium border ${colors[difficulty]}`}
-    >
-      {difficulty.charAt(0).toUpperCase() + difficulty.slice(1)}
-    </span>
-  );
-};
 
 const LevelBadge = ({ level }: { level: string }) => {
   const colors: Record<string, string> = {
@@ -106,9 +59,7 @@ const LevelBadge = ({ level }: { level: string }) => {
 
   return (
     <span
-      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-        colors[level] || "bg-gray-100 text-gray-800"
-      }`}
+      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${colors[level] || "bg-gray-100 text-gray-800"}`}
     >
       {level.charAt(0).toUpperCase() + level.slice(1)}
     </span>
@@ -116,154 +67,47 @@ const LevelBadge = ({ level }: { level: string }) => {
 };
 
 const HintUsageDisplay = ({ hintUsages }: { hintUsages?: HintUsage[] }) => {
-  // 1. Safety check: If it's not an array or it's empty, show None
   if (!Array.isArray(hintUsages) || hintUsages.length === 0) {
-    return <span className="text-gray-400">None</span>;
+    return <span className="text-gray-400 text-sm italic">None</span>;
   }
 
-  // 2. Count occurrences of each level
-  const counts = hintUsages.reduce((acc, usage) => {
-    const level = usage.hintLevel?.toLowerCase() || "unknown";
-    acc[level] = (acc[level] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>);
-
-  // 3. Create the string (e.g., "1 big, 2 small")
-  const levelsString = Object.entries(counts)
-    .map(([level, count]) => `${count} ${level}`)
-    .join(", ");
+  const counts = hintUsages.reduce(
+    (acc, usage) => {
+      const level = usage.hintLevel?.toLowerCase() || "unknown";
+      acc[level] = (acc[level] || 0) + 1;
+      return acc;
+    },
+    {} as Record<string, number>,
+  );
 
   return (
     <div className="flex items-center gap-2">
-      <Lightbulb className="w-4 h-4 text-yellow-500 flex-shrink-0" />
-      <span className="text-sm text-gray-700 font-medium">{levelsString}</span>
+      <Lightbulb className="w-3.5 h-3.5 text-yellow-500 flex-shrink-0" />
+      <span className="text-sm text-gray-700">
+        {Object.entries(counts)
+          .map(([lvl, count]) => `${count} ${lvl}`)
+          .join(", ")}
+      </span>
     </div>
   );
 };
 
 const UserAvatar = ({ username }: { username: string }) => (
-  <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-medium flex-shrink-0">
+  <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-medium flex-shrink-0 border border-white">
     {username.charAt(0).toUpperCase()}
   </div>
 );
 
 // ============================================================================
-// Excel Export Utility Functions
-// ============================================================================
-
-const formatHintUsageForExcel = (hintUsages?: HintUsage[]): string => {
-  if (!hintUsages?.length) return "None";
-
-  const counts = hintUsages.reduce((acc, usage) => {
-    const level = usage.hintLevel.toLowerCase();
-    acc[level] = (acc[level] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>);
-
-  return Object.entries(counts)
-    .map(([level, count]) => `${count} ${level}`)
-    .join(", ");
-};
-
-const exportToExcel = (
-  records: ProblemSolveRecord[],
-  problemMap: Map<string, Problem>,
-  userMap: Map<string, User>,
-  filters: SolveRecordFilters
-) => {
-  // Prepare data for Excel
-  const excelData = records.map((record) => {
-    const problem = problemMap.get(record.problemId);
-    const user = userMap.get(record.userId);
-
-    return {
-      "Problem Title": problem?.title || "Unknown",
-      "Problem ID": record.problemId,
-      User: user?.username || "Unknown",
-      "User ID": record.userId,
-      Difficulty: problem?.difficulty || "-",
-      Level: problem?.difficulty || "-",
-      "Time Spent (seconds)": record.timeSpent,
-      "Points Earned": record.pointsEarned,
-      "Hints Used Details": formatHintUsageForExcel(record.hintUsages),
-      "Completed At": new Date(record.completedAt).toLocaleString(),
-      "Date (YYYY-MM-DD)": new Date(record.completedAt)
-        .toISOString()
-        .split("T")[0],
-      "Time (HH:MM:SS)": new Date(record.completedAt)
-        .toTimeString()
-        .split(" ")[0],
-    };
-  });
-
-  // Create worksheet
-  const worksheet = XLSX.utils.json_to_sheet(excelData);
-
-  // Create workbook
-  const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, "Solve Records");
-
-  // Add summary sheet
-  const summaryData = [
-    ["SOLVE RECORDS EXPORT SUMMARY"],
-    ["Export Date:", new Date().toLocaleString()],
-    ["Total Records:", records.length],
-    ["Filters Applied:"],
-    ["- Problem ID:", filters.problemId === "all" ? "All" : filters.problemId],
-    ["- User ID:", filters.userId === "all" ? "All" : filters.userId],
-    ["- Level:", filters.level === "all" ? "All" : filters.level],
-    ["- Status:", filters.isSolved === "all" ? "All" : filters.isSolved],
-    [],
-    ["DATA COLUMNS DESCRIPTION"],
-    ["Problem Title: Name of the coding problem"],
-    ["Problem ID: Unique identifier for the problem"],
-    ["User: Username of the solver"],
-    ["User ID: Unique identifier for the user"],
-    ["Difficulty: Problem difficulty level"],
-    ["Level: Problem level (easy, medium, hard, boss)"],
-    ["Time Spent (seconds): Time taken to solve in seconds"],
-    ["Points Earned: Points awarded for solving"],
-    ["Hints Used Details: Breakdown of hint levels used"],
-    ["Completed At: Full timestamp of completion"],
-    ["Date (YYYY-MM-DD): Completion date"],
-    ["Time (HH:MM:SS): Completion time"],
-  ];
-
-  const summarySheet = XLSX.utils.aoa_to_sheet(summaryData);
-  XLSX.utils.book_append_sheet(workbook, summarySheet, "Export Info");
-
-  // Set column widths
-  const maxWidths = excelData.reduce((acc, row) => {
-    Object.entries(row).forEach(([key, value]) => {
-      const length = String(value).length;
-      if (!acc[key] || length > acc[key]) {
-        acc[key] = length;
-      }
-    });
-    return acc;
-  }, {} as Record<string, number>);
-
-  worksheet["!cols"] = Object.keys(maxWidths).map((key) => ({
-    wch: Math.min(Math.max(maxWidths[key] || 10, key.length), 50),
-  }));
-
-  // Generate filename with timestamp
-  const timestamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
-  const filename = `solve-records-export-${timestamp}.xlsx`;
-
-  // Export file
-  XLSX.writeFile(workbook, filename);
-};
-
-// ============================================================================
-// Main Component
+// Main Dashboard Component
 // ============================================================================
 
 export default function SolveRecordsDashboard() {
-  // State
+  const [currentView, setCurrentView] = useState<ViewState>("dashboard");
   const [records, setRecords] = useState<ProblemSolveRecord[]>([]);
   const [problems, setProblems] = useState<Problem[]>([]);
   const [users, setUsers] = useState<User[]>([]);
+  const [allProgress, setAllProgress] = useState<IGameProgress[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
@@ -271,467 +115,340 @@ export default function SolveRecordsDashboard() {
   const [filters, setFilters] = useState<SolveRecordFilters>({
     problemId: "all",
     userId: "all",
-    isSolved: "all",
     level: "all",
   });
 
-  const [showAllProblems, setShowAllProblems] = useState(false);
-  const [showAllUsers, setShowAllUsers] = useState(false);
-
-  // Data Fetching
-  useEffect(() => {
-    const loadData = async () => {
-      try {
-        setLoading(true);
-        const [recordsRes, usersRes, problemsRes] = await Promise.all([
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      const [recordsRes, usersRes, problemsRes, progressRes] =
+        await Promise.all([
           fetchAllSolveRecords(),
           fetchAllUsers(),
           fetchAllProblems(),
+          fetchAllGameProgress(),
         ]);
 
-        if (recordsRes.success && usersRes.success && problemsRes.success) {
-          setRecords(recordsRes.data);
-          setUsers(usersRes.data);
-          setProblems(problemsRes.problems);
-          setError(null);
-        } else {
-          setError("Failed to fetch data. Please try again.");
-        }
-      } catch (e) {
-        console.error("Data loading error:", e);
-        setError("An unexpected error occurred.");
-      } finally {
-        setLoading(false);
+      if (
+        recordsRes.success &&
+        usersRes.success &&
+        problemsRes.success &&
+        progressRes.success
+      ) {
+        setRecords(recordsRes.data);
+        setUsers(usersRes.data);
+        setProblems(problemsRes.problems);
+        setAllProgress(progressRes.data);
+        setError(null);
+      } else {
+        setError("Failed to fetch data.");
       }
-    };
+    } catch (e) {
+      setError("An unexpected error occurred.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  useEffect(() => {
     loadData();
   }, []);
 
-  // Memoized data and calculations
+  const userMap = useMemo(
+    () => new Map<string, User>(users.map((u) => [u._id, u])),
+    [users],
+  );
   const problemMap = useMemo(
-    () => new Map(problems.map((p) => [p._id, p])),
-    [problems]
+    () => new Map<string, Problem>(problems.map((p) => [p._id, p])),
+    [problems],
   );
 
-  const userMap = useMemo(() => new Map(users.map((u) => [u._id, u])), [users]);
+  const uniqueProblems = useMemo(
+    () => Array.from(problemMap.values()),
+    [problemMap],
+  );
+  const uniqueUsers = useMemo(() => Array.from(userMap.values()), [userMap]);
 
-  // FIXED: Get unique problems for dropdown (remove duplicates)
-  const uniqueProblems = useMemo(() => {
-    const seen = new Set<string>();
-    return problems.filter((problem) => {
-      if (seen.has(problem._id)) {
-        return false;
-      }
-      seen.add(problem._id);
-      return true;
-    });
-  }, [problems]);
-
-  // FIXED: Get unique users for dropdown
-  const uniqueUsers = useMemo(() => {
-    const seen = new Set<string>();
-    return users.filter((user) => {
-      if (seen.has(user._id)) {
-        return false;
-      }
-      seen.add(user._id);
-      return true;
-    });
-  }, [users]);
-
-  // FIXED: Correct filtering logic
   const filteredRecords = useMemo(() => {
     return records.filter((record) => {
       const problem = problemMap.get(record.problemId);
-      const user = userMap.get(record.userId);
-
-      // If no problem/user found, skip
-      if (!problem || !user) return false;
-
-      // Problem ID filter
-      if (filters.problemId !== "all" && record.problemId !== filters.problemId)
-        return false;
-
-      // User ID filter
-      if (filters.userId !== "all" && record.userId !== filters.userId)
-        return false;
-
-      // Level filter
-      if (filters.level !== "all" && problem.difficulty !== filters.level)
-        return false;
-
-      // Solved/Unsolved filter
-      if (filters.isSolved !== "all") {
-        const isSolved = record.pointsEarned > 0; // Assuming points > 0 means solved
-        if (filters.isSolved === "solved" && !isSolved) return false;
-        if (filters.isSolved === "unsolved" && isSolved) return false;
-      }
-
-      return true;
+      if (!problem) return false;
+      const matchesProblem =
+        filters.problemId === "all" || record.problemId === filters.problemId;
+      const matchesUser =
+        filters.userId === "all" || record.userId === filters.userId;
+      const matchesLevel =
+        filters.level === "all" || problem.difficulty === filters.level;
+      return matchesProblem && matchesUser && matchesLevel;
     });
-  }, [records, filters, problemMap, userMap]);
+  }, [records, filters, problemMap]);
 
-  // Handlers
-  const handleFilterChange = (key: keyof SolveRecordFilters, value: string) => {
-    setFilters((prev) => ({ ...prev, [key]: value }));
-  };
-
-  const clearFilters = () => {
-    setFilters({
-      problemId: "all",
-      userId: "all",
-      isSolved: "all",
-      level: "all",
-    });
-  };
-
-  const handleExportToExcel = () => {
-    if (filteredRecords.length === 0) {
-      alert("No records to export. Please adjust your filters.");
-      return;
-    }
-
+  const handleExport = () => {
     try {
       setExporting(true);
-      exportToExcel(filteredRecords, problemMap, userMap, filters);
-    } catch (error) {
-      console.error("Export failed:", error);
-      alert("Failed to export to Excel. Please try again.");
+      const excelData = filteredRecords.map((record) => {
+        const problem = problemMap.get(record.problemId);
+        const user = userMap.get(record.userId);
+        return {
+          Problem: problem?.title || "Unknown",
+          User: user?.username || "Unknown",
+          Difficulty: problem?.difficulty || "-",
+          Seconds: record.timeSpent,
+          Points: record.pointsEarned,
+          Completion_Time: new Date(record.completedAt).toLocaleString("en-GB"),
+        };
+      });
+
+      const worksheet = XLSX.utils.json_to_sheet(excelData);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Records");
+      XLSX.writeFile(
+        workbook,
+        `SolveRecords_${new Date().toISOString().split("T")[0]}.xlsx`,
+      );
+    } catch (err) {
+      console.error("Export Error:", err);
     } finally {
       setExporting(false);
     }
   };
 
-  const difficultyLevels = ["easy", "medium", "hard", "boss"];
-
-  // Render states
-  if (loading) return <LoadingState />;
-  if (error)
+  if (loading)
     return (
-      <ErrorState error={error} onRetry={() => window.location.reload()} />
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <Loader2 className="w-10 h-10 animate-spin text-blue-500 mx-auto mb-4" />
+          <p className="text-gray-400 font-medium">Loading Learning Data...</p>
+        </div>
+      </div>
     );
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100 p-4 md:p-6">
-      <div className="max-w-7xl mx-auto space-y-8">
-        {/* Header */}
+    <div className="min-h-screen bg-gray-50 p-4 md:p-8">
+      <div className="max-w-7xl mx-auto space-y-6">
+        {/* View Switcher */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900 tracking-tight">
-              Solve Records Dashboard
-            </h1>
-            <p className="text-gray-600 mt-2">
-              Analyzing {filteredRecords.length} of {records.length} total
-              records
-            </p>
-          </div>
-
-          <div className="flex flex-wrap gap-2">
-            {/* Problems Button as Link */}
-            <Link
-              href="/reports/problems"
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 transition-colors"
+          <div className="flex bg-white p-1.5 rounded-2xl shadow-sm border border-gray-200 self-start overflow-x-auto">
+            <button
+              onClick={() => setCurrentView("dashboard")}
+              className={`flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-semibold transition-all whitespace-nowrap ${currentView === "dashboard" ? "bg-blue-600 text-white shadow-md shadow-blue-200" : "text-gray-500 hover:text-gray-900"}`}
             >
-              <BookOpen className="w-4 h-4" />
-              Problems ({problems.length})
-            </Link>
-
-            {/* Users Button as Link */}
-            <Link
-              href="/reports/users"
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 transition-colors"
+              <LayoutDashboard className="w-4 h-4" /> Dashboard
+            </button>
+            <button
+              onClick={() => setCurrentView("progress")}
+              className={`flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-semibold transition-all whitespace-nowrap ${currentView === "progress" ? "bg-blue-600 text-white shadow-md shadow-blue-200" : "text-gray-500 hover:text-gray-900"}`}
             >
-              <Users className="w-4 h-4" />
-              Users ({users.length})
-            </Link>
+              <Activity className="w-4 h-4" /> Live Progress
+            </button>
+            <button
+              onClick={() => setCurrentView("problems")}
+              className={`flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-semibold transition-all whitespace-nowrap ${currentView === "problems" ? "bg-blue-600 text-white shadow-md shadow-blue-200" : "text-gray-500 hover:text-gray-900"}`}
+            >
+              <BookOpen className="w-4 h-4" /> Problems
+            </button>
+            <button
+              onClick={() => setCurrentView("users")}
+              className={`flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-semibold transition-all whitespace-nowrap ${currentView === "users" ? "bg-blue-600 text-white shadow-md shadow-blue-200" : "text-gray-500 hover:text-gray-900"}`}
+            >
+              <Users className="w-4 h-4" /> Users
+            </button>
           </div>
         </div>
 
-        {/* Filters Card */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-blue-50 rounded-lg">
-                <Filter className="w-5 h-5 text-blue-600" />
-              </div>
-              <div>
-                <h2 className="text-lg font-semibold text-gray-900">
-                  Filter Records
-                </h2>
-                <p className="text-sm text-gray-500">
-                  Refine your search with multiple filters
-                </p>
-              </div>
-            </div>
-            <div className="flex gap-2">
-              <button
-                onClick={clearFilters}
-                className="inline-flex items-center gap-2 px-4 py-2 text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
-              >
-                <X className="w-4 h-4" />
-                Clear filters
-              </button>
-            </div>
-          </div>
+        {/* View Rendering */}
+        {currentView === "problems" && (
+          <ProblemsList problems={problems} loading={false} error={null} />
+        )}
+        {currentView === "users" && (
+          <UsersList users={users} loading={false} error={null} />
+        )}
+        {currentView === "progress" && (
+          <GameProgressList progressData={allProgress} userMap={userMap} />
+        )}
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Problem Filter */}
-            <div className="space-y-3">
-              <label className="block text-sm font-medium text-gray-700">
-                Problem
-              </label>
-              <select
-                value={filters.problemId}
-                onChange={(e) =>
-                  handleFilterChange("problemId", e.target.value)
-                }
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors bg-white"
-              >
-                <option value="all">
-                  All Problems ({uniqueProblems.length})
-                </option>
-                {uniqueProblems.map((p) => (
-                  <option key={p._id} value={p._id}>
-                    {p.title}
-                  </option>
-                ))}
-                {uniqueProblems.length === 0 && (
-                  <option disabled>No problems available</option>
-                )}
-              </select>
-            </div>
-
-            {/* User Filter */}
-            <div className="space-y-3">
-              <label className="block text-sm font-medium text-gray-700">
-                User
-              </label>
-              <select
-                value={filters.userId}
-                onChange={(e) => handleFilterChange("userId", e.target.value)}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors bg-white"
-              >
-                <option value="all">All Users ({uniqueUsers.length})</option>
-                {uniqueUsers.map((u) => (
-                  <option key={u._id} value={u._id}>
-                    {u.username}
-                  </option>
-                ))}
-                {uniqueUsers.length === 0 && (
-                  <option disabled>No users available</option>
-                )}
-              </select>
-            </div>
-
-            {/* Level Filter */}
-            <div className="space-y-3">
-              <label className="block text-sm font-medium text-gray-700">
-                Level
-              </label>
-              <select
-                value={filters.level}
-                onChange={(e) => handleFilterChange("level", e.target.value)}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors bg-white"
-              >
-                <option value="all">All Levels</option>
-                <option value="easy">Easy</option>
-                <option value="medium">Medium</option>
-                <option value="hard">Hard</option>
-                <option value="boss">Boss</option>
-              </select>
-            </div>
-
-            {/* Status Filter */}
-            <div className="space-y-3">
-              <label className="block text-sm font-medium text-gray-700">
-                Status
-              </label>
-              <select
-                value={filters.isSolved}
-                onChange={(e) => handleFilterChange("isSolved", e.target.value)}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors bg-white"
-              >
-                <option value="all">All Records</option>
-                <option value="solved">Solved Only</option>
-                <option value="unsolved">Unsolved Only</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Export Info */}
-          <div className="mt-6 pt-6 border-t border-gray-200">
-            <div className="flex items-center justify-between">
-              <div className="text-sm text-gray-500">
-                {filteredRecords.length} record(s) available for export
-              </div>
-              <button
-                onClick={handleExportToExcel}
-                disabled={exporting || filteredRecords.length === 0}
-                className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
-                  exporting || filteredRecords.length === 0
-                    ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                    : "bg-green-500 text-white hover:bg-green-600"
-                }`}
-              >
-                {exporting ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Exporting...
-                  </>
-                ) : (
-                  <>
-                    <Download className="w-4 h-4" />
-                    Download Excel
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Records Table */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900">
-                  Solve Records
-                </h3>
-                <p className="text-sm text-gray-500">
-                  {filteredRecords.length} record
-                  {filteredRecords.length !== 1 ? "s" : ""} found
-                </p>
-              </div>
-              <div className="text-sm text-gray-500">
-                Sorted by completion date
-              </div>
-            </div>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+        {currentView === "dashboard" && (
+          <div className="space-y-6 animate-in fade-in duration-500">
+            {/* Filter Card */}
+            <div className="bg-white rounded-3xl shadow-sm border border-gray-200 p-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">
                     Problem
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    User
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  </label>
+                  <select
+                    value={filters.problemId}
+                    onChange={(e) =>
+                      setFilters((f) => ({ ...f, problemId: e.target.value }))
+                    }
+                    className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl outline-none"
+                  >
+                    <option value="all">All Problems</option>
+                    {uniqueProblems.map((p) => (
+                      <option key={p._id} value={p._id}>
+                        {p.title}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">
+                    Student
+                  </label>
+                  <select
+                    value={filters.userId}
+                    onChange={(e) =>
+                      setFilters((f) => ({ ...f, userId: e.target.value }))
+                    }
+                    className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl outline-none"
+                  >
+                    <option value="all">All Users</option>
+                    {uniqueUsers.map((u) => (
+                      <option key={u._id} value={u._id}>
+                        {u.username}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">
                     Level
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    <Clock className="w-4 h-4 inline mr-1" />
-                    Time
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    <Award className="w-4 h-4 inline mr-1" />
-                    Points
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Hints Used
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    <Calendar className="w-4 h-4 inline mr-1" />
-                    Completed
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {filteredRecords.length > 0 ? (
-                  filteredRecords.map((record) => {
-                    const problem = problemMap.get(record.problemId);
-                    const user = userMap.get(record.userId);
+                  </label>
+                  <select
+                    value={filters.level}
+                    onChange={(e) =>
+                      setFilters((f) => ({
+                        ...f,
+                        level: e.target.value as DifficultyLevel | "all",
+                      }))
+                    }
+                    className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl outline-none capitalize"
+                  >
+                    <option value="all">Any Difficulty</option>
+                    {DIFFICULTIES.map((l) => (
+                      <option key={l} value={l}>
+                        {l}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
 
-                    return (
-                      <tr
-                        key={`${record.userId}-${record.problemId}-${record.completedAt}`}
-                        className="hover:bg-gray-50 transition-colors group"
-                      >
-                        <td className="px-6 py-4">
-                          <div className="font-medium text-gray-900 group-hover:text-blue-600 transition-colors">
-                            {problem?.title || "Unknown Problem"}
-                          </div>
-                          <div className="text-sm text-gray-500">
-                            ID: {record.problemId.slice(0, 8)}...
-                          </div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-3">
-                            <UserAvatar
-                              username={user?.username || "Unknown"}
-                            />
-                            <div>
-                              <span className="text-gray-700">
-                                {user?.username || "Unknown User"}
-                              </span>
-                              <div className="text-sm text-gray-500">
-                                ID: {record.userId.slice(0, 8)}...
+              <div className="mt-6 pt-6 border-t border-gray-100 flex items-center justify-between">
+                <p className="text-sm text-gray-500">
+                  Found{" "}
+                  <span className="font-bold text-gray-900">
+                    {filteredRecords.length}
+                  </span>{" "}
+                  matching entries
+                </p>
+                <button
+                  onClick={handleExport}
+                  disabled={filteredRecords.length === 0 || exporting}
+                  className="inline-flex items-center gap-2 px-6 py-2 bg-green-600 text-white rounded-xl hover:bg-green-700 disabled:opacity-50 transition-all font-semibold text-sm"
+                >
+                  <Download className="w-4 h-4" />{" "}
+                  {exporting ? "Generating..." : "Export to Excel"}
+                </button>
+              </div>
+            </div>
+
+            {/* Table */}
+            <div className="bg-white rounded-3xl shadow-sm border border-gray-200 overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left">
+                  <thead className="bg-gray-50/50 border-b border-gray-100">
+                    <tr>
+                      <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase">
+                        Problem
+                      </th>
+                      <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase">
+                        User
+                      </th>
+                      <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase">
+                        Performance
+                      </th>
+                      <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase">
+                        Hints Usage
+                      </th>
+                      <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase">
+                        Completed At
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {filteredRecords.length > 0 ? (
+                      filteredRecords.map((record) => {
+                        const problem = problemMap.get(record.problemId);
+                        const user = userMap.get(record.userId);
+                        const dateObj = new Date(record.completedAt);
+                        return (
+                          <tr
+                            key={`${record.userId}-${record.problemId}-${record.completedAt}`}
+                            className="hover:bg-blue-50/30 transition-colors"
+                          >
+                            <td className="px-6 py-4">
+                              <p className="font-bold text-gray-900">
+                                {problem?.title || "???"}
+                              </p>
+                              <LevelBadge level={problem?.difficulty || ""} />
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="flex items-center gap-3">
+                                <UserAvatar username={user?.username || "U"} />
+                                <span className="text-sm font-medium text-gray-700">
+                                  {user?.username || "Unknown"}
+                                </span>
                               </div>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4">
-                          {problem?.difficulty && (
-                            <LevelBadge level={problem.difficulty} />
-                          )}
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-2 text-gray-700">
-                            <Clock className="w-4 h-4 text-gray-400 flex-shrink-0" />
-                            <span>{record.timeSpent}s</span>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-2 text-gray-700">
-                            <Award className="w-4 h-4 text-yellow-500 flex-shrink-0" />
-                            <span className="font-medium">
-                              {record.pointsEarned}
-                            </span>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <HintUsageDisplay hintUsages={record.hintUsages} />
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-2 text-gray-600">
-                            <Calendar className="w-4 h-4 text-gray-400 flex-shrink-0" />
-                            <span>
-                              {new Date(record.completedAt).toLocaleDateString(
-                                "en-US",
-                                {
-                                  year: "numeric",
-                                  month: "short",
-                                  day: "numeric",
-                                }
-                              )}
-                            </span>
-                          </div>
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="flex items-center gap-4">
+                                <span className="flex items-center gap-1 text-sm font-mono bg-blue-50 text-blue-700 px-2 py-1 rounded-lg">
+                                  <Clock className="w-3 h-3" />{" "}
+                                  {record.timeSpent}s
+                                </span>
+                                <span className="flex items-center gap-1 text-sm font-bold text-green-700">
+                                  <Award className="w-4 h-4" />{" "}
+                                  {record.pointsEarned}
+                                </span>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4">
+                              <HintUsageDisplay
+                                hintUsages={record.hintUsages}
+                              />
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="text-sm text-gray-900 font-medium">
+                                {dateObj.toLocaleDateString("en-GB")}
+                              </div>
+                              <div className="text-xs text-gray-500">
+                                {dateObj.toLocaleTimeString("en-GB", {
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                  second: "2-digit",
+                                })}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    ) : (
+                      <tr>
+                        <td
+                          colSpan={5}
+                          className="py-20 text-center text-gray-400"
+                        >
+                          No records found.
                         </td>
                       </tr>
-                    );
-                  })
-                ) : (
-                  <tr>
-                    <td colSpan={8} className="px-6 py-12 text-center">
-                      <div className="max-w-sm mx-auto text-gray-400">
-                        <Filter className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                        <p className="text-lg font-medium text-gray-500 mb-2">
-                          No matching records
-                        </p>
-                        <p className="text-sm">
-                          Try adjusting your filters or search terms
-                        </p>
-                      </div>
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );

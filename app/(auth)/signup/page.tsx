@@ -18,7 +18,7 @@ export default function SignUpPage() {
   useEffect(() => {
     const storedUser = localStorage.getItem("user");
     if (storedUser) {
-      router.replace("/game");
+      router.replace("/");
     }
   }, [router]);
 

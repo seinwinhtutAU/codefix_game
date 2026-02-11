@@ -17,7 +17,7 @@ export default function LoginPage() {
   useEffect(() => {
     const storedUser = localStorage.getItem("user");
     if (storedUser) {
-      router.replace("/game");
+      router.replace("/");
     }
   }, [router]);
 

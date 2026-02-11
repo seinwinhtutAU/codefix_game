@@ -12,6 +12,11 @@ export async function getPlayerProgress() {
   return await response.json();
 }
 
+export const fetchAllGameProgress = async () => {
+  const response = await fetch("/api/game-progress");
+  return response.json();
+};
+
 export async function saveGameProgress(progress: IGameProgress): Promise<void> {
   console.log("saveGameProgress payload: ", JSON.stringify(progress, null, 2));
 

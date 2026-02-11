@@ -1,12 +1,14 @@
 @import "tailwindcss";
 
-/* @import url('https://fonts.googleapis.com/css2?family=Gluten:wght@100..900&display=swap');
+pre {
+  @apply overflow-x-auto;
+}
 
-.font-gluten {
-  font-family: 'Gluten', cursive;
-} */
+code {
+  @apply font-mono text-sm;
+}
 
-@layer base {
+/* @layer base {
   html,
   body,
   :root {
@@ -51,4 +53,4 @@
   border-radius: 50% 0 0 50%;
   shape-outside: circle(50% at 50% 50%);
   margin-right: 1em;
-}
+} */

@@ -107,11 +107,14 @@ export function useExecutor({
 
       console.log("test cases: ", JSON.stringify(request, null, 2));
 
-      const response = await fetch("http://0.0.0.0:8000/api/execute/test", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(request),
-      });
+      const response = await fetch(
+        "https://fastapi-code.up.railway.app/api/execute/test",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(request),
+        },
+      );
 
       const data = await response.json();
       const result = formatTestExecutionResult(data);
