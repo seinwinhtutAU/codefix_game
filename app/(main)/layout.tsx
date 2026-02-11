@@ -25,9 +25,11 @@ export default function MainLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+    <div
+      className={`${geistSans.variable} ${geistMono.variable} antialiased flex flex-col min-h-screen`}
+    >
       <MenuBar />
       <main className="flex-1">{children}</main>
-    </body>
+    </div>
   );
 }
