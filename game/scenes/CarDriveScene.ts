@@ -184,7 +184,7 @@ export default class CarDriveScene extends GameScene {
     const roadY = 635;
     const shadowYOffset = 55;
 
-    this.car = this.add.sprite(400, roadY, "car");
+    this.car = this.add.sprite(400, roadY, "car_player");
     this.car.setDisplaySize(260, 130);
     this.car.setDepth(100);
 
@@ -229,7 +229,7 @@ export default class CarDriveScene extends GameScene {
 
     this.tweens.add({
       targets: this.car,
-      y: roadY - 1,
+      y: roadY - 0.5,
       duration: 100,
       yoyo: true,
       repeat: -1,
@@ -451,10 +451,10 @@ export default class CarDriveScene extends GameScene {
     this.solveButton = new Button(this, {
       x: this.SCREEN_WIDTH / 2,
       y: this.SCREEN_HEIGHT / 2,
-      width: 150,
-      height: 50,
+      width: 165,
+      height: 55,
       text: "START >",
-      color: 0x2ecc71,
+      color: 0x4a90e2,
       onClick: async () => {
         this.solveButton.setEnabled(false);
 

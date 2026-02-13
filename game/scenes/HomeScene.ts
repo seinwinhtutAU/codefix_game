@@ -34,7 +34,9 @@ export default class HomeScene extends GameScene {
       x: 1250,
       y: 700,
       text: "Next >>",
-      color: 0x2ecc71,
+      width: 165,
+      height: 55,
+      color: 0x4a90e2,
       onClick: () => {
         this.handleSceneComplete();
       },

@@ -61,7 +61,7 @@ export default class MainMenuScene extends GameScene {
       width: 240,
       height: 60,
       text: "LEVELS",
-      color: 0x4a90e2, // Softer pink for secondary action
+      color: 0x4a90e2,
       textStyle: {
         fontFamily: "Gluten",
         fontSize: "24px",

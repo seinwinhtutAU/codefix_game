@@ -18,7 +18,7 @@ export interface ButtonConfig {
 export default class Button extends Phaser.GameObjects.Container {
   private bg: Phaser.GameObjects.Graphics;
   private label: Phaser.GameObjects.Text;
-  private hitZone: Phaser.GameObjects.Zone; // <--- The secret weapon
+  private hitZone: Phaser.GameObjects.Zone;
   private config: ButtonConfig;
   private isDisabled = false;
   private baseColor: number;

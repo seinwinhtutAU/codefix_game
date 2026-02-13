@@ -38,7 +38,9 @@ export default class OfficeScene extends GameScene {
       x: width - 150,
       y: height - 100,
       text: "NEXT >",
-      color: 0x2ecc71,
+      width: 165,
+      height: 55,
+      color: 0x4a90e2,
       onClick: () => {
         this.completeOffice();
       },

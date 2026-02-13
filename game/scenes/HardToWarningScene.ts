@@ -2,6 +2,11 @@ import GameScene from "./GameScene";
 import AudioManager from "../AudioManager";
 
 export default class HardToWarningScene extends GameScene {
+  private worldContainer!: Phaser.GameObjects.Container;
+  private clouds: Phaser.GameObjects.Image[] = [];
+  private car!: Phaser.GameObjects.Sprite;
+  private dustEmitter!: Phaser.GameObjects.Particles.ParticleEmitter;
+
   constructor() {
     super("HardToWarningScene");
   }
@@ -13,13 +18,16 @@ export default class HardToWarningScene extends GameScene {
     // 1. Create a "Smoke" texture
     const graphics = this.make.graphics({ x: 0, y: 0 });
     graphics.fillStyle(0xffffff, 1);
-    graphics.fillCircle(10, 10, 10);
-    graphics.generateTexture("smoke_puff", 20, 20);
+    graphics.fillCircle(8, 8, 8);
+    graphics.generateTexture("dust", 16, 16);
     graphics.destroy();
 
-    // 2. Add Text
+    // 2. Setup the Moving World (Container)
+    this.setupWorld();
+
+    // 3. Add Text (Stay on screen, not in container)
     const text = this.add
-      .text(this.scale.width / 2, 300, "The Next Day. Heading to Office...", {
+      .text(this.scale.width / 2, 300, "The Next Day.\n Heading to Office...", {
         fontFamily: '"Press Start 2P", monospace',
         fontSize: "28px",
         color: "#ffffff",
@@ -27,37 +35,33 @@ export default class HardToWarningScene extends GameScene {
         strokeThickness: 6,
         align: "center",
       })
-      .setOrigin(0.5);
-    text.setAlpha(0);
+      .setOrigin(0.5)
+      .setAlpha(0);
 
-    // 3. ADD THE LINE BELOW THE CAR
-    // We place it at y = 560 so the car (at y = 500) looks like it sits on it
-    const groundLine = this.add.rectangle(
-      this.scale.width / 2,
-      510,
-      this.scale.width,
-      4,
-      0xffffff,
-    );
-    groundLine.setAlpha(0.3); // Make it a bit subtle/transparent
+    // 4. Add Car (Static on screen while world moves)
+    this.car = this.add.sprite(400, 650, "car_player");
+    this.car.setDisplaySize(260, 130);
 
-    // 4. Add Car
-    const car = this.add.sprite(-200, 500, "car");
-    car.setScale(0.4);
-
-    // 5. Create Exhaust Particles
-    const emitter = this.add.particles(0, 0, "smoke_puff", {
-      speed: { min: 20, max: 50 },
-      angle: { min: 160, max: 200 },
-      scale: { start: 0.3, end: 0 },
-      alpha: { start: 0.5, end: 0 },
-      lifespan: 800,
-      frequency: 150,
-      follow: car,
-      followOffset: { x: -60, y: 20 },
+    // 5. Dust Emitter
+    this.dustEmitter = this.add.particles(0, 0, "dust", {
+      scale: { start: 0.4, end: 3.0 },
+      x: { min: -5, max: 10 },
+      y: { min: -5, max: 5 },
+      alpha: { start: 0.4, end: 0 },
+      lifespan: 1000,
+      speed: { min: 30, max: 100 },
+      angle: { min: 140, max: 240 },
+      gravityY: -40,
+      blendMode: "NORMAL",
+      tint: 0xcccccc,
+      frequency: 30,
+      follow: this.car,
+      followOffset: { x: -140, y: 15 },
     });
 
-    // 6. Animation Sequence
+    // --- ANIMATIONS ---
+
+    // Fade text in and out
     this.tweens.add({
       targets: text,
       alpha: 1,
@@ -66,17 +70,75 @@ export default class HardToWarningScene extends GameScene {
       yoyo: true,
     });
 
+    // Move the WORLD (Everything moves left, making car look like it's going right)
     this.tweens.add({
-      targets: car,
-      x: 1600,
-      delay: 500,
+      targets: this.worldContainer,
+      x: -2000, // Distance to travel
       duration: 8000,
       ease: "Linear",
       onComplete: () => {
-        emitter.stop();
+        this.dustEmitter.stop();
         this.transitionToHome();
       },
     });
+
+    // Car engine vibration
+    this.tweens.add({
+      targets: this.car,
+      y: 650 - 1.5,
+      duration: 100,
+      yoyo: true,
+      repeat: -1,
+    });
+  }
+
+  update() {
+    // Cloud drifting logic
+    this.clouds.forEach((cloud) => {
+      const speed = cloud.getData("driftSpeed");
+      cloud.x -= speed;
+      if (cloud.x < -200) cloud.x = 2500;
+    });
+  }
+
+  private setupWorld() {
+    this.worldContainer = this.add.container(0, 0);
+
+    // Background Image
+    const bg1 = this.add.image(0, 0, "car_bg_1").setOrigin(0, 0);
+    const bg2 = this.add.image(1376, 0, "car_bg_1").setOrigin(0, 0);
+    this.worldContainer.add(bg1);
+    this.worldContainer.add(bg2);
+
+    // Sun
+    const sun = this.add
+      .image(this.scale.width / 2 - 100, 100, "sun")
+      .setScale(0.5);
+    this.worldContainer.add(sun);
+
+    // Clouds
+    const cloudPositions = [
+      { x: 200, y: 200 },
+      { x: 800, y: 100 },
+      { x: 1400, y: 150 },
+      { x: 2000, y: 120 },
+    ];
+
+    cloudPositions.forEach((pos) => {
+      const cloud = this.add
+        .image(pos.x, pos.y, "car_cloud")
+        .setScale(0.5)
+        .setAlpha(0.5);
+      cloud.setData("driftSpeed", Phaser.Math.FloatBetween(0.2, 0.5));
+      this.clouds.push(cloud);
+      this.worldContainer.add(cloud);
+    });
+
+    // Building/City Scenery
+    const building = this.add.image(0, 30, "car_building").setOrigin(0, 0);
+    const light = this.add.image(100, 500, "transition-light").setOrigin(0);
+
+    this.worldContainer.add([building, light]);
   }
 
   private initAudio() {

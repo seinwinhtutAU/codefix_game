@@ -74,6 +74,11 @@ export default class PreloadScene extends Phaser.Scene {
     // Easy Level
     this.load.image("house-bg", "/easy/house-bg.png");
     this.load.image("car", "/easy/car.png");
+    this.load.image("car_player", "/car_player.png");
+    this.load.svg("car_family", "/car_family.svg", {
+      width: 682,
+      height: 318,
+    });
     this.load.image("police_car", "/easy/police_car.png");
     this.load.image("office-bg", "/easy/office_bg.png");
     this.load.image("sun", "/easy/bg/sun.png");
@@ -128,6 +133,12 @@ export default class PreloadScene extends Phaser.Scene {
     this.load.image("level-core", "/system_core.png");
     this.load.image("menu-bg", "/menu-bg.png");
     this.load.image("level-bg", "/level-bg.png");
+
+    // Transition
+    this.load.image("transition-dark-bg", "/transition/bg.png");
+    this.load.image("transition-dark-building", "/transition/building1.png");
+    this.load.image("transition-light", "/transition/light.png");
+    this.load.image("moon", "/transition/moon.png");
   }
 
   create() {

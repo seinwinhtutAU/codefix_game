@@ -65,8 +65,10 @@ export default class PlayGroundScene extends GameScene {
     this.nextButton = new Button(this, {
       x: width - 150,
       y: height - 80,
-      text: "NEXT >>",
-      color: 0x2ecc71,
+      text: "NEXT >",
+      width: 165,
+      height: 55,
+      color: 0x4a90e2,
       onClick: async () => {
         this.nextButton.setEnabled(false);
         await this.savePlaygroundCompletion();
@@ -164,8 +166,9 @@ export default class PlayGroundScene extends GameScene {
     this.shadow.setAlpha(0.5);
     this.shadow.setDepth(99);
 
-    this.car = this.add.sprite(400, roadY, "car");
+    this.car = this.add.sprite(400, roadY, "car_family");
     this.car.setDisplaySize(260, 130);
+
     this.car.setDepth(100);
 
     this.dustEmitter = this.add.particles(
@@ -189,8 +192,8 @@ export default class PlayGroundScene extends GameScene {
 
     this.tweens.add({
       targets: this.car,
-      y: roadY - 2,
-      duration: 150,
+      y: roadY - 1,
+      duration: 100,
       yoyo: true,
       repeat: -1,
     });

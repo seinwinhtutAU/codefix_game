@@ -168,7 +168,7 @@ export default function DebuggingQuiz({
         <GameNotification
           type="SUCCESS"
           title="QUIZ COMPLETED!"
-          message={`You scored ${score} out of ${QUESTIONS.length}`}
+          message={""}
           points={500}
           onConfirm={handleQuizNotificationConfirm}
           confirmLabel={isSaving ? "SAVING..." : "BACK TO GAME"}

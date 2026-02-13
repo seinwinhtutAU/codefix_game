@@ -616,9 +616,6 @@ export default class HardLevelScene extends GameScene {
     const btnX = width - 150;
     const btnY = height - 80;
 
-    // 3. Create a custom Large Yellow Button
-    // Note: Using your existing Button class if it exists,
-    // or creating a quick graphics-based one here:
     const nextBtnContainer = this.add.container(btnX, btnY).setDepth(1000);
 
     const bg = this.add.graphics();
