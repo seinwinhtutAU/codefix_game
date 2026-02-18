@@ -204,11 +204,12 @@ export default class HardLevelScene extends GameScene {
   }
 
   private drawRoadProgress() {
-    if (!this.roadProgressGraphics) {
-      this.roadProgressGraphics = this.add.graphics();
-      this.roadProgressGraphics.setDepth(1); // Above map, below points
+    if (this.roadProgressGraphics) {
+      this.roadProgressGraphics.destroy();
     }
-    this.roadProgressGraphics.clear();
+
+    this.roadProgressGraphics = this.add.graphics();
+    this.roadProgressGraphics.setDepth(1);
 
     if (this.currentPointIndex === 0) return;
 
@@ -589,7 +590,14 @@ export default class HardLevelScene extends GameScene {
 
       await Promise.all(promises);
 
-      this.calculateCurrentIndex();
+      const savedIndex =
+        this.savedProgress?.gameState?.currentTask?.currentActiveIndex;
+
+      if (savedIndex !== undefined && savedIndex !== null) {
+        this.currentPointIndex = savedIndex;
+      } else {
+        this.calculateCurrentIndex();
+      }
 
       this.updatePointUI();
     } finally {

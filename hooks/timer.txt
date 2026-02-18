@@ -5,7 +5,7 @@ export function useSolvingTimer(
   initialTimeSpent: number,
   hasCompleted: boolean,
   problem: Problem | null,
-  timeLimit: number = 30
+  timeLimit: number = 30,
 ) {
   const [totalTimeSpent, setTotalTimeSpent] =
     useState<number>(initialTimeSpent);

@@ -6,14 +6,35 @@ export function useSolvingTimer(
   hasCompleted: boolean,
   problem: Problem | null,
   timeLimit: number = 30,
+  problemId: string, // Pass problemId explicitly to avoid waiting for the full object
 ) {
-  const [totalTimeSpent, setTotalTimeSpent] =
-    useState<number>(initialTimeSpent);
+  const storageKey = `timer_${problemId}`;
+
+  const [totalTimeSpent, setTotalTimeSpent] = useState<number>(() => {
+    if (typeof window === "undefined") return initialTimeSpent;
+
+    const saved = localStorage.getItem(`timer_${problemId}`);
+    const savedTime = Number(saved);
+
+    if (!Number.isNaN(savedTime)) {
+      return savedTime;
+    }
+
+    return initialTimeSpent;
+  });
   const [isSolving, setIsSolving] = useState<boolean>(true);
   const [isTimeUp, setIsTimeUp] = useState(false);
 
+  // 2. Persist changes to LocalStorage
   useEffect(() => {
-    let interval: NodeJS.Timeout;
+    if (!hasCompleted && totalTimeSpent > 0) {
+      localStorage.setItem(storageKey, totalTimeSpent.toString());
+    }
+  }, [totalTimeSpent, storageKey, hasCompleted]);
+
+  // 3. The Interval Logic
+  useEffect(() => {
+    let interval: ReturnType<typeof setInterval>;
 
     if (isSolving && !hasCompleted && problem && !isTimeUp) {
       interval = setInterval(() => {
@@ -35,10 +56,11 @@ export function useSolvingTimer(
   }, [isSolving, hasCompleted, problem, timeLimit, isTimeUp]);
 
   const resetTimer = useCallback(() => {
+    localStorage.removeItem(storageKey);
     setTotalTimeSpent(0);
     setIsTimeUp(false);
     setIsSolving(true);
-  }, []);
+  }, [storageKey]);
 
   return {
     totalTimeSpent,

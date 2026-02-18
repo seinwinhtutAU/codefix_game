@@ -77,6 +77,11 @@ export default class BossLevelScene extends GameScene {
 
     super.create();
 
+    if (this.savedProgress?.gameState?.currentTask?.currentActiveIndex) {
+      this.currentPointIndex =
+        this.savedProgress.gameState.currentTask.currentActiveIndex;
+    }
+
     this.initAudio();
     if (
       this.savedProgress.bugCounts &&

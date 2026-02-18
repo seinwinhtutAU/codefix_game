@@ -2,80 +2,149 @@ import AudioManager from "../AudioManager";
 import GameScene from "./GameScene";
 import Button from "../ui/Button";
 import { fetchProblem } from "@/services/problem";
-import { ProblemSolveRecord } from "@/lib/types";
+import { IGameProgress, ProblemSolveRecord } from "@/lib/types";
+import { EventBus } from "../events";
 
 interface LevelStats {
   points: number;
   time: number;
+  solveCount: number; // Now mandatory for tracking
 }
 
 interface LevelData {
-  id: string;
+  sceneKey: string;
   label: string;
   difficulty: "EASY" | "MEDIUM" | "HARD" | "BOSS";
   imageKey: string;
-  unlocked: boolean;
-  completed: boolean;
-  points: number;
-  time: number;
 }
 
 export default class LevelScene extends GameScene {
-  // UI References
   private totalPointsText!: Phaser.GameObjects.Text;
   private totalTimeText!: Phaser.GameObjects.Text;
   private levelCards: Phaser.GameObjects.Container[] = [];
 
-  // Data State
+  private cardStatsTexts: Map<
+    string,
+    {
+      pts: Phaser.GameObjects.Text;
+      time: Phaser.GameObjects.Text;
+      count: Phaser.GameObjects.Text;
+    }
+  > = new Map();
+
+  private globalSpinner!: Phaser.GameObjects.Container;
+
   private stats: Record<string, LevelStats> = {
-    easy: { points: 0, time: 0 },
-    medium: { points: 0, time: 0 },
-    hard: { points: 0, time: 0 },
-    boss: { points: 0, time: 0 },
+    easy: { points: 0, time: 0, solveCount: 0 },
+    medium: { points: 0, time: 0, solveCount: 0 },
+    hard: { points: 0, time: 0, solveCount: 0 },
+    boss: { points: 0, time: 0, solveCount: 0 },
   };
 
   constructor() {
     super("LevelScene");
   }
 
-  async create() {
+  create() {
     super.create();
     const { width, height } = this.cameras.main;
 
-    // 1. Static Visuals
     this.add.image(width / 2, height / 2, "level-bg").setTint(0xf8fafc);
     this.createTitle(width / 2, 50);
 
-    // 2. Initial UI Shell (Shows 0 initially)
     this.createTotalSummary(width / 2, 110);
-
-    // 3. Fetch Data & Refresh
-    await this.loadAndAggregateStats();
     this.renderLevelContent(width, height);
-    this.updateSummaryUI();
-
-    // 4. Navigation
     this.createBackButton(width / 2, height - 50);
+
+    this.createGlobalSpinner(width / 2, height / 2);
+
+    this.initiateBackgroundLoading();
+    this.cameras.main.fadeIn(300);
   }
 
-  /**
-   * DATA LOGIC
-   */
+  private createGlobalSpinner(x: number, y: number) {
+    this.globalSpinner = this.add.container(x, y).setDepth(1000);
+    const spinnerGfx = this.add.graphics();
+    spinnerGfx.lineStyle(6, 0x4a90e2, 1);
+    spinnerGfx.beginPath();
+    spinnerGfx.arc(
+      0,
+      0,
+      40,
+      Phaser.Math.DegToRad(0),
+      Phaser.Math.DegToRad(90),
+      false,
+    );
+    spinnerGfx.strokePath();
+    this.globalSpinner.add(spinnerGfx);
+
+    this.tweens.add({
+      targets: spinnerGfx,
+      angle: 360,
+      duration: 800,
+      repeat: -1,
+    });
+  }
+
+  private async initiateBackgroundLoading() {
+    try {
+      await this.loadAndAggregateStats();
+      if (!this.scene.isActive(this.scene.key)) return;
+      this.updateUIWithLoadedData();
+    } catch (error) {
+      console.error("Failed to load background stats:", error);
+    }
+  }
+
+  private updateUIWithLoadedData() {
+    if (this.globalSpinner) {
+      this.tweens.add({
+        targets: this.globalSpinner,
+        alpha: 0,
+        scale: 0.5,
+        duration: 200,
+        onComplete: () => this.globalSpinner.destroy(),
+      });
+    }
+
+    this.updateSummaryUI();
+
+    this.cardStatsTexts.forEach((texts, difficulty) => {
+      const lowerDiff = difficulty.toLowerCase();
+      const currentStat = this.stats[lowerDiff];
+      if (currentStat) {
+        texts.pts.setText(`${currentStat.points} pts`).setAlpha(1);
+        texts.time.setText(this.formatTime(currentStat.time)).setAlpha(1);
+        texts.count.setText(`${currentStat.solveCount} SOLVED`).setAlpha(1);
+      }
+    });
+
+    this.levelCards.forEach((card) => {
+      if (card && card.scene) {
+        this.tweens.add({ targets: card, alpha: 1, duration: 400 });
+        card.setInteractive();
+      }
+    });
+  }
 
   private async loadAndAggregateStats() {
-    // Add static bonus for easy completion
-    if (
-      this.savedProgress?.gameState?.eventFlags?.easyQuizCompleted &&
-      this.stats.easy.points == 0
-    ) {
+    // Reset stats to ensure fresh calculation
+    this.stats = {
+      easy: { points: 0, time: 0, solveCount: 0 },
+      medium: { points: 0, time: 0, solveCount: 0 },
+      hard: { points: 0, time: 0, solveCount: 0 },
+      boss: { points: 0, time: 0, solveCount: 0 },
+    };
+
+    // Static points logic
+    if (this.savedProgress?.gameState?.eventFlags?.easyQuizCompleted) {
       this.stats.easy.points += 500;
     }
 
     const rawRecords = await this.getAllSolvedRecord();
-    console.log("rawRecords: ", JSON.stringify(rawRecords, null, 2));
     if (!rawRecords.length) return;
 
-    // Group by problemId to get highest score per problem
+    // Filter unique records (highest score per problem)
     const uniqueRecords = new Map<string, ProblemSolveRecord>();
     rawRecords.forEach((rec) => {
       const prev = uniqueRecords.get(rec.problemId);
@@ -84,7 +153,7 @@ export default class LevelScene extends GameScene {
       }
     });
 
-    // Fetch problem metadata to determine difficulty category
+    // Aggregate by Difficulty
     await Promise.all(
       Array.from(uniqueRecords.values()).map(async (record) => {
         try {
@@ -93,9 +162,10 @@ export default class LevelScene extends GameScene {
           if (diff && this.stats[diff]) {
             this.stats[diff].points += record.pointsEarned;
             this.stats[diff].time += record.timeSpent;
+            this.stats[diff].solveCount += 1; // Increment per-level count
           }
         } catch (e) {
-          console.warn(`Metadata missing for problem: ${record.problemId}`);
+          console.warn(`Problem metadata missing: ${record.problemId}`);
         }
       }),
     );
@@ -104,23 +174,18 @@ export default class LevelScene extends GameScene {
   private async getAllSolvedRecord(): Promise<ProblemSolveRecord[]> {
     const userId = this.savedProgress?.userId;
     if (!userId) return [];
-
     try {
       const res = await fetch(`/api/solve-record?userId=${userId}`);
       const result = await res.json();
-      // Ensure we always return an array
-      if (Array.isArray(result.data)) return result.data;
-      if (result.data) return [result.data];
-      return [];
+      return Array.isArray(result.data)
+        ? result.data
+        : result.data
+          ? [result.data]
+          : [];
     } catch (e) {
-      console.error("Fetch failed", e);
       return [];
     }
   }
-
-  /**
-   * UI RENDERING
-   */
 
   private createTitle(x: number, y: number) {
     this.add
@@ -130,8 +195,7 @@ export default class LevelScene extends GameScene {
         color: "#4a90e2",
       })
       .setOrigin(0.5)
-      .setStroke("#FFF", 6)
-      .setShadow(2, 2, "rgba(0,0,0,0.1)", 2);
+      .setStroke("#FFF", 6);
   }
 
   private createTotalSummary(x: number, y: number) {
@@ -139,25 +203,46 @@ export default class LevelScene extends GameScene {
     const bg = this.add
       .graphics()
       .fillStyle(0xffffff, 1)
-      .fillRoundedRect(-180, -22, 360, 44, 22);
-    bg.lineStyle(1, 0xcbd5e1, 1).strokeRoundedRect(-180, -22, 360, 44, 22);
+      .fillRoundedRect(-180, -22, 360, 44, 22)
+      .lineStyle(1, 0xcbd5e1, 1)
+      .strokeRoundedRect(-180, -22, 360, 44, 22);
 
-    const style = {
-      fontFamily: "Arial",
-      fontSize: "14px",
-      color: "#4A90E2",
-      fontStyle: "bold",
-    };
-    const labelStyle = { ...style, fontSize: "9px" };
-
-    this.totalPointsText = this.add.text(-90, 8, "0", style).setOrigin(0.5);
-    this.totalTimeText = this.add.text(90, 8, "0m 0s", style).setOrigin(0.5);
+    this.totalPointsText = this.add
+      .text(-90, 8, "0", {
+        fontFamily: "Arial",
+        fontSize: "14px",
+        color: "#4A90E2",
+        fontStyle: "bold",
+      })
+      .setOrigin(0.5);
+    this.totalTimeText = this.add
+      .text(90, 8, "0m 0s", {
+        fontFamily: "Arial",
+        fontSize: "14px",
+        color: "#4A90E2",
+        fontStyle: "bold",
+      })
+      .setOrigin(0.5);
 
     container.add([
       bg,
-      this.add.text(-90, -8, "TOTAL POINTS", labelStyle).setOrigin(0.5),
+      this.add
+        .text(-90, -8, "TOTAL POINTS", {
+          fontFamily: "Arial",
+          fontSize: "9px",
+          color: "#4A90E2",
+          fontStyle: "bold",
+        })
+        .setOrigin(0.5),
       this.totalPointsText,
-      this.add.text(90, -8, "TOTAL TIME", labelStyle).setOrigin(0.5),
+      this.add
+        .text(90, -8, "TOTAL TIME", {
+          fontFamily: "Arial",
+          fontSize: "9px",
+          color: "#4A90E2",
+          fontStyle: "bold",
+        })
+        .setOrigin(0.5),
       this.totalTimeText,
       this.add.graphics().lineStyle(1, 0xe2e8f0).lineBetween(0, -15, 0, 15),
     ]);
@@ -172,53 +257,35 @@ export default class LevelScene extends GameScene {
       (acc, s) => acc + s.time,
       0,
     );
-
     this.totalPointsText.setText(totalPoints.toString());
     this.totalTimeText.setText(this.formatTime(totalTime));
   }
 
   private renderLevelContent(width: number, height: number) {
-    const flags = this.savedProgress?.gameState?.eventFlags;
     const levels: LevelData[] = [
       {
-        id: "Easy",
+        sceneKey: "CarDriveScene",
         label: "TRAFFIC STOP",
         difficulty: "EASY",
         imageKey: "level-police-red-light",
-        unlocked: true,
-        completed: !!flags?.easyQuizCompleted,
-        points: this.stats.easy.points,
-        time: this.stats.easy.time,
       },
       {
-        id: "Medium",
+        sceneKey: "MediumLevelScene",
         label: "THE OFFICE",
         difficulty: "MEDIUM",
         imageKey: "level-office-home",
-        unlocked: !!flags?.easyQuizCompleted,
-        completed: !!flags?.mediumLevelCompleted,
-        points: this.stats.medium.points,
-        time: this.stats.medium.time,
       },
       {
-        id: "Hard",
+        sceneKey: "HardLevelScene",
         label: "THE PARK",
         difficulty: "HARD",
         imageKey: "level-park",
-        unlocked: !!flags?.mediumLevelCompleted,
-        completed: !!flags?.hardLevelCompleted,
-        points: this.stats.hard.points,
-        time: this.stats.hard.time,
       },
       {
-        id: "Boss",
+        sceneKey: "BossLevelScene",
         label: "SYSTEM CORE",
         difficulty: "BOSS",
         imageKey: "level-core",
-        unlocked: !!flags?.hardLevelCompleted,
-        completed: !!flags?.bossLevelCompleted,
-        points: this.stats.boss.points,
-        time: this.stats.boss.time,
       },
     ];
 
@@ -229,132 +296,102 @@ export default class LevelScene extends GameScene {
       { x: width / 2 + 200, y: height / 2 + 170 },
     ];
 
-    this.drawPath(coords);
     levels.forEach((lvl, i) =>
       this.createLevelCard(coords[i].x, coords[i].y, lvl),
     );
   }
 
   private createLevelCard(x: number, y: number, level: LevelData) {
-    const isLocked = !level.unlocked;
-    const isCompleted = level.completed;
-    const isCurrent = level.unlocked && !level.completed;
-
-    const container = this.add.container(x, y);
+    const cardContainer = this.add.container(x, y).setAlpha(0.3);
     const cardW = 240,
       cardH = 180;
 
-    // Card Colors
-    const theme = isLocked
-      ? { bg: 0xf1f5f9, border: 0xcbd5e1 }
-      : isCompleted
-        ? { bg: 0xf0fdf4, border: 0x86efac }
-        : { bg: 0xffffff, border: 0x4a90e2 };
-
-    // Graphics
-    const card = this.add.graphics();
-    card
-      .fillStyle(0x000000, 0.05)
-      .fillRoundedRect(-cardW / 2 + 4, -cardH / 2 + 4, cardW, cardH, 16);
-    card
-      .fillStyle(theme.bg)
-      .fillRoundedRect(-cardW / 2, -cardH / 2, cardW, cardH, 16);
-    card
-      .lineStyle(isCurrent ? 4 : 2, theme.border)
+    const cardBg = this.add
+      .graphics()
+      .fillStyle(0xffffff)
+      .fillRoundedRect(-cardW / 2, -cardH / 2, cardW, cardH, 16)
+      .lineStyle(2, 0x4a90e2)
       .strokeRoundedRect(-cardW / 2, -cardH / 2, cardW, cardH, 16);
-    container.add(card);
 
-    // Image
-    const img = this.add.image(0, -35, level.imageKey);
-    if (isLocked) img.setTint(0x000000).setAlpha(0.2);
-    container.add(img);
-    if (isLocked)
-      container.add(
-        this.add.text(0, -35, "🔒", { fontSize: "40px" }).setOrigin(0.5),
-      );
-
-    // Texts
-    container.add(
+    cardContainer.add([
+      cardBg,
+      this.add.image(0, -35, level.imageKey),
       this.add
-        .text(0, 50, level.label, {
+        .text(0, 45, level.label, {
           fontFamily: "Arial",
           fontSize: "16px",
           fontStyle: "bold",
-          color: isLocked ? "#94a3b8" : "#334155",
+          color: "#334155",
         })
         .setOrigin(0.5),
-    );
+    ]);
 
-    // Stats Pill
-    if (!isLocked) {
-      this.addStatsPill(container, level.points, level.time);
-    }
+    this.addStatsPill(cardContainer, level.difficulty);
+    cardContainer.setSize(cardW, cardH);
 
-    // Interactions
-    if (isCurrent) {
-      container
-        .setSize(cardW, cardH)
-        .setInteractive({ useHandCursor: true })
-        .on("pointerdown", () => this.handleGameStart());
-      this.tweens.add({
-        targets: container,
-        scale: 1.02,
-        duration: 1000,
-        yoyo: true,
-        repeat: -1,
-      });
-    }
+    cardContainer
+      .on("pointerdown", () =>
+        this.handleLevelSelect(level.sceneKey, level.difficulty),
+      )
+      .on("pointerover", () =>
+        this.tweens.add({ targets: cardContainer, scale: 1.05, duration: 200 }),
+      )
+      .on("pointerout", () =>
+        this.tweens.add({ targets: cardContainer, scale: 1, duration: 200 }),
+      );
 
-    this.levelCards.push(container);
-
-    // 1. Define colors for difficulty labels
-    const difficultyColors: Record<string, string> = {
-      EASY: "#22c55e", // Green
-      MEDIUM: "#eab308", // Yellow
-      HARD: "#ef4444", // Red
-      BOSS: "#7c3aed", // Purple
-    };
-
-    // 2. Create the Difficulty Label Text
-    const diffLabel = this.add
-      .text(-80, 65, level.difficulty, {
-        fontFamily: "Arial",
-        fontSize: "13px",
-        fontStyle: "bold",
-        color: isLocked ? "#94a3b8" : difficultyColors[level.difficulty],
-        backgroundColor: isLocked ? "#f1f5f9" : "transparent",
-        padding: { x: 4, y: 2 },
-      })
-      .setOrigin(0.5);
-
-    container.add(diffLabel);
+    this.levelCards.push(cardContainer);
   }
 
   private addStatsPill(
     container: Phaser.GameObjects.Container,
-    pts: number,
-    time: number,
+    difficulty: string,
   ) {
-    const pill = this.add.container(0, 120);
+    const pill = this.add.container(0, 115);
     const bg = this.add
       .graphics()
-      .fillStyle(0xffffff)
-      .fillRoundedRect(-95, -12, 190, 40, 8);
-    bg.lineStyle(1, 0xe2e8f0).strokeRoundedRect(-95, -12, 190, 40, 8);
+      .fillStyle(0xf1f5f9)
+      .fillRoundedRect(-100, -15, 200, 45, 8);
 
-    const txtStyle = { fontSize: "14px", color: "#334155", fontStyle: "bold" };
+    const ptsText = this.add
+      .text(-50, 5, "---", {
+        fontSize: "12px",
+        color: "#64748b",
+        fontStyle: "bold",
+      })
+      .setOrigin(0.5)
+      .setAlpha(0);
+    const timeText = this.add
+      .text(50, 5, "---", {
+        fontSize: "12px",
+        color: "#64748b",
+        fontStyle: "bold",
+      })
+      .setOrigin(0.5)
+      .setAlpha(0);
+    const countText = this.add
+      .text(0, -35, "0 SOLVED", {
+        fontSize: "11px",
+        color: "#4CAF50",
+        fontStyle: "bold",
+      })
+      .setOrigin(0.5)
+      .setAlpha(0);
+
+    this.cardStatsTexts.set(difficulty, {
+      pts: ptsText,
+      time: timeText,
+      count: countText,
+    });
     pill.add([
       bg,
-      this.add.text(-45, 8, `${pts} pts`, txtStyle).setOrigin(0.5),
-      this.add.text(45, 8, this.formatTime(time), txtStyle).setOrigin(0.5),
-      this.add.graphics().lineStyle(1, 0xe2e8f0).lineBetween(0, -8, 0, 8),
+      ptsText,
+      timeText,
+      countText,
+      this.add.graphics().lineStyle(1, 0xe2e8f0).lineBetween(0, -5, 0, 15),
     ]);
     container.add(pill);
   }
-
-  /**
-   * HELPERS
-   */
 
   private formatTime(seconds: number): string {
     const m = Math.floor(seconds / 60);
@@ -379,37 +416,73 @@ export default class LevelScene extends GameScene {
     });
   }
 
-  private drawPath(coords: { x: number; y: number }[]) {
-    const g = this.add.graphics().lineStyle(4, 0xcbd5e1, 0.3);
-    for (let i = 0; i < coords.length - 1; i++) {
-      g.lineBetween(coords[i].x, coords[i].y, coords[i + 1].x, coords[i + 1].y);
+  private handleLevelSelect(sceneKey: string, difficulty: string) {
+    let eventFlags = {};
+    switch (sceneKey) {
+      case "CarDriveScene":
+        eventFlags = { introCompleted: true, policeStoppedPlayer: true };
+        break;
+      case "MediumLevelScene":
+        eventFlags = {
+          introCompleted: true,
+          policeStoppedPlayer: true,
+          arrivedAtOffice: true,
+          officeCompleted: true,
+        };
+        break;
+      case "HardLevelScene":
+        eventFlags = {
+          introCompleted: true,
+          policeStoppedPlayer: true,
+          arrivedAtOffice: true,
+          officeCompleted: true,
+          mediumLevelCompleted: true,
+          hardIntroCompleted: true,
+          playgroundCompleted: true,
+        };
+        break;
+      case "BossLevelScene":
+        eventFlags = {
+          introCompleted: true,
+          policeStoppedPlayer: true,
+          arrivedAtOffice: true,
+          officeCompleted: true,
+          mediumLevelCompleted: true,
+          hardIntroCompleted: true,
+          playgroundCompleted: true,
+          hardLevelCompleted: true,
+          warningCompleted: true,
+        };
+        break;
     }
-  }
 
-  private handleGameStart() {
+    // Use the per-difficulty solve count to determine which problem index to load
+    const specificSolveCount =
+      this.stats[difficulty.toLowerCase()]?.solveCount || 0;
+
+    const updatedProgress: IGameProgress = {
+      ...this.savedProgress,
+      gameState: {
+        ...this.savedProgress?.gameState,
+        currentScene: sceneKey,
+        eventFlags: eventFlags,
+        currentTask: {
+          taskType: "none",
+          status: "none",
+          attempts: 0,
+          timer: 0,
+          currentActiveIndex: specificSolveCount,
+        },
+      },
+    };
+
     AudioManager.getInstance().playSound("click");
+    this.savedProgress = updatedProgress;
+    EventBus.emit("progress-updated", this.savedProgress);
+
     this.cameras.main.fadeOut(500);
-    this.cameras.main.once("camerafadeoutcomplete", () => {
-      const flags = this.savedProgress?.gameState?.eventFlags;
-      if (flags?.bossLevelCompleted)
-        this.scene.start("BossLevelScene", this.savedProgress);
-      else if (flags?.warningCompleted)
-        this.scene.start("BossLevelScene", this.savedProgress);
-      else if (flags?.hardLevelCompleted)
-        this.scene.start("WarningScene", this.savedProgress);
-      else if (flags?.playgroundCompleted)
-        this.scene.start("MediumLevelScene", this.savedProgress);
-      else if (flags?.hardIntroCompleted)
-        this.scene.start("PlayGroundScene", this.savedProgress);
-      else if (flags?.mediumLevelCompleted)
-        this.scene.start("HomeScene", this.savedProgress);
-      else if (flags?.officeCompleted)
-        this.scene.start("MediumLevelScene", this.savedProgress);
-      else if (flags?.arrivedAtOffice)
-        this.scene.start("OfficeScene", this.savedProgress);
-      else if (flags?.introCompleted)
-        this.scene.start("CarDriveScene", this.savedProgress);
-      else this.scene.start("IntroScene", this.savedProgress ?? undefined);
-    });
+    this.cameras.main.once("camerafadeoutcomplete", () =>
+      this.scene.start(sceneKey, this.savedProgress),
+    );
   }
 }

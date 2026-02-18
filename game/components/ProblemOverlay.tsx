@@ -266,7 +266,7 @@ export function ProblemOverlay({
   }, [currentBugCount]);
 
   const { totalTimeSpent, timeLeft, isTimeUp, resetTimer, setIsSolving } =
-    useSolvingTimer(0, hasCompleted, problem, timeLimited);
+    useSolvingTimer(0, hasCompleted, problem, timeLimited, problemId);
 
   const level = problem ? problem.difficulty : "no level";
 
@@ -531,6 +531,7 @@ export function ProblemOverlay({
     }
 
     if (hasCompleted) {
+      localStorage.removeItem(`timer_${problemId}`);
       EventBus.emit("problem-solved", { currentTask: updatedTask });
     }
     EventBus.emit("resume-after-solve", updatedProgress);

@@ -144,12 +144,15 @@ export default class MediumLevelScene extends GameScene {
   }
 
   private drawRoadProgress() {
+    console.log("Drawing road with index:", this.currentPointIndex);
+
     // 1. Initialize or clear the graphics object
-    if (!this.roadProgressGraphics) {
-      this.roadProgressGraphics = this.add.graphics();
-      this.roadProgressGraphics.setDepth(1); // Above map, below points
+    if (this.roadProgressGraphics) {
+      this.roadProgressGraphics.destroy();
     }
-    this.roadProgressGraphics.clear();
+
+    this.roadProgressGraphics = this.add.graphics();
+    this.roadProgressGraphics.setDepth(1);
 
     // 2. We only draw if we have at least one solved point
     if (this.currentPointIndex === 0) return;
@@ -550,7 +553,14 @@ export default class MediumLevelScene extends GameScene {
 
       await Promise.all(promises);
 
-      this.calculateCurrentIndex();
+      const savedIndex =
+        this.savedProgress?.gameState?.currentTask?.currentActiveIndex;
+
+      if (savedIndex !== undefined && savedIndex !== null) {
+        this.currentPointIndex = savedIndex;
+      } else {
+        this.calculateCurrentIndex();
+      }
 
       this.updatePointUI();
       this.hideLoading();

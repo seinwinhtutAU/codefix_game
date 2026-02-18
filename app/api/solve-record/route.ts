@@ -168,7 +168,7 @@ export async function GET(req: NextRequest) {
         completedAt: -1,
       });
     } else {
-      result = await ProblemSolveRecord.find().sort({ completedAt: -1 });
+      result = await ProblemSolveRecord.find(filter).sort({ completedAt: -1 });
     }
     // // ✅ Case 1: No filters → fetch all records
     // if (!userIdParam && !problemIdParam) {
