@@ -163,7 +163,7 @@ export default function ProblemModeSelector() {
 
   const pasteBenefits: ModeBenefit[] = [
     { icon: Timer, text: "Infinite Time" },
-    { icon: Lightbulb, text: "Full Hint Support" },
+    { icon: Lightbulb, text: "AI Hint Support" },
   ];
 
   return (
