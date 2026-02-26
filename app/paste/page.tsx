@@ -203,18 +203,21 @@ export default function PastePage() {
       const freshError = freshResult?.error || null;
       const freshOutput = freshResult?.output || "";
 
-      const response = await fetch("http://0.0.0.0:8000/api/get-hint", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          files: [{ name: "main.py", path: "main.py", content: code }],
-          error: freshError,
-          hint_level: hintLevel,
-          current_output: freshOutput,
-          expected_output: expectedOutput,
-          extra_info: extraInfo,
-        }),
-      });
+      const response = await fetch(
+        "https://fastapi-code.up.railway.app/api/get-hint",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            files: [{ name: "main.py", path: "main.py", content: code }],
+            error: freshError,
+            hint_level: hintLevel,
+            current_output: freshOutput,
+            expected_output: expectedOutput,
+            extra_info: extraInfo,
+          }),
+        },
+      );
 
       const data = await response.json();
       if (data.success) setHints(data.hints);
