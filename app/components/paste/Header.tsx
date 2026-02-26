@@ -2,12 +2,12 @@
 
 import Link from "next/link";
 import {
-  ChevronLeft,
   Code2,
   Terminal,
   Sparkles,
   Play,
   Loader2,
+  Home, // 1. Imported Home
 } from "lucide-react";
 
 interface HeaderProps {
@@ -30,12 +30,15 @@ export function Header({
   return (
     <header className="h-14 border-b border-slate-100 bg-white flex items-center justify-between px-6 shrink-0 z-20 shadow-sm">
       <div className="flex items-center gap-4">
+        {/* 2. Replaced ChevronLeft with Home Icon */}
         <Link
           href="/"
-          className="p-1.5 hover:bg-slate-50 rounded-full text-slate-400 transition-colors"
+          className="p-1.5 hover:bg-slate-50 rounded-lg text-slate-400 transition-colors"
+          title="Home"
         >
-          <ChevronLeft size={20} />
+          <Home size={20} />
         </Link>
+
         <div className="flex items-center gap-2">
           <div className="p-1.5 bg-violet-100 text-violet-600 rounded-lg">
             <Code2 size={18} />

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Home, User, LogOut, Settings } from "lucide-react";
+import { Home, User, LogOut, Settings } from "lucide-react"; // Home is already imported
 
 interface UserProfile {
   id: string;
@@ -68,6 +68,16 @@ export default function MenuBar() {
                 <div className="w-3 h-3 rounded bg-blue-500"></div>
               </div>
               <span className="text-2xl font-extrabold">CodeFix</span>
+            </button>
+
+            {/* --- ADDED HOME ICON HERE --- */}
+            <button
+              onClick={() => router.push("/")}
+              className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors"
+              title="Home"
+            >
+              <Home size={20} />
+              <span className="text-sm font-medium hidden sm:inline">Home</span>
             </button>
           </div>
 

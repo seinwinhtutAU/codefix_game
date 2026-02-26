@@ -5,8 +5,8 @@ export function useSolvingTimer(
   initialTimeSpent: number,
   hasCompleted: boolean,
   problem: Problem | null,
-  timeLimit: number = 30,
-  problemId: string, // Pass problemId explicitly to avoid waiting for the full object
+  problemId: string,
+  timeLimit: number,
 ) {
   const storageKey = `timer_${problemId}`;
 

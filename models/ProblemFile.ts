@@ -2,7 +2,7 @@ import mongoose from "mongoose";
 import { IFileDocument } from "./IFileDocument";
 
 export interface IProblemFile extends IFileDocument {
-  mode: "learning" | "paste";
+  mode: "normal" | "game" | "paste";
   problemId: mongoose.Types.ObjectId;
   content?: string;
 }
@@ -10,7 +10,7 @@ export interface IProblemFile extends IFileDocument {
 const problemFileSchema = new mongoose.Schema<IProblemFile>({
   mode: {
     type: String,
-    enum: ["learning", "paste"],
+    enum: ["normal", "game", "paste"],
     required: true,
   },
   problemId: {

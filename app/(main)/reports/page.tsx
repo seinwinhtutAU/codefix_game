@@ -30,6 +30,7 @@ import * as XLSX from "xlsx";
 import ProblemsList from "./ProblemList";
 import UsersList from "./UserList";
 import GameProgressList from "./GameProgressList";
+import { useRouter } from "next/navigation";
 
 // ============================================================================
 // Types
@@ -117,6 +118,24 @@ export default function SolveRecordsDashboard() {
     userId: "all",
     level: "all",
   });
+
+  const router = useRouter();
+
+  useEffect(() => {
+    const userData = localStorage.getItem("user");
+
+    if (!userData) {
+      router.replace("/");
+      return;
+    }
+
+    const user = JSON.parse(userData);
+    const username = user.username?.toLowerCase() || "";
+
+    if (!username.startsWith("admin")) {
+      router.replace("/");
+    }
+  }, [router]);
 
   const loadData = async () => {
     try {

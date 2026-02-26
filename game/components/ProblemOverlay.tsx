@@ -266,7 +266,7 @@ export function ProblemOverlay({
   }, [currentBugCount]);
 
   const { totalTimeSpent, timeLeft, isTimeUp, resetTimer, setIsSolving } =
-    useSolvingTimer(0, hasCompleted, problem, timeLimited, problemId);
+    useSolvingTimer(0, hasCompleted, problem, problemId, timeLimited);
 
   const level = problem ? problem.difficulty : "no level";
 

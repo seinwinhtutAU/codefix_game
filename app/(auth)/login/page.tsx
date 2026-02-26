@@ -48,7 +48,7 @@ export default function LoginPage() {
 
       if (response.ok) {
         localStorage.setItem("user", JSON.stringify(data.user));
-        router.push("/game");
+        router.push("/");
       } else {
         setError(data.message || "Invalid email or password");
       }

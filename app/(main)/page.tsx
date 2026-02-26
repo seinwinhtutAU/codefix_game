@@ -12,6 +12,7 @@ import {
   Trophy,
   LucideIcon,
   Search,
+  Code2, // Added for Normal Mode icon
 } from "lucide-react";
 
 // --- TYPES ---
@@ -25,7 +26,7 @@ interface ModeCardProps {
   title: string;
   description: string;
   icon: LucideIcon;
-  color: "blue" | "amber";
+  color: "blue" | "amber" | "indigo"; // Added indigo
   benefits: ModeBenefit[];
   isHovered: boolean;
   onHover: () => void;
@@ -46,7 +47,32 @@ function ModeCard({
   onLeave,
   onClick,
 }: ModeCardProps) {
-  const isBlue = color === "blue";
+  // Color Mapping
+  const colorStyles = {
+    blue: {
+      border: "border-blue-400 shadow-blue-100",
+      bgActive: "bg-blue-600",
+      bgSoft: "bg-blue-50 text-blue-500",
+      textActive: "text-blue-600",
+      glow: "bg-blue-400",
+    },
+    amber: {
+      border: "border-amber-400 shadow-amber-100",
+      bgActive: "bg-amber-500",
+      bgSoft: "bg-amber-50 text-amber-500",
+      textActive: "text-amber-500",
+      glow: "bg-amber-400",
+    },
+    indigo: {
+      border: "border-indigo-400 shadow-indigo-100",
+      bgActive: "bg-indigo-600",
+      bgSoft: "bg-indigo-50 text-indigo-500",
+      textActive: "text-indigo-600",
+      glow: "bg-indigo-400",
+    },
+  };
+
+  const style = colorStyles[color];
 
   return (
     <motion.button
@@ -56,22 +82,12 @@ function ModeCard({
       onMouseLeave={onLeave}
       onClick={onClick}
       className={`relative flex flex-col items-start p-8 rounded-[2.5rem] border-2 text-left transition-all duration-300 bg-white shadow-sm overflow-hidden h-full ${
-        isHovered
-          ? isBlue
-            ? "border-blue-400 shadow-blue-100"
-            : "border-amber-400 shadow-amber-100"
-          : "border-slate-100"
+        isHovered ? style.border : "border-slate-100"
       }`}
     >
       <div
         className={`p-4 rounded-2xl mb-6 transition-colors ${
-          isHovered
-            ? isBlue
-              ? "bg-blue-600 text-white"
-              : "bg-amber-500 text-white"
-            : isBlue
-              ? "bg-blue-50 text-blue-500"
-              : "bg-amber-50 text-amber-400"
+          isHovered ? `${style.bgActive} text-white` : style.bgSoft
         }`}
       >
         <Icon size={32} strokeWidth={2.5} />
@@ -90,13 +106,7 @@ function ModeCard({
               key={idx}
               className="flex items-center gap-3 text-sm font-semibold text-slate-600"
             >
-              <div
-                className={`p-1.5 rounded-lg ${
-                  isBlue
-                    ? "bg-blue-50 text-blue-500"
-                    : "bg-amber-50 text-amber-500"
-                }`}
-              >
+              <div className={`p-1.5 rounded-lg ${style.bgSoft}`}>
                 <BenefitIcon size={16} />
               </div>
               {item.text}
@@ -107,11 +117,7 @@ function ModeCard({
 
       <div
         className={`mt-10 flex items-center gap-2 font-bold text-xs uppercase tracking-widest transition-all ${
-          isHovered
-            ? isBlue
-              ? "text-blue-600 translate-x-2"
-              : "text-amber-500 translate-x-2"
-            : "text-slate-400"
+          isHovered ? `${style.textActive} translate-x-2` : "text-slate-400"
         }`}
       >
         Launch {title} <ArrowRight size={16} />
@@ -124,9 +130,7 @@ function ModeCard({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className={`absolute inset-0 -z-10 rounded-[2.5rem] blur-2xl opacity-20 ${
-              isBlue ? "bg-blue-400" : "bg-amber-400"
-            }`}
+            className={`absolute inset-0 -z-10 rounded-[2.5rem] blur-2xl opacity-20 ${style.glow}`}
           />
         )}
       </AnimatePresence>
@@ -138,7 +142,9 @@ function ModeCard({
 
 export default function ProblemModeSelector() {
   const router = useRouter();
-  const [hoveredMode, setHoveredMode] = useState<"game" | "paste" | null>(null);
+  const [hoveredMode, setHoveredMode] = useState<
+    "game" | "normal" | "paste" | null
+  >(null);
 
   const handleNavigation = (path: string) => {
     router.push(`/${path}`);
@@ -147,6 +153,11 @@ export default function ProblemModeSelector() {
   const gameBenefits: ModeBenefit[] = [
     { icon: Timer, text: "Timed Performance" },
     { icon: Trophy, text: "Earn Reward Points" },
+    { icon: Lightbulb, text: "Full Hint Support" },
+  ];
+
+  const normalBenefits: ModeBenefit[] = [
+    { icon: Search, text: "Structured Learning" },
     { icon: Lightbulb, text: "Full Hint Support" },
   ];
 
@@ -160,17 +171,18 @@ export default function ProblemModeSelector() {
       {/* Background Decoration */}
       <div className="absolute top-0 left-0 w-full h-full pointer-events-none">
         <div className="absolute top-[-5%] left-[-5%] w-[40%] h-[40%] bg-blue-100/40 rounded-full blur-[100px]" />
-        <div className="absolute bottom-[-5%] right-[-5%] w-[40%] h-[40%] bg-blue-50/60 rounded-full blur-[100px]" />
+        <div className="absolute bottom-[-5%] right-[-5%] w-[40%] h-[40%] bg-indigo-50/60 rounded-full blur-[100px]" />
       </div>
 
-      <div className="max-w-4xl w-full z-10 py-12">
+      <div className="max-w-6xl w-full z-10 py-12">
+        {" "}
+        {/* Increased max-w for 3 columns */}
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           className="flex flex-col items-center text-center mb-16"
         >
-          {/* HORIZONTAL LOGO: Pulse point on the left */}
           <div className="group cursor-default flex items-center gap-6 mb-8">
             <div className="relative flex items-center justify-center">
               <div className="w-5 h-5 rounded-full bg-blue-600 animate-pulse" />
@@ -190,16 +202,16 @@ export default function ProblemModeSelector() {
             </h1>
             <div className="h-1.5 w-16 bg-blue-600 rounded-full mb-6" />
             <p className="text-slate-400 font-medium max-w-sm mx-auto text-sm leading-relaxed">
-              Choose mode to begin your debugging learning.
+              Choose a mode to begin your debugging journey.
             </p>
           </div>
         </motion.div>
-
         {/* Cards Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-stretch">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-stretch">
+          {/* Game Mode */}
           <motion.div
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
           >
             <ModeCard
@@ -215,14 +227,34 @@ export default function ProblemModeSelector() {
             />
           </motion.div>
 
+          {/* Normal Mode */}
           <motion.div
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
           >
             <ModeCard
+              title="Normal Mode"
+              description="Master the fundamentals at your own pace with structured levels."
+              icon={Code2}
+              color="indigo"
+              benefits={normalBenefits}
+              isHovered={hoveredMode === "normal"}
+              onHover={() => setHoveredMode("normal")}
+              onLeave={() => setHoveredMode(null)}
+              onClick={() => handleNavigation("normal")}
+            />
+          </motion.div>
+
+          {/* Paste Mode */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+          >
+            <ModeCard
               title="Paste Mode"
-              description="A stress-free workspace to paste own code and run it"
+              description="A stress-free workspace to paste your own code and run it."
               icon={ClipboardPaste}
               color="amber"
               benefits={pasteBenefits}

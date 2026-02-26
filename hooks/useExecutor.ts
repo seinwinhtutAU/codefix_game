@@ -20,9 +20,9 @@ interface UseExecutorProps {
   hasCompleted: boolean;
   setHasCompleted: (completed: boolean) => void;
   level: string;
-  attempt: number;
-  bugCounts: number;
-  timeLimited: number;
+  attempt?: number;
+  bugCounts?: number;
+  timeLimited?: number;
 }
 
 export function useExecutor({
@@ -135,7 +135,7 @@ export function useExecutor({
 
         if (hintUsages.length == 0) {
           pointsEarned = 100;
-          const bugFactor = Math.max(0, bugCounts - 10);
+          const bugFactor = Math.max(0, (bugCounts ?? 0) - 10);
           pointsEarned = pointsEarned + bugFactor * 10;
         } else {
           for (const hintUsage of hintUsages) {
@@ -153,12 +153,14 @@ export function useExecutor({
           pointsEarned = pointsEarned - reduceAttemptPoint;
         }
 
+        const PENALTY_PER_ATTEMPT = timeLimited ?? 1200;
+        const totalAttempts = attempt ?? 0;
         // Save solve record
         try {
           const newRecord: SolveRecordRequest = {
             userId: userId,
             problemId: problem._id,
-            timeSpent: timerTimeSpent + attempt * timeLimited,
+            timeSpent: timerTimeSpent + totalAttempts * PENALTY_PER_ATTEMPT,
             hintUsages: hintUsages,
             pointsEarned: pointsEarned,
             level: level,

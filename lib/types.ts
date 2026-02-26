@@ -19,7 +19,7 @@ export interface TreeNode<T = object> {
 // ============================================================================
 
 export interface CreateProblemRequest {
-  mode: "learning" | "paste";
+  mode: "normal" | "game" | "paste";
   title?: string;
   description?: string;
   difficulty?: "easy" | "medium" | "hard" | "boss";
@@ -65,7 +65,7 @@ export interface Problem {
   userCodeFiles: TreeNode<UserCodeFileNode>[];
   expectedOutput: string;
   testCases: ITestCase[];
-  mode: "learning" | "paste";
+  mode: "normal" | "game" | "paste";
   hints?: {
     small?: string[];
     medium?: string[];
@@ -350,5 +350,4 @@ export type ActiveTab = "terminal" | "expected" | "description";
 
 export type FileType = "file" | "folder";
 export type DifficultyLevel = "easy" | "medium" | "hard" | "boss";
-export type ProblemMode = "learning" | "paste";
 export type HintLevel = "small" | "medium" | "big";

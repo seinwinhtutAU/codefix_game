@@ -4,7 +4,6 @@ import Problem, { IProblem } from "@/models/Problem";
 import UserCodeFile from "@/models/UserCodeFile";
 import ProblemFile, { IProblemFile } from "@/models/ProblemFile";
 import SolutionFile, { ISolutionFile } from "@/models/SolutionFile";
-import ProblemGuide, { IProblemGuide } from "@/models/ProblemGuide";
 import ProblemSolveRecord from "@/models/ProblemSolveRecord";
 import { saveFiles, validateSiblingNames, flattenTree } from "@/lib/utils";
 import {
@@ -21,20 +20,17 @@ export async function POST(req: NextRequest) {
 
     const body: CreateProblemRequest = await req.json();
 
-    // Validate learning mode requirements
-    if (body.mode === "learning") {
-      const missingFields = [];
-      if (!body.title) missingFields.push("title");
-      if (!body.description) missingFields.push("description");
-      if (!body.difficulty) missingFields.push("difficulty");
-      if (!body.order) missingFields.push("order");
+    const missingFields = [];
+    if (!body.title) missingFields.push("title");
+    if (!body.description) missingFields.push("description");
+    if (!body.difficulty) missingFields.push("difficulty");
+    if (!body.order) missingFields.push("order");
 
-      if (missingFields.length > 0) {
-        return NextResponse.json(
-          { error: `Missing required fields: ${missingFields.join(", ")}` },
-          { status: 400 },
-        );
-      }
+    if (missingFields.length > 0) {
+      return NextResponse.json(
+        { error: `Missing required fields: ${missingFields.join(", ")}` },
+        { status: 400 },
+      );
     }
 
     // Validate file structure

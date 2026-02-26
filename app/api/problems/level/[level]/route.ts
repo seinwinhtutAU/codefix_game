@@ -14,7 +14,7 @@ const VALID_LEVELS = ["easy", "medium", "hard", "boss"] as const;
 
 export async function GET(
   _req: NextRequest,
-  ctx: RouteContext<"/api/problems/level/[level]">
+  ctx: RouteContext<"/api/problems/level/[level]">,
 ) {
   try {
     await dbConnect();
@@ -31,12 +31,12 @@ export async function GET(
     }
 
     // Add sorting by order field in ascending order
-    const problems = await Problem.find({ difficulty: level })
-      .sort({ order: 1 }) // 1 = ascending, -1 = descending
+    const problems = await Problem.find({ difficulty: level, mode: "normal" })
+      .sort({ order: 1 })
       .lean<IProblem[]>();
 
     const problemsWithFiles = await Promise.all(
-      problems.map((problem) => enrichProblemWithFiles(problem))
+      problems.map((problem) => enrichProblemWithFiles(problem)),
     );
 
     return NextResponse.json({
@@ -59,7 +59,7 @@ async function enrichProblemWithFiles(problem: IProblem) {
         problemId: doc.problemId.toString(),
         content: doc.content,
         mode: doc.mode,
-      })
+      }),
     ),
     buildProblemFiles<SolutionFileNode, ISolutionFile>(
       SolutionFile,
@@ -67,7 +67,7 @@ async function enrichProblemWithFiles(problem: IProblem) {
       (doc) => ({
         problemId: doc.problemId.toString(),
         content: doc.content,
-      })
+      }),
     ),
   ]);
 

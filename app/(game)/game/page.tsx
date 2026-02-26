@@ -2,22 +2,22 @@
 
 import { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
-import { AnimatePresence } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import { EventBus } from "@/game/events";
 import { GameNotificationProps } from "@/game/components/GameNotification";
 import DebuggingQuiz from "@/game/components/DebuggingQuiz";
 import AudioManager from "@/game/AudioManager";
 import { useRouter } from "next/navigation";
+import { Home } from "lucide-react"; // Imported Home icon
 
+// --- DYNAMIC IMPORTS ---
 const PhaserGame = dynamic(() => import("@/game/components/PhaserGame"), {
   ssr: false,
 });
 
 const GameOverlay = dynamic(
   () => import("@/game/components/GameOverlay").then((mod) => mod.GameOverlay),
-  {
-    ssr: false,
-  },
+  { ssr: false },
 );
 
 const ProblemOverlay = dynamic(
@@ -25,9 +25,7 @@ const ProblemOverlay = dynamic(
     import("@/game/components/ProblemOverlay").then(
       (mod) => mod.ProblemOverlay,
     ),
-  {
-    ssr: false,
-  },
+  { ssr: false },
 );
 
 const GameNotification = dynamic(
@@ -35,9 +33,7 @@ const GameNotification = dynamic(
     import("@/game/components/GameNotification").then(
       (mod) => mod.GameNotification,
     ),
-  {
-    ssr: false,
-  },
+  { ssr: false },
 );
 
 export default function GamePage() {
@@ -47,12 +43,11 @@ export default function GamePage() {
   const [difficulty, setDifficulty] = useState<string | null>(null);
   const [notification, setNotification] =
     useState<GameNotificationProps | null>(null);
-  const [showDebuggingQuiz, setShowDebuggingQuiz] = useState(false); // New state for quiz
+  const [showDebuggingQuiz, setShowDebuggingQuiz] = useState(false);
 
   const router = useRouter();
 
   useEffect(() => {
-    // Check if we are in the browser
     if (typeof window !== "undefined") {
       const storedUser = localStorage.getItem("user");
       if (!storedUser) {
@@ -62,7 +57,6 @@ export default function GamePage() {
   }, [router]);
 
   useEffect(() => {
-    // --- RESET LOGIC ---
     const handleReset = () => {
       setIsResetting(true);
       setActiveProblemId(null);
@@ -74,7 +68,6 @@ export default function GamePage() {
       AudioManager.getInstance().playSound(soundName, { volume: 0.2 });
     };
 
-    // --- PROBLEM OVERLAY LOGIC ---
     const handleOpenProblem = (data: {
       problemId: string;
       difficulty: string;
@@ -83,12 +76,10 @@ export default function GamePage() {
       setDifficulty(data.difficulty);
     };
 
-    // --- QUIZ OVERLAY LOGIC ---
     const handleOpenQuiz = () => {
       setShowDebuggingQuiz(true);
     };
 
-    // --- NOTIFICATION LOGIC ---
     const handleShowNotification = (config: GameNotificationProps) => {
       setNotification(config);
     };
@@ -99,7 +90,7 @@ export default function GamePage() {
 
     EventBus.on("ui-reset-start", handleReset);
     EventBus.on("ui-open-problem", handleOpenProblem);
-    EventBus.on("ui-open-quiz", handleOpenQuiz); // Listen for quiz event
+    EventBus.on("ui-open-quiz", handleOpenQuiz);
     EventBus.on("show-notification", handleShowNotification);
     EventBus.on("hide-notification", handleHideNotification);
     EventBus.on("play-ui-sound", handlePlayUISound);
@@ -114,14 +105,25 @@ export default function GamePage() {
     };
   }, []);
 
-  const handleQuizComplete = (score: number, total: number) => {
-    console.log(`Quiz completed! Score: ${score}/${total}`);
-    EventBus.emit("quiz-completed", { score, total });
-  };
-
   return (
     <div className="flex items-center justify-center min-h-screen bg-[#333333] p-0 md:p-4">
       <div className="relative shadow-2xl border-4 border-gray-800 rounded-lg overflow-hidden w-full max-w-[1376px] aspect-video bg-[#1a1a2e]">
+        {/* --- FLOATING HOME BUTTON --- */}
+        <motion.button
+          initial={{ opacity: 0, scale: 0.5 }}
+          animate={{ opacity: 1, scale: 1 }}
+          whileHover={{ scale: 1.1, backgroundColor: "#2563eb" }}
+          whileTap={{ scale: 0.9 }}
+          onClick={() => router.push("/")}
+          className="absolute top-4 left-4 z-[250] p-3 bg-gray-900/90 border border-gray-700 rounded-xl text-white shadow-2xl transition-colors group"
+          title="Back to Home"
+        >
+          <Home
+            size={22}
+            className="group-hover:text-white text-blue-400 transition-colors"
+          />
+        </motion.button>
+
         {/* 1. DATA RESET OVERLAY (Highest Z-Index) */}
         {isResetting && (
           <div className="absolute inset-0 z-[300] bg-[#1a1a2e] flex flex-col items-center justify-center text-white">

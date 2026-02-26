@@ -49,7 +49,7 @@ export default function SignUpPage() {
 
       if (response.ok) {
         localStorage.setItem("user", JSON.stringify(data.user));
-        router.push("/game");
+        router.push("/");
       } else {
         setError(data.message || "Signup failed. Please try again.");
       }

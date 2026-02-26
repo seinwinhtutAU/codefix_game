@@ -5,13 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { CheckCircle, Circle, ChevronRight, Trophy } from "lucide-react";
 import { User } from "@/lib/types";
-
-interface Problem {
-  _id: string;
-  title: string;
-  difficulty: string;
-  order: number;
-}
+import { Problem } from "@/lib/types";
 
 interface ProblemWithStatus extends Problem {
   isCompleted: boolean;
@@ -41,7 +35,7 @@ export default function ProblemsListPage() {
           if (userId && userId !== "null") {
             try {
               const solveRes = await fetch(
-                `/api/solve-record?userId=${userId}&problemId=${problem._id}`
+                `/api/solve-record?userId=${userId}&problemId=${problem._id}`,
               );
               const solveData = await solveRes.json();
               isCompleted = solveData.data != null;
@@ -72,7 +66,7 @@ export default function ProblemsListPage() {
   // Handle problem click - Navigate directly to problem page for all levels
   const handleProblemClick = (
     problem: ProblemWithStatus,
-    e: React.MouseEvent
+    e: React.MouseEvent,
   ) => {
     e.preventDefault(); // Prevent any default behavior
     // Navigate directly to problem page for all levels
@@ -88,7 +82,7 @@ export default function ProblemsListPage() {
   // Calculate total points earned
   const totalPointsEarned = problems.reduce(
     (sum, problem) => sum + (problem.pointsEarned || 0),
-    0
+    0,
   );
 
   // Get difficulty color

@@ -8,7 +8,7 @@ export interface ITestCase {
 
 export interface IProblem {
   _id: Types.ObjectId;
-  mode: "learning" | "paste";
+  mode: "normal" | "game" | "paste";
   title?: string;
   description?: string;
   difficulty?: "easy" | "medium" | "hard" | "boss";
@@ -31,7 +31,7 @@ export interface IProblem {
 const problemSchema = new mongoose.Schema<IProblem>({
   mode: {
     type: String,
-    enum: ["learning", "paste"],
+    enum: ["normal", "game", "paste"],
     required: true,
   },
 
