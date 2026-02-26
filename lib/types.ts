@@ -330,6 +330,17 @@ export interface CurrentTask {
 }
 
 // ============================================================================
+// Paste Mode
+// ============================================================================
+export type HistoryItem = {
+  type: "output" | "input";
+  content: string;
+  isError?: boolean;
+};
+
+export type ActiveTab = "terminal" | "expected" | "description";
+
+// ============================================================================
 // Generate Code and Hint
 // ============================================================================
 

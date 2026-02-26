@@ -53,8 +53,7 @@ export default class MainMenuScene extends GameScene {
       },
     });
 
-    // --- NEW: LEVEL SELECT BUTTON ---
-    // Positioned below the main button
+    // --- LEVEL SELECT BUTTON ---
     const level = new Button(this, {
       x: width / 2,
       y: height / 2 + 110,
@@ -72,27 +71,6 @@ export default class MainMenuScene extends GameScene {
         this.scene.start("LevelScene", this.savedProgress);
       },
     });
-
-    // --- DATA MANAGEMENT ---
-    if (isIntroDone) {
-      const resetText = this.add
-        .text(width / 2, height - 60, "Reset Progress", {
-          fontFamily: "Gluten",
-          fontSize: "16px",
-          color: "#8B5E66",
-        })
-        .setOrigin(0.5)
-        .setInteractive({ useHandCursor: true })
-        .setAlpha(0.6);
-
-      resetText.on("pointerdown", () => this.handleResetData());
-      resetText.on("pointerover", () =>
-        resetText.setAlpha(1).setColor("#ff0000"),
-      );
-      resetText.on("pointerout", () =>
-        resetText.setAlpha(0.6).setColor("#8B5E66"),
-      );
-    }
   }
 
   private handleGameStart(isIntroDone: boolean) {
@@ -122,26 +100,5 @@ export default class MainMenuScene extends GameScene {
     else if (flags?.arrivedAtOffice)
       this.scene.start("OfficeScene", this.savedProgress);
     else this.scene.start("CarDriveScene", this.savedProgress);
-  }
-
-  private async handleResetData() {
-    if (
-      window.confirm(
-        "Warning: This will permanently delete your story progress and code solutions!",
-      )
-    ) {
-      EventBus.emit("ui-reset-start");
-      try {
-        const uid = this.savedProgress.userId;
-        await Promise.all([
-          fetch(`/api/game-progress?userId=${uid}`, { method: "DELETE" }),
-          fetch(`/api/code/${uid}`, { method: "DELETE" }),
-          fetch(`/api/solve-record?userId=${uid}`, { method: "DELETE" }),
-        ]);
-        window.location.reload();
-      } catch (e) {
-        console.error("Failed to reset game data:", e);
-      }
-    }
   }
 }

@@ -71,7 +71,7 @@ export default function LoginPage() {
           </div>
           <div className="flex items-center justify-center gap-3 mb-4">
             <Code className="h-8 w-8 text-[#569cd6]" />
-            <h1 className="text-3xl font-bold text-[#cccccc]">DebugFix</h1>
+            <h1 className="text-3xl font-bold text-[#cccccc]">CodeFix</h1>
           </div>
           <p className="text-[#858585] text-lg">Sign in to continue</p>
         </div>

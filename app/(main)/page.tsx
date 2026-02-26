@@ -190,7 +190,7 @@ export default function ProblemModeSelector() {
             </h1>
             <div className="h-1.5 w-16 bg-blue-600 rounded-full mb-6" />
             <p className="text-slate-400 font-medium max-w-sm mx-auto text-sm leading-relaxed">
-              Choose your protocol to begin the session.
+              Choose mode to begin your debugging learning.
             </p>
           </div>
         </motion.div>

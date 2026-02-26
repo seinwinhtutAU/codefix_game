@@ -1,0 +1,374 @@
+"use client";
+
+import { useState, useRef, useMemo, useEffect } from "react";
+import Editor from "@monaco-editor/react";
+import {
+  Play,
+  Lightbulb,
+  Loader2,
+  Terminal,
+  Code2,
+  Sparkles,
+  ChevronLeft,
+  X,
+  WrapText,
+  Target,
+} from "lucide-react";
+import Link from "next/link";
+import { useExecutor, useUserId } from "@/hooks";
+import { Problem } from "@/lib/types";
+
+type HistoryItem = {
+  type: "output" | "input";
+  content: string;
+  isError?: boolean;
+};
+
+export default function PastePage() {
+  const userId = useUserId();
+
+  // --- BASIC STATE ---
+  const [code, setCode] = useState(
+    "# Paste your code here\nprint('Hello World')",
+  );
+  const [hints, setHints] = useState<string[]>([]);
+  const [isGeneratingHints, setIsGeneratingHints] = useState(false);
+  const [hintLevel, setHintLevel] = useState<"small" | "medium" | "big">(
+    "small",
+  );
+
+  // --- OUTPUT CONTEXT STATES ---
+  const [expectedOutput, setExpectedOutput] = useState("");
+  const [currentOutput, setCurrentOutput] = useState("");
+  const [activeTab, setActiveTab] = useState<"terminal" | "expected">(
+    "terminal",
+  );
+
+  // --- UI VISIBILITY STATES ---
+  const [isOutputVisible, setIsOutputVisible] = useState(true);
+  const [isHintsVisible, setIsHintsVisible] = useState(true);
+  const [outputHeight, setOutputHeight] = useState(250);
+  const [isResizing, setIsResizing] = useState(false);
+  const [wordWrap, setWordWrap] = useState(true);
+  const [sessionHistory, setSessionHistory] = useState<HistoryItem[]>([]);
+
+  const outputRef = useRef<HTMLPreElement>(null);
+
+  const pasteProblem: Problem = useMemo(
+    () => ({
+      _id: "paste-session",
+      title: "Paste & Debug",
+      description: "Paste mode.",
+      difficulty: "small",
+      mode: "paste",
+      files: [
+        {
+          id: "main-file-id",
+          name: "main.py",
+          type: "file",
+          content: code,
+          order: 0,
+          parentId: null,
+          children: [],
+        },
+      ],
+      userCodeFiles: [],
+      expectedOutput: expectedOutput,
+      testCases: [],
+      hints: { small: [], medium: [], big: [] },
+    }),
+    [code, expectedOutput],
+  );
+
+  const { isSubmitting, executionResult, runNormalCode } = useExecutor({
+    problem: pasteProblem,
+    fileContents: { "main-file-id": code },
+    userId,
+    level: "paste",
+    timerTimeSpent: 0,
+    hasCompleted: false,
+    setHasCompleted: () => {},
+    attempt: 0,
+    bugCounts: 0,
+    timeLimited: 0,
+    hintUsages: [],
+  });
+
+  useEffect(() => {
+    if (isSubmitting) {
+      setIsOutputVisible(true);
+      setActiveTab("terminal");
+    }
+  }, [isSubmitting]);
+
+  useEffect(() => {
+    if (!executionResult) return;
+    const hasError = Boolean(executionResult.error);
+    const content = hasError ? executionResult.error! : executionResult.output!;
+    setCurrentOutput(content);
+    setSessionHistory([{ type: "output", content, isError: hasError }]);
+    if (outputRef.current)
+      outputRef.current.scrollTop = outputRef.current.scrollHeight;
+  }, [executionResult]);
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isResizing) return;
+      const newHeight = window.innerHeight - e.clientY;
+      if (newHeight > 80 && newHeight < window.innerHeight - 150)
+        setOutputHeight(newHeight);
+    };
+    const handleMouseUp = () => setIsResizing(false);
+    if (isResizing) {
+      window.addEventListener("mousemove", handleMouseMove);
+      window.addEventListener("mouseup", handleMouseUp);
+    }
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, [isResizing]);
+
+  const handleGetHint = async () => {
+    if (!code.trim()) return;
+    setIsGeneratingHints(true);
+    try {
+      const response = await fetch("http://0.0.0.0:8000/api/get-hint", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          files: [{ name: "main.py", path: "main.py", content: code }],
+          error: executionResult?.error || null,
+          hint_level: hintLevel,
+          current_output: currentOutput,
+          expected_output: expectedOutput,
+        }),
+      });
+      const data = await response.json();
+      if (data.success) setHints(data.hints);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setIsGeneratingHints(false);
+    }
+  };
+
+  return (
+    <div className="flex flex-col h-screen w-full bg-[#FDFBF7] font-sans overflow-hidden">
+      <header className="h-14 border-b border-slate-100 bg-white flex items-center justify-between px-6 shrink-0 z-20 shadow-sm">
+        <div className="flex items-center gap-4">
+          <Link
+            href="/"
+            className="p-1.5 hover:bg-slate-50 rounded-full text-slate-400"
+          >
+            <ChevronLeft size={20} />
+          </Link>
+          <div className="flex items-center gap-2">
+            <div className="p-1.5 bg-violet-100 text-violet-600 rounded-lg">
+              <Code2 size={18} />
+            </div>
+            <h1 className="font-bold text-slate-700">Paste & Debug</h1>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setIsOutputVisible(!isOutputVisible)}
+            className={`p-2 rounded-lg transition-colors ${isOutputVisible ? "bg-violet-50 text-violet-600" : "text-slate-400 hover:bg-slate-50"}`}
+          >
+            <Terminal size={18} />
+          </button>
+          <button
+            onClick={() => setIsHintsVisible(!isHintsVisible)}
+            className={`p-2 rounded-lg transition-colors ${isHintsVisible ? "bg-amber-50 text-amber-600" : "text-slate-400 hover:bg-slate-50"}`}
+          >
+            <Sparkles size={18} />
+          </button>
+          <div className="w-[1px] h-6 bg-slate-100 mx-1" />
+          <button
+            onClick={runNormalCode}
+            disabled={isSubmitting}
+            className="flex items-center gap-2 bg-violet-600 text-white px-5 py-1.5 rounded-lg text-sm font-bold hover:bg-violet-700 transition-all disabled:opacity-50"
+          >
+            {isSubmitting ? (
+              <Loader2 size={16} className="animate-spin" />
+            ) : (
+              <Play size={16} fill="currentColor" />
+            )}
+            Run Code
+          </button>
+        </div>
+      </header>
+
+      <main className="flex-1 flex min-h-0 overflow-hidden relative">
+        <div className="flex-1 flex flex-col min-w-0 bg-white">
+          <div className="flex-1 min-h-0 relative">
+            <Editor
+              height="100%"
+              language="python"
+              theme="light"
+              value={code}
+              onChange={(val) => setCode(val || "")}
+              options={{
+                minimap: { enabled: false },
+                fontSize: 14,
+                padding: { top: 16 },
+                scrollBeyondLastLine: false,
+              }}
+            />
+          </div>
+
+          {/* EXPANDED OUTPUT PANEL WITH TABS */}
+          {isOutputVisible && (
+            <div
+              className="bg-white border-t border-slate-200 flex flex-col relative z-10"
+              style={{ height: `${outputHeight}px` }}
+            >
+              <div
+                onMouseDown={() => setIsResizing(true)}
+                className="absolute top-0 left-0 right-0 h-1 cursor-row-resize hover:bg-violet-400 transition-colors"
+              />
+
+              <div className="flex justify-between items-center px-4 border-b border-slate-100 shrink-0">
+                <div className="flex items-center gap-4">
+                  <button
+                    onClick={() => setActiveTab("terminal")}
+                    className={`py-2 px-1 text-[10px] font-bold uppercase tracking-wider flex items-center gap-2 border-b-2 transition-all ${activeTab === "terminal" ? "border-violet-600 text-violet-600" : "border-transparent text-slate-400"}`}
+                  >
+                    <Terminal size={14} /> Terminal
+                  </button>
+                  <button
+                    onClick={() => setActiveTab("expected")}
+                    className={`py-2 px-1 text-[10px] font-bold uppercase tracking-wider flex items-center gap-2 border-b-2 transition-all ${activeTab === "expected" ? "border-violet-600 text-violet-600" : "border-transparent text-slate-400"}`}
+                  >
+                    <Target size={14} /> Expected Output
+                  </button>
+                </div>
+
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => setWordWrap(!wordWrap)}
+                    className={`p-1.5 rounded-md ${wordWrap ? "text-violet-600 bg-violet-50" : "text-slate-400"}`}
+                  >
+                    <WrapText size={14} />
+                  </button>
+                  <button
+                    onClick={() => setIsOutputVisible(false)}
+                    className="p-1.5 text-slate-400 hover:text-rose-500"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex-1 p-3 bg-white overflow-hidden">
+                <div className="h-full rounded-xl bg-slate-50 border border-slate-200/60 overflow-hidden">
+                  {activeTab === "terminal" ? (
+                    <pre
+                      ref={outputRef}
+                      className={`h-full text-sm font-mono p-4 text-slate-700 overflow-auto ${wordWrap ? "whitespace-pre-wrap" : "whitespace-pre"}`}
+                    >
+                      {isSubmitting ? (
+                        <div className="text-violet-500 animate-pulse flex items-center gap-2">
+                          <Loader2 size={14} className="animate-spin" />{" "}
+                          Running...
+                        </div>
+                      ) : (
+                        sessionHistory.map((item, i) => (
+                          <span
+                            key={i}
+                            className={item.isError ? "text-rose-600" : ""}
+                          >
+                            {item.content}
+                          </span>
+                        ))
+                      )}
+                    </pre>
+                  ) : (
+                    <textarea
+                      value={expectedOutput}
+                      onChange={(e) => setExpectedOutput(e.target.value)}
+                      placeholder="Paste your expected output here."
+                      className={`w-full h-full p-4 text-sm font-mono text-slate-700 bg-transparent outline-none resize-none ${wordWrap ? "whitespace-pre-wrap" : "whitespace-pre"}`}
+                    />
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* AI HINTS SIDEBAR */}
+        {isHintsVisible && (
+          <div className="w-[380px] flex flex-col bg-white border-l border-slate-100 shrink-0">
+            <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between bg-amber-50/20">
+              <div className="flex items-center gap-2 text-amber-600">
+                <Sparkles size={18} />
+                <span className="text-sm font-bold">Hints</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <select
+                  value={hintLevel}
+                  onChange={(e) =>
+                    setHintLevel(e.target.value as "big" | "small" | "medium")
+                  }
+                  className="text-[11px] bg-white border border-amber-200 rounded px-2 py-0.5 outline-none font-bold text-amber-700"
+                >
+                  <option value="small">small</option>
+                  <option value="medium">medium</option>
+                  <option value="big">big</option>
+                </select>
+                <button
+                  onClick={() => setIsHintsVisible(false)}
+                  className="text-slate-400 hover:text-slate-600"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+            </div>
+
+            <div className="flex-1 p-6 overflow-y-auto">
+              {hints.length > 0 ? (
+                <div className="space-y-5">
+                  {hints.map((hint, i) => (
+                    <div key={i} className="flex gap-3">
+                      <div className="flex-shrink-0 w-5 h-5 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center text-[10px] font-bold">
+                        {i + 1}
+                      </div>
+                      <p className="text-sm text-slate-600 leading-relaxed pt-0.5">
+                        {hint}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="h-full flex flex-col items-center justify-center text-center opacity-40">
+                  <Lightbulb size={32} className="text-amber-300 mb-3" />
+                  <p className="text-xs text-slate-500">
+                    Define your <strong>Expected Output</strong> in the bottom
+                    panel, run your code, then request a hint.
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <div className="p-4 border-t border-slate-100 bg-slate-50/50">
+              <button
+                onClick={handleGetHint}
+                disabled={isGeneratingHints || !code.trim()}
+                className="w-full bg-amber-500 hover:bg-amber-600 text-white font-bold py-2.5 rounded-xl text-sm flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+              >
+                {isGeneratingHints ? (
+                  <Loader2 size={18} className="animate-spin" />
+                ) : (
+                  <Sparkles size={18} />
+                )}
+                Get AI Hint
+              </button>
+            </div>
+          </div>
+        )}
+      </main>
+    </div>
+  );
+}
