@@ -71,6 +71,51 @@ export default class MainMenuScene extends GameScene {
         this.scene.start("LevelScene", this.savedProgress);
       },
     });
+
+    // --- RESET PROGRESS LOGIC ---
+    if (isIntroDone) {
+      const resetText = this.add
+        .text(width / 2, height - 50, "RESET DATA", {
+          fontFamily: "Gluten",
+          fontSize: "16px",
+          color: "#ff4d4d",
+        })
+        .setOrigin(0.5)
+        .setInteractive({ useHandCursor: true });
+
+      resetText.on("pointerdown", async () => {
+        const confirmReset = window.confirm(
+          "Are you sure? This will delete all progress!",
+        );
+
+        if (confirmReset) {
+          try {
+            const response = await fetch(
+              `/api/game-progress?userId=${this.savedProgress.userId}`,
+              {
+                method: "DELETE",
+              },
+            );
+
+            if (response.ok) {
+              EventBus.emit("ui-reset-start");
+              AudioManager.getInstance().stopMusic();
+
+              // Brief delay to ensure the event fires before reload
+              setTimeout(() => {
+                window.location.reload();
+              }, 100);
+            }
+          } catch (error) {
+            console.error("Failed to delete progress:", error);
+          }
+        }
+      });
+
+      // Hover Effects for Reset Text
+      resetText.on("pointerover", () => resetText.setColor("#ffffff"));
+      resetText.on("pointerout", () => resetText.setColor("#ff4d4d"));
+    }
   }
 
   private handleGameStart(isIntroDone: boolean) {
