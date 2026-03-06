@@ -11,6 +11,16 @@ interface ProblemWithStatus extends Problem {
   pointsEarned: number;
 }
 
+interface SolveRecord {
+  problemId: string;
+  pointsEarned?: number;
+}
+
+interface SolveRecordResponse {
+  success: boolean;
+  data?: SolveRecord[];
+}
+
 export default function ProblemsListPage() {
   const { level } = useParams();
   const router = useRouter();
@@ -60,10 +70,10 @@ export default function ProblemsListPage() {
               `/api/solve-record/bulk?userId=${userId}&problemIds=${problemIds}`,
             );
             if (solveRes.ok) {
-              const solveData = await solveRes.json();
+              const solveData: SolveRecordResponse = await solveRes.json();
               if (solveData?.success && Array.isArray(solveData.data)) {
-                const solveRecordMap = new Map(
-                  solveData.data.map((r: any) => [
+                const solveRecordMap = new Map<string, { pointsEarned: number }>(
+                  solveData.data.map((r) => [
                     r.problemId,
                     { pointsEarned: r.pointsEarned || 0 },
                   ]),

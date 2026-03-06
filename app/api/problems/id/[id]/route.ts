@@ -3,7 +3,9 @@ import dbConnect from "@/lib/db";
 import Problem, { IProblem } from "@/models/Problem";
 import ProblemFile, { IProblemFile } from "@/models/ProblemFile";
 import SolutionFile, { ISolutionFile } from "@/models/SolutionFile";
-import { ProblemFileNode, SolutionFileNode } from "@/lib/types";
+import UserCodeFile from "@/models/UserCodeFile";
+import ProblemSolveRecord from "@/models/ProblemSolveRecord";
+import { ProblemFileNode, SolutionFileNode, TreeNode } from "@/lib/types";
 import {
   createErrorResponse,
   validateParams,
@@ -56,7 +58,7 @@ export async function GET(
               content: doc.content,
             })
           )
-        : Promise.resolve([] as SolutionFileNode[]),
+        : Promise.resolve([] as TreeNode<SolutionFileNode>[]),
     ]);
 
     return NextResponse.json({
