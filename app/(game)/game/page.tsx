@@ -8,7 +8,7 @@ import { GameNotificationProps } from "@/game/components/GameNotification";
 import DebuggingQuiz from "@/game/components/DebuggingQuiz";
 import AudioManager from "@/game/AudioManager";
 import { useRouter } from "next/navigation";
-import { Home } from "lucide-react"; // Imported Home icon
+import { Home } from "lucide-react";
 
 // --- DYNAMIC IMPORTS ---
 const PhaserGame = dynamic(() => import("@/game/components/PhaserGame"), {
@@ -114,20 +114,22 @@ export default function GamePage() {
     <div className="flex items-center justify-center min-h-screen bg-[#333333] p-0 md:p-4">
       <div className="relative shadow-2xl border-4 border-gray-800 rounded-lg overflow-hidden w-full max-w-[1376px] aspect-video bg-[#1a1a2e]">
         {/* --- FLOATING HOME BUTTON --- */}
-        <motion.button
-          initial={{ opacity: 0, scale: 0.5 }}
-          animate={{ opacity: 1, scale: 1 }}
-          whileHover={{ scale: 1.1, backgroundColor: "#2563eb" }}
-          whileTap={{ scale: 0.9 }}
-          onClick={() => router.push("/")}
-          className="absolute top-4 left-4 z-[250] p-3 bg-gray-900/90 border border-gray-700 rounded-xl text-white shadow-2xl transition-colors group"
-          title="Back to Home"
-        >
-          <Home
-            size={22}
-            className="group-hover:text-white text-blue-400 transition-colors"
-          />
-        </motion.button>
+        {!activeProblemId && (
+          <motion.button
+            initial={{ opacity: 0, scale: 0.5 }}
+            animate={{ opacity: 1, scale: 1 }}
+            whileHover={{ scale: 1.1, backgroundColor: "#2563eb" }}
+            whileTap={{ scale: 0.9 }}
+            onClick={() => router.push("/")}
+            className="absolute top-4 left-4 z-[250] p-3 bg-gray-900/90 border border-gray-700 rounded-xl text-white shadow-2xl transition-colors group"
+            title="Back to Home"
+          >
+            <Home
+              size={22}
+              className="group-hover:text-white text-blue-400 transition-colors"
+            />
+          </motion.button>
+        )}
 
         {/* 1. DATA RESET OVERLAY (Highest Z-Index) */}
         {isResetting && (
