@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { CheckCircle, Circle, ChevronRight, Trophy } from "lucide-react";
-import { User } from "@/lib/types";
 import { Problem } from "@/lib/types";
 
 interface ProblemWithStatus extends Problem {
@@ -17,42 +16,73 @@ export default function ProblemsListPage() {
   const router = useRouter();
   const [problems, setProblems] = useState<ProblemWithStatus[]>([]);
   const [loading, setLoading] = useState(true);
+  const [userId, setUserId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const loadUser = async () => {
+      try {
+        const res = await fetch("/api/me");
+        if (!res.ok) {
+          router.push("/login");
+          return;
+        }
+        const data = await res.json();
+        setUserId(data?.user?.id || null);
+      } catch {
+        router.push("/login");
+      }
+    };
+
+    loadUser();
+  }, [router]);
 
   useEffect(() => {
     async function fetchProblems() {
       try {
-        const res = await fetch(`/api/problems/level/${level}`);
+        const res = await fetch(
+          `/api/problems/level/${level}?includeFiles=false`,
+        );
         const data = await res.json();
 
-        const user: User = JSON.parse(localStorage.getItem("user") || "{}");
-        const userId = user.id;
-        const problemsWithStatus: ProblemWithStatus[] = [];
+        const problemsWithStatus: ProblemWithStatus[] = (
+          data.problems || []
+        ).map((problem: Problem) => ({
+          ...problem,
+          isCompleted: false,
+          pointsEarned: 0,
+        }));
+        setProblems(problemsWithStatus);
 
-        for (const problem of data.problems || []) {
-          let isCompleted = false;
-          let pointsEarned = 0;
-
-          if (userId && userId !== "null") {
-            try {
-              const solveRes = await fetch(
-                `/api/solve-record?userId=${userId}&problemId=${problem._id}`,
-              );
+        if (userId && userId !== "null" && Array.isArray(data.problems)) {
+          const problemIds = data.problems.map((p: Problem) => p._id).join(",");
+          if (problemIds.length > 0) {
+            const solveRes = await fetch(
+              `/api/solve-record/bulk?userId=${userId}&problemIds=${problemIds}`,
+            );
+            if (solveRes.ok) {
               const solveData = await solveRes.json();
-              isCompleted = solveData.data != null;
-              pointsEarned = solveData.data ? solveData.data.pointsEarned : 0;
-            } catch (err) {
-              console.error(`Error checking completion for problem:`, err);
+              if (solveData?.success && Array.isArray(solveData.data)) {
+                const solveRecordMap = new Map(
+                  solveData.data.map((r: any) => [
+                    r.problemId,
+                    { pointsEarned: r.pointsEarned || 0 },
+                  ]),
+                );
+
+                setProblems((prev) =>
+                  prev.map((p) => {
+                    const record = solveRecordMap.get(p._id);
+                    return {
+                      ...p,
+                      isCompleted: !!record,
+                      pointsEarned: record?.pointsEarned || 0,
+                    };
+                  }),
+                );
+              }
             }
           }
-
-          problemsWithStatus.push({
-            ...problem,
-            isCompleted,
-            pointsEarned,
-          });
         }
-
-        setProblems(problemsWithStatus);
       } catch (err) {
         console.error("Failed to fetch problems:", err);
         setProblems([]);
@@ -60,8 +90,10 @@ export default function ProblemsListPage() {
       setLoading(false);
     }
 
-    fetchProblems();
-  }, [level]);
+    if (userId !== null) {
+      fetchProblems();
+    }
+  }, [level, userId]);
 
   // Handle problem click - Navigate directly to problem page for all levels
   const handleProblemClick = (

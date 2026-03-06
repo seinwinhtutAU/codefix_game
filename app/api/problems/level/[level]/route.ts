@@ -9,17 +9,23 @@ import {
   validateParams,
   buildProblemFiles,
 } from "@/lib/api-helpers";
+import { requireAuth } from "@/lib/auth-guard";
 
 const VALID_LEVELS = ["easy", "medium", "hard", "boss"] as const;
 
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   ctx: RouteContext<"/api/problems/level/[level]">,
 ) {
   try {
+    const auth = requireAuth(req);
+    if (!auth.ok) return auth.response;
+
     await dbConnect();
 
     const { level } = await ctx.params;
+    const includeFilesParam = req.nextUrl.searchParams.get("includeFiles");
+    const includeFiles = includeFilesParam !== "false";
 
     const validationError = validateParams({ level });
     if (validationError) {
@@ -35,13 +41,20 @@ export async function GET(
       .sort({ order: 1 })
       .lean<IProblem[]>();
 
-    const problemsWithFiles = await Promise.all(
-      problems.map((problem) => enrichProblemWithFiles(problem)),
-    );
+    if (includeFiles) {
+      const problemsWithFiles = await Promise.all(
+        problems.map((problem) => enrichProblemWithFiles(problem)),
+      );
+
+      return NextResponse.json({
+        success: true,
+        problems: problemsWithFiles,
+      });
+    }
 
     return NextResponse.json({
       success: true,
-      problems: problemsWithFiles,
+      problems,
     });
   } catch (error) {
     return createErrorResponse(error);

@@ -1,8 +1,9 @@
-import { NextResponse } from "next/server";
+import { NextResponse, NextRequest } from "next/server";
 import dbConnect from "@/lib/db";
 import GameProgressModel from "@/models/GameProgress";
 import { HintUsage } from "@/models/ProblemSolveRecord";
 import mongoose from "mongoose";
+import { requireAuth, requireSameUser, requireAdmin } from "@/lib/auth-guard";
 
 export const dynamic = "force-dynamic";
 
@@ -60,8 +61,11 @@ const DEFAULT_GAME_STATE = {
 // HTTP Methods
 // ============================================================================
 
-export async function GET(req: Request) {
+export async function GET(req: NextRequest) {
   try {
+    const auth = requireAuth(req);
+    if (!auth.ok) return auth.response;
+
     await dbConnect();
 
     const { searchParams } = new URL(req.url);
@@ -72,6 +76,9 @@ export async function GET(req: Request) {
      * Used by the Admin Dashboard to see all students' live status.
      */
     if (!userId) {
+      const admin = await requireAdmin(req);
+      if (!admin.ok) return admin.response;
+
       const allProgress = await GameProgressModel.find({})
         .sort({ updatedAt: -1 }) // Show most recent activity first
         .lean();
@@ -86,6 +93,10 @@ export async function GET(req: Request) {
      * CASE 2: Fetch Specific User Progress
      * Used by the Phaser game client to load a player's save.
      */
+    if (auth.payload.sub !== userId) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
     const progress = await GameProgressModel.findOne({ userId }).lean();
 
     // If no progress exists, return the default starting state
@@ -104,11 +115,14 @@ export async function GET(req: Request) {
   }
 }
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   try {
+    const body: GameProgressRequest = await req.json();
+    const auth = requireSameUser(req, body.userId);
+    if (!auth.ok) return auth.response;
+
     await dbConnect();
 
-    const body: GameProgressRequest = await req.json();
     const { userId, lastLocation, gameState, bugCounts } = body;
 
     if (!userId) {
@@ -160,19 +174,21 @@ export async function POST(req: Request) {
   }
 }
 
-export async function DELETE(req: Request) {
+export async function DELETE(req: NextRequest) {
   try {
-    await dbConnect();
-
     const { searchParams } = new URL(req.url);
     const userId = searchParams.get("userId");
-
     if (!userId) {
       return NextResponse.json(
         { error: "User ID is required to delete progress" },
         { status: 400 },
       );
     }
+
+    const auth = requireSameUser(req, userId);
+    if (!auth.ok) return auth.response;
+
+    await dbConnect();
 
     const deletedProgress = await GameProgressModel.findOneAndDelete({
       userId,

@@ -306,7 +306,7 @@ export function ProblemOverlay({
       incrementAttemptsInProgress();
       setShowGameOver(true);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [isTimeUp, hasCompleted]);
 
   useEffect(() => {
@@ -964,6 +964,7 @@ export function ProblemOverlay({
                 isVisible={showTestCases}
                 isSubmitting={isTestRunning || isSubmitting}
                 onResize={setTestCasePanelHeight}
+                defaultHeight={testCasePanelHeight}
                 onClose={() => setShowTestCases(false)}
               />
             </div>

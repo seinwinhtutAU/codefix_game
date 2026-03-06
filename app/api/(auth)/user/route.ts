@@ -4,9 +4,13 @@ import User from "@/models/User";
 import mongoose from "mongoose";
 import ProblemSolveRecord from "@/models/ProblemSolveRecord";
 import UserCodeFile from "@/models/UserCodeFile";
+import { requireAdmin } from "@/lib/auth-guard";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
+    const admin = await requireAdmin(req);
+    if (!admin.ok) return admin.response;
+
     await dbConnect();
 
     const users = await User.find().select("-password").sort({ createdAt: -1 });
@@ -29,6 +33,9 @@ export async function GET() {
 
 export async function DELETE(req: NextRequest) {
   try {
+    const admin = await requireAdmin(req);
+    if (!admin.ok) return admin.response;
+
     await dbConnect();
 
     const url = new URL(req.url);

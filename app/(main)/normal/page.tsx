@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 
 const levels = [
@@ -28,14 +29,18 @@ const levels = [
 export default function LearnPage() {
   const router = useRouter();
 
-  // Check login directly
-  if (typeof window !== "undefined") {
-    const storedUser = localStorage.getItem("user");
-    if (!storedUser) {
-      router.push("/login");
-      return null;
-    }
-  }
+  // Check login
+  useEffect(() => {
+    const checkSession = async () => {
+      try {
+        const res = await fetch("/api/me");
+        if (!res.ok) router.push("/login");
+      } catch {
+        router.push("/login");
+      }
+    };
+    checkSession();
+  }, [router]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800 py-12 px-4 sm:px-6 lg:px-8">

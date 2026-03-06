@@ -16,22 +16,18 @@ export default function SignUpPage() {
 
   // Redirect if already logged in
   useEffect(() => {
-    const storedUser = localStorage.getItem("user");
-    if (storedUser) {
-      router.replace("/");
-    }
+    const checkSession = async () => {
+      try {
+        const res = await fetch("/api/me");
+        if (res.ok) {
+          router.replace("/");
+        }
+      } catch {
+        // ignore
+      }
+    };
+    checkSession();
   }, [router]);
-
-  if (typeof window !== "undefined" && localStorage.getItem("user")) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-[#1e1e1e]">
-        <div className="text-center">
-          <div className="w-10 h-10 border-4 border-[#007acc] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-[#cccccc]">Redirecting...</p>
-        </div>
-      </div>
-    );
-  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -48,7 +44,6 @@ export default function SignUpPage() {
       const data = await response.json();
 
       if (response.ok) {
-        localStorage.setItem("user", JSON.stringify(data.user));
         router.push("/");
       } else {
         setError(data.message || "Signup failed. Please try again.");
@@ -148,7 +143,7 @@ export default function SignUpPage() {
               </div>
               <p className="text-xs text-[#858585] mt-2 flex items-center gap-1">
                 <div className="w-1.5 h-1.5 rounded-full bg-[#4ec9b0]" />
-                Use at least 6 characters
+                Use at least 8 characters
               </p>
             </div>
 

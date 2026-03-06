@@ -3,8 +3,6 @@ import dbConnect from "@/lib/db";
 import Problem, { IProblem } from "@/models/Problem";
 import ProblemFile, { IProblemFile } from "@/models/ProblemFile";
 import SolutionFile, { ISolutionFile } from "@/models/SolutionFile";
-import UserCodeFile from "@/models/UserCodeFile";
-import ProblemSolveRecord from "@/models/ProblemSolveRecord";
 import { ProblemFileNode, SolutionFileNode } from "@/lib/types";
 import {
   createErrorResponse,
@@ -12,15 +10,22 @@ import {
   buildProblemFiles,
 } from "@/lib/api-helpers";
 import { flattenTree } from "@/lib/utils";
+import { requireAuth } from "@/lib/auth-guard";
 
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   ctx: RouteContext<"/api/problems/id/[id]">
 ) {
   try {
+    const auth = requireAuth(req);
+    if (!auth.ok) return auth.response;
+
     await dbConnect();
 
     const { id: problemId } = await ctx.params;
+    const includeSolutionFilesParam =
+      req.nextUrl.searchParams.get("includeSolutionFiles");
+    const includeSolutionFiles = includeSolutionFilesParam === "true";
 
     const validationError = validateParams({ problemId });
     if (validationError) {
@@ -42,14 +47,16 @@ export async function GET(
           mode: doc.mode,
         })
       ),
-      buildProblemFiles<SolutionFileNode, ISolutionFile>(
-        SolutionFile,
-        problemId,
-        (doc) => ({
-          problemId: doc.problemId.toString(),
-          content: doc.content,
-        })
-      ),
+      includeSolutionFiles
+        ? buildProblemFiles<SolutionFileNode, ISolutionFile>(
+            SolutionFile,
+            problemId,
+            (doc) => ({
+              problemId: doc.problemId.toString(),
+              content: doc.content,
+            })
+          )
+        : Promise.resolve([] as SolutionFileNode[]),
     ]);
 
     return NextResponse.json({
@@ -58,7 +65,9 @@ export async function GET(
         ...problem,
         _id: problem._id.toString(),
         files: flattenTree(problemFiles),
-        solutionFiles: flattenTree(solutionFiles),
+        solutionFiles: includeSolutionFiles
+          ? flattenTree(solutionFiles)
+          : undefined,
       },
     });
   } catch (error) {
@@ -71,6 +80,9 @@ export async function DELETE(
   ctx: RouteContext<"/api/problems/id/[id]">
 ) {
   try {
+    const auth = requireAuth(req);
+    if (!auth.ok) return auth.response;
+
     await dbConnect();
 
     const { id: problemId } = await ctx.params;

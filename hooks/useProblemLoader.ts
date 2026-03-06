@@ -21,9 +21,13 @@ export function useProblemLoader(problemId: string, userId: string) {
   const loadProblemData = useCallback(async () => {
     try {
       setIsLoading(true);
-      const [problemData, userCodeData] = await Promise.all([
+      const shouldCheckRecord = userId && userId !== "null";
+      const [problemData, userCodeData, existingRecord] = await Promise.all([
         fetchProblem(problemId),
         fetchUserCode(userId, problemId),
+        shouldCheckRecord
+          ? checkExistingSolveRecord(userId, problemId)
+          : Promise.resolve(null),
       ]);
 
       if (problemData.success && userCodeData.success) {
@@ -44,15 +48,6 @@ export function useProblemLoader(problemId: string, userId: string) {
 
         const firstFile = findFirstFile(problemData.problem.files);
         setSelectedFile(firstFile);
-
-        // Check for existing solve record
-        const existingRecord = await checkExistingSolveRecord(
-          userId,
-          problemId,
-        );
-
-        // Debug log to see what we're getting from the API
-        console.log("Existing solve record:", existingRecord);
 
         if (existingRecord?.data) {
           // Set states based on existing record

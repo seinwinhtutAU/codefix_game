@@ -36,15 +36,21 @@ export interface ProblemByLevelResponse {
 
 export async function fetchProblem(
   problemId: string,
+  includeSolutionFiles: boolean = false,
 ): Promise<ProblemResponse> {
-  const response = await fetch(`/api/problems/id/${problemId}`);
+  const response = await fetch(
+    `/api/problems/id/${problemId}?includeSolutionFiles=${includeSolutionFiles ? "true" : "false"}`
+  );
   return response.json();
 }
 
 export async function fetchProblemsByLevel(
   level: string,
+  includeFiles: boolean = true,
 ): Promise<ProblemByLevelResponse> {
-  const response = await fetch(`/api/problems/level/${level}`);
+  const response = await fetch(
+    `/api/problems/level/${level}?includeFiles=${includeFiles ? "true" : "false"}`
+  );
   return response.json();
 }
 

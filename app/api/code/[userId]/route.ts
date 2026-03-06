@@ -4,15 +4,18 @@ import { buildTree } from "@/lib/utils";
 import UserCodeFile, { IUserCodeFile } from "@/models/UserCodeFile";
 import { UserCodeFileNode } from "@/lib/types";
 import { createErrorResponse, validateParams } from "@/lib/api-helpers";
+import { requireSameUser } from "@/lib/auth-guard";
 
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   ctx: RouteContext<"/api/code/[userId]">
 ) {
   try {
-    await dbConnect();
-
     const { userId } = await ctx.params;
+    const auth = requireSameUser(req, userId);
+    if (!auth.ok) return auth.response;
+
+    await dbConnect();
 
     const validationError = validateParams({ userId });
     if (validationError) {
@@ -26,11 +29,11 @@ export async function GET(
         userId: doc.userId.toString(),
         problemId: doc.problemId.toString(),
         content: doc.content,
-      })
+      }),
+      { userId }
     );
 
-    const userFiles = allFiles.filter((file) => file.data?.userId === userId);
-
+    const userFiles = allFiles;
     return NextResponse.json({
       success: true,
       files: userFiles,
@@ -41,13 +44,15 @@ export async function GET(
 }
 
 export async function DELETE(
-  _req: NextRequest,
+  req: NextRequest,
   ctx: RouteContext<"/api/code/[userId]">
 ) {
   try {
-    await dbConnect();
-
     const { userId } = await ctx.params;
+    const auth = requireSameUser(req, userId);
+    if (!auth.ok) return auth.response;
+
+    await dbConnect();
 
     const validationError = validateParams({ userId });
     if (validationError) {

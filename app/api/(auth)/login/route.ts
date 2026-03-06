@@ -8,14 +8,13 @@ export async function POST(request: Request) {
   await dbConnect();
   const { email, password } = await request.json();
 
-  const normalizedEmail =
-    typeof email === "string" ? email.trim().toLowerCase() : "";
+  const normalizedEmail = typeof email === "string" ? email.trim().toLowerCase() : "";
   const passwordStr = typeof password === "string" ? password : "";
 
   if (!normalizedEmail || !passwordStr) {
     return NextResponse.json(
       { message: "Email and password required." },
-      { status: 422 },
+      { status: 422 }
     );
   }
 
@@ -25,7 +24,7 @@ export async function POST(request: Request) {
     if (!user) {
       return NextResponse.json(
         { message: "Invalid credentials." },
-        { status: 401 },
+        { status: 401 }
       );
     }
 
@@ -33,7 +32,7 @@ export async function POST(request: Request) {
     if (!isValidPassword) {
       return NextResponse.json(
         { message: "Invalid credentials." },
-        { status: 401 },
+        { status: 401 }
       );
     }
 
@@ -52,7 +51,7 @@ export async function POST(request: Request) {
     console.error(error);
     return NextResponse.json(
       { message: "Internal server error." },
-      { status: 500 },
+      { status: 500 }
     );
   }
 }

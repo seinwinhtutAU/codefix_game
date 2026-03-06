@@ -16,6 +16,14 @@ export function signAuthToken(payload: { sub: string; email: string }) {
   return jwt.sign(payload, getJwtSecret(), { expiresIn: JWT_EXPIRES_IN });
 }
 
+export function verifyAuthToken(token: string): { sub: string; email: string } {
+  return jwt.verify(token, getJwtSecret()) as { sub: string; email: string };
+}
+
+export function getAuthCookieName() {
+  return JWT_COOKIE_NAME;
+}
+
 export function setAuthCookie(response: NextResponse, token: string) {
   response.cookies.set(JWT_COOKIE_NAME, token, {
     httpOnly: true,

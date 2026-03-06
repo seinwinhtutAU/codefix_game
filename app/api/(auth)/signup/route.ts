@@ -8,10 +8,8 @@ export async function POST(request: Request) {
   await dbConnect();
   const { username, email, password } = await request.json();
 
-  const normalizedEmail =
-    typeof email === "string" ? email.trim().toLowerCase() : "";
-  const normalizedUsername =
-    typeof username === "string" ? username.trim() : "";
+  const normalizedEmail = typeof email === "string" ? email.trim().toLowerCase() : "";
+  const normalizedUsername = typeof username === "string" ? username.trim() : "";
   const passwordStr = typeof password === "string" ? password : "";
 
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -23,11 +21,8 @@ export async function POST(request: Request) {
     passwordStr.length < 8
   ) {
     return NextResponse.json(
-      {
-        message:
-          "Invalid input. Use a valid email and a password of 8+ characters.",
-      },
-      { status: 422 },
+      { message: "Invalid input. Use a valid email and a password of 8+ characters." },
+      { status: 422 }
     );
   }
 
@@ -38,7 +33,7 @@ export async function POST(request: Request) {
     if (existingUser) {
       return NextResponse.json(
         { message: "User already exists." },
-        { status: 409 },
+        { status: 409 }
       );
     }
 
@@ -63,7 +58,7 @@ export async function POST(request: Request) {
           email: newUser.email,
         },
       },
-      { status: 201 },
+      { status: 201 }
     );
     setAuthCookie(response, token);
     return response;
@@ -71,7 +66,7 @@ export async function POST(request: Request) {
     console.error(error);
     return NextResponse.json(
       { message: "Internal server error." },
-      { status: 500 },
+      { status: 500 }
     );
   }
 }

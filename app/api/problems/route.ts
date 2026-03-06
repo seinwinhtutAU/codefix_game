@@ -13,9 +13,13 @@ import {
 } from "@/lib/types";
 import { createErrorResponse } from "@/lib/api-helpers";
 import { buildProblemFiles } from "@/lib/api-helpers";
+import { requireAuth } from "@/lib/auth-guard";
 
 export async function POST(req: NextRequest) {
   try {
+    const auth = requireAuth(req);
+    if (!auth.ok) return auth.response;
+
     await dbConnect();
 
     const body: CreateProblemRequest = await req.json();
@@ -81,8 +85,11 @@ export async function POST(req: NextRequest) {
   }
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
+    const auth = requireAuth(req);
+    if (!auth.ok) return auth.response;
+
     await dbConnect();
 
     // Add sorting by order field in ascending order
@@ -138,6 +145,9 @@ async function enrichProblemWithFiles(problem: IProblem) {
 
 export async function DELETE(req: NextRequest) {
   try {
+    const auth = requireAuth(req);
+    if (!auth.ok) return auth.response;
+
     await dbConnect();
 
     const url = new URL(req.url);

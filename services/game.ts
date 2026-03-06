@@ -2,11 +2,13 @@ import { CreateProblemRequest, IGameProgress } from "@/lib/types";
 import { ProblemResponse } from "./problem";
 
 export async function getPlayerProgress() {
-  const userJson = localStorage.getItem("user");
-  if (!userJson) return null;
+  const meRes = await fetch("/api/me");
+  if (!meRes.ok) return null;
+  const me = await meRes.json();
+  const userId = me?.user?.id;
+  if (!userId) return null;
 
-  const user = JSON.parse(userJson);
-  const response = await fetch(`/api/game-progress?userId=${user.id}`);
+  const response = await fetch(`/api/game-progress?userId=${userId}`);
   if (!response.ok) return null;
 
   return await response.json();

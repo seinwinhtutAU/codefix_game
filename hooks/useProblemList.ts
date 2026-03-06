@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from "react";
 import { Problem } from "@/lib/types";
-import { fetchProblemsByLevel, checkExistingSolveRecord } from "@/services";
+import { fetchProblemsByLevel } from "@/services";
 
 interface UseProblemListProps {
   currentProblem?: Problem | null;
@@ -24,28 +24,46 @@ export function useProblemList({
   // -------------------------------------------------------------
   // Refresh completion statuses
   // -------------------------------------------------------------
-  const refreshCompletionStatuses = useCallback(async () => {
-    if (!userId || userId === "null" || !levelProblems.length) return;
+  const refreshCompletionStatuses = useCallback(
+    async (problemsOverride?: Problem[]) => {
+      const problemsToCheck = problemsOverride || levelProblems;
+      if (!userId || userId === "null" || !problemsToCheck.length) return;
 
-    try {
-      const statuses: Record<string, boolean> = {};
+      try {
+        const statuses: Record<string, boolean> = {};
+        const problemIds = problemsToCheck.map((p) => p._id).join(",");
 
-      const promises = levelProblems.map(async (problem) => {
-        try {
-          const record = await checkExistingSolveRecord(userId, problem._id);
-          statuses[problem._id] =
-            record?.success === true && record.data !== null;
-        } catch {
-          statuses[problem._id] = false;
+        if (problemIds.length > 0) {
+          const res = await fetch(
+            `/api/solve-record/bulk?userId=${userId}&problemIds=${problemIds}`,
+          );
+
+          if (res.ok) {
+            const data = await res.json();
+            if (data?.success && Array.isArray(data.data)) {
+              const recordMap = new Map(
+                data.data.map((r: any) => [r.problemId, r]),
+              );
+              problemsToCheck.forEach((problem) => {
+                statuses[problem._id] = recordMap.has(problem._id);
+              });
+              setCompletionStatus(statuses);
+              return;
+            }
+          }
         }
-      });
 
-      await Promise.all(promises);
-      setCompletionStatus(statuses);
-    } catch (error) {
-      console.error("Failed to refresh completion statuses:", error);
-    }
-  }, [userId, levelProblems]);
+        // Fallback: set all to false if bulk fetch fails
+        problemsToCheck.forEach((problem) => {
+          statuses[problem._id] = false;
+        });
+        setCompletionStatus(statuses);
+      } catch (error) {
+        console.error("Failed to refresh completion statuses:", error);
+      }
+    },
+    [userId, levelProblems],
+  );
 
   // -------------------------------------------------------------
   // 1. Load problems for current difficulty
@@ -57,7 +75,8 @@ export function useProblemList({
 
     try {
       const res = await fetchProblemsByLevel(
-        currentProblem.difficulty.toLowerCase()
+        currentProblem.difficulty.toLowerCase(),
+        false,
       );
 
       if (!res.success) return;
@@ -67,7 +86,7 @@ export function useProblemList({
       setHasFetched(true); // Mark as fetched
 
       // Refresh completion statuses
-      await refreshCompletionStatuses();
+      await refreshCompletionStatuses(problems);
     } catch (err) {
       console.error("Error loading problems:", err);
     } finally {

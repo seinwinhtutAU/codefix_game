@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import mongoose from "mongoose";
 import dbConnect from "@/lib/db";
 import ProblemSolveRecord, { HintUsage } from "@/models/ProblemSolveRecord";
+import { requireAuth, requireSameUser } from "@/lib/auth-guard";
 
 type IncomingHint = Omit<HintUsage, "hintId">;
 
@@ -24,9 +25,11 @@ interface RecordsFilter {
 // POST: Create a new solve record
 export async function POST(req: NextRequest) {
   try {
-    await dbConnect();
-
     const body: SolveRecordRequestBody = await req.json();
+    const auth = requireSameUser(req, body.userId);
+    if (!auth.ok) return auth.response;
+
+    await dbConnect();
     const {
       userId,
       problemId,
@@ -133,6 +136,9 @@ interface RecordsFilter {
 
 export async function GET(req: NextRequest) {
   try {
+    const auth = requireAuth(req);
+    if (!auth.ok) return auth.response;
+
     await dbConnect();
 
     const url = new URL(req.url);
@@ -146,6 +152,12 @@ export async function GET(req: NextRequest) {
         return NextResponse.json<SolveRecordResponse>(
           { success: false, data: null },
           { status: 400 },
+        );
+      }
+      if (auth.payload.sub !== userIdParam) {
+        return NextResponse.json<SolveRecordResponse>(
+          { success: false, data: null },
+          { status: 403 },
         );
       }
       filter.userId = new mongoose.Types.ObjectId(userIdParam);
@@ -170,16 +182,6 @@ export async function GET(req: NextRequest) {
     } else {
       result = await ProblemSolveRecord.find(filter).sort({ completedAt: -1 });
     }
-    // // ✅ Case 1: No filters → fetch all records
-    // if (!userIdParam && !problemIdParam) {
-    //   result = await ProblemSolveRecord.find().sort({ completedAt: -1 });
-    // }
-    // // ✅ Case 2: With filters → fetch only one (latest)
-    // else {
-    //   result = await ProblemSolveRecord.findOne(filter).sort({
-    //     completedAt: -1,
-    //   });
-    // }
 
     return NextResponse.json<SolveRecordResponse>({
       success: true,
@@ -197,6 +199,9 @@ export async function GET(req: NextRequest) {
 // DELETE: Delete solve records
 export async function DELETE(req: NextRequest) {
   try {
+    const auth = requireAuth(req);
+    if (!auth.ok) return auth.response;
+
     await dbConnect();
 
     const url = new URL(req.url);

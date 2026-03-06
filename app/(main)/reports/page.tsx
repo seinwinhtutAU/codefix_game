@@ -1,13 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import {
-  fetchAllSolveRecords,
-  fetchAllUsers,
-  fetchAllProblems,
-  User,
-} from "@/services";
-import { fetchAllGameProgress } from "@/services/game";
+import { User } from "@/services";
 import {
   Problem,
   ProblemSolveRecord,
@@ -122,42 +116,37 @@ export default function SolveRecordsDashboard() {
   const router = useRouter();
 
   useEffect(() => {
-    const userData = localStorage.getItem("user");
+    const checkAdmin = async () => {
+      try {
+        const res = await fetch("/api/me");
+        if (!res.ok) {
+          router.replace("/");
+          return;
+        }
+        const data = await res.json();
+        const username = data?.user?.username?.toLowerCase() || "";
+        if (!username.startsWith("admin")) {
+          router.replace("/");
+        }
+      } catch {
+        router.replace("/");
+      }
+    };
 
-    if (!userData) {
-      router.replace("/");
-      return;
-    }
-
-    const user = JSON.parse(userData);
-    const username = user.username?.toLowerCase() || "";
-
-    if (!username.startsWith("admin")) {
-      router.replace("/");
-    }
+    checkAdmin();
   }, [router]);
 
   const loadData = async () => {
     try {
       setLoading(true);
-      const [recordsRes, usersRes, problemsRes, progressRes] =
-        await Promise.all([
-          fetchAllSolveRecords(),
-          fetchAllUsers(),
-          fetchAllProblems(),
-          fetchAllGameProgress(),
-        ]);
+      const res = await fetch("/api/reports/overview");
+      const payload = await res.json();
 
-      if (
-        recordsRes.success &&
-        usersRes.success &&
-        problemsRes.success &&
-        progressRes.success
-      ) {
-        setRecords(recordsRes.data);
-        setUsers(usersRes.data);
-        setProblems(problemsRes.problems);
-        setAllProgress(progressRes.data);
+      if (res.ok && payload?.success) {
+        setRecords(payload.data.records || []);
+        setUsers(payload.data.users || []);
+        setProblems(payload.data.problems || []);
+        setAllProgress(payload.data.progress || []);
         setError(null);
       } else {
         setError("Failed to fetch data.");

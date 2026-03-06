@@ -81,16 +81,20 @@ export async function saveFiles<T, D extends IFileDocument>(
 export async function buildTree<T, D extends IFileDocument>(
   Model: mongoose.Model<D>,
   parentId: string | null = null,
-  extraTransform?: (doc: D) => T
+  extraTransform?: (doc: D) => T,
+  baseFilter: Record<string, unknown> = {}
 ): Promise<TreeNode<T>[]> {
-  const documents = await Model.find({ parentId }).sort({ order: 1 }).lean();
+  const documents = await Model.find({ parentId, ...baseFilter })
+    .sort({ order: 1 })
+    .lean();
   const tree: TreeNode<T>[] = [];
 
   for (const doc of documents) {
     const children = await buildTree<T, D>(
       Model,
       doc._id.toString(),
-      extraTransform
+      extraTransform,
+      baseFilter
     );
 
     tree.push({

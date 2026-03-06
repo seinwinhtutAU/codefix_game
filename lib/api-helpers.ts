@@ -38,6 +38,5 @@ export async function buildProblemFiles<
   problemId: string,
   transform: (doc: D) => T
 ): Promise<TreeNode<T>[]> {
-  const allFiles = await buildTree<T, D>(Model, null, transform);
-  return allFiles.filter((file) => file.data?.problemId === problemId);
+  return buildTree<T, D>(Model, null, transform, { problemId });
 }

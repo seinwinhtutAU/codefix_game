@@ -48,12 +48,17 @@ export default function GamePage() {
   const router = useRouter();
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const storedUser = localStorage.getItem("user");
-      if (!storedUser) {
+    const checkSession = async () => {
+      try {
+        const res = await fetch("/api/me");
+        if (!res.ok) {
+          router.push("/login");
+        }
+      } catch {
         router.push("/login");
       }
-    }
+    };
+    checkSession();
   }, [router]);
 
   useEffect(() => {

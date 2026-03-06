@@ -5,15 +5,18 @@ import { TreeNode } from "@/lib/types";
 import UserCodeFile, { IUserCodeFile } from "@/models/UserCodeFile";
 import { UserCodeFileNode, UserCodeRequest } from "@/lib/types";
 import { createErrorResponse, validateParams } from "@/lib/api-helpers";
+import { requireSameUser } from "@/lib/auth-guard";
 
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   ctx: RouteContext<"/api/code/[userId]/[problemId]">
 ) {
   try {
-    await dbConnect();
-
     const { problemId, userId } = await ctx.params;
+    const auth = requireSameUser(req, userId);
+    if (!auth.ok) return auth.response;
+
+    await dbConnect();
 
     const validationError = validateParams({ problemId, userId });
     if (validationError) {
@@ -27,14 +30,11 @@ export async function GET(
         userId: doc.userId.toString(),
         problemId: doc.problemId.toString(),
         content: doc.content,
-      })
+      }),
+      { userId, problemId }
     );
 
-    const userFiles = allFiles.filter(
-      (file) =>
-        file.data?.problemId === problemId && file.data?.userId === userId
-    );
-
+    const userFiles = allFiles;
     return NextResponse.json({
       success: true,
       files: userFiles,
@@ -49,10 +49,12 @@ export async function POST(
   ctx: RouteContext<"/api/code/[userId]/[problemId]">
 ) {
   try {
-    await dbConnect();
-
-    const body: UserCodeRequest = await req.json();
     const { problemId, userId } = await ctx.params;
+    const auth = requireSameUser(req, userId);
+    if (!auth.ok) return auth.response;
+
+    await dbConnect();
+    const body: UserCodeRequest = await req.json();
 
     const validationError = validateParams({ problemId, userId });
     if (validationError) {
@@ -86,10 +88,12 @@ export async function PUT(
   ctx: RouteContext<"/api/code/[userId]/[problemId]">
 ) {
   try {
-    await dbConnect();
-
-    const body: UserCodeRequest = await req.json();
     const { problemId, userId } = await ctx.params;
+    const auth = requireSameUser(req, userId);
+    if (!auth.ok) return auth.response;
+
+    await dbConnect();
+    const body: UserCodeRequest = await req.json();
 
     const validationError = validateParams({ problemId, userId });
     if (validationError) {
@@ -130,10 +134,12 @@ export async function DELETE(
   ctx: RouteContext<"/api/code/[userId]/[problemId]">
 ) {
   try {
-    await dbConnect();
-
-    const body: { id: string } = await req.json();
     const { problemId, userId } = await ctx.params;
+    const auth = requireSameUser(req, userId);
+    if (!auth.ok) return auth.response;
+
+    await dbConnect();
+    const body: { id: string } = await req.json();
 
     const validationError = validateParams({ problemId, userId });
     if (validationError) {

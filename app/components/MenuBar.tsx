@@ -18,15 +18,27 @@ export default function MenuBar() {
   const [showDropdown, setShowDropdown] = useState(false);
 
   useEffect(() => {
-    Promise.resolve().then(() => {
+    let isMounted = true;
+    const loadUser = async () => {
       setMounted(true);
-      const stored = localStorage.getItem("user");
-      if (stored) {
-        setUser(JSON.parse(stored));
-      } else {
+      try {
+        const res = await fetch("/api/me");
+        if (!res.ok) {
+          router.push("/login");
+          return;
+        }
+        const data = await res.json();
+        if (isMounted) {
+          setUser(data.user);
+        }
+      } catch {
         router.push("/login");
       }
-    });
+    };
+    loadUser();
+    return () => {
+      isMounted = false;
+    };
   }, [router]);
 
   // Close dropdown when clicking outside
@@ -42,8 +54,12 @@ export default function MenuBar() {
     return () => document.removeEventListener("click", handleClickOutside);
   }, []);
 
-  const handleLogout = () => {
-    localStorage.removeItem("user");
+  const handleLogout = async () => {
+    try {
+      await fetch("/api/logout", { method: "POST" });
+    } catch {
+      // ignore
+    }
     router.push("/login");
   };
 
