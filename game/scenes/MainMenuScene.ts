@@ -85,19 +85,30 @@ export default class MainMenuScene extends GameScene {
 
       resetText.on("pointerdown", async () => {
         const confirmReset = window.confirm(
-          "Are you sure? This will delete all progress!",
+          "Are you sure? This will delete all progress, solved records, and your code!",
         );
 
         if (confirmReset) {
           try {
-            const response = await fetch(
-              `/api/game-progress?userId=${this.savedProgress.userId}`,
-              {
+            const userId = this.savedProgress.userId;
+            const [progressResponse, solveRecordResponse, userCodeResponse] =
+              await Promise.all([
+              fetch(`/api/game-progress?userId=${userId}`, {
                 method: "DELETE",
-              },
-            );
+              }),
+              fetch(`/api/solve-record?userId=${userId}`, {
+                method: "DELETE",
+              }),
+              fetch(`/api/code/${userId}`, {
+                method: "DELETE",
+              }),
+            ]);
 
-            if (response.ok) {
+            if (
+              progressResponse.ok &&
+              solveRecordResponse.ok &&
+              userCodeResponse.ok
+            ) {
               EventBus.emit("ui-reset-start");
               AudioManager.getInstance().stopMusic();
 
@@ -105,9 +116,15 @@ export default class MainMenuScene extends GameScene {
               setTimeout(() => {
                 window.location.reload();
               }, 100);
+            } else {
+              console.error("Failed to fully reset data", {
+                progressStatus: progressResponse.status,
+                solveRecordStatus: solveRecordResponse.status,
+                userCodeStatus: userCodeResponse.status,
+              });
             }
           } catch (error) {
-            console.error("Failed to delete progress:", error);
+            console.error("Failed to delete reset data:", error);
           }
         }
       });
