@@ -3,14 +3,9 @@ import dbConnect from "@/lib/db";
 import Problem, { IProblem } from "@/models/Problem";
 import UserCodeFile from "@/models/UserCodeFile";
 import ProblemFile, { IProblemFile } from "@/models/ProblemFile";
-import SolutionFile, { ISolutionFile } from "@/models/SolutionFile";
 import ProblemSolveRecord from "@/models/ProblemSolveRecord";
 import { saveFiles, validateSiblingNames, flattenTree } from "@/lib/utils";
-import {
-  CreateProblemRequest,
-  ProblemFileNode,
-  SolutionFileNode,
-} from "@/lib/types";
+import { CreateProblemRequest, ProblemFileNode } from "@/lib/types";
 import { createErrorResponse } from "@/lib/api-helpers";
 import { buildProblemFiles } from "@/lib/api-helpers";
 import { requireAuth } from "@/lib/auth-guard";
@@ -39,7 +34,6 @@ export async function POST(req: NextRequest) {
 
     // Validate file structure
     if (body.files) validateSiblingNames(body.files);
-    if (body.solutionFiles) validateSiblingNames(body.solutionFiles);
 
     // Create problem document
     const problem = await Problem.create({
@@ -53,31 +47,20 @@ export async function POST(req: NextRequest) {
     };
 
     // Save associated files
-    const [files, solutionFiles] = await Promise.all([
-      body.files?.length
-        ? saveFiles<ProblemFileNode, IProblemFile>(
-            body.files,
-            ProblemFile,
-            null,
-            problemMetadata,
-          )
-        : Promise.resolve([]),
-      body.solutionFiles?.length
-        ? saveFiles<SolutionFileNode, ISolutionFile>(
-            body.solutionFiles,
-            SolutionFile,
-            null,
-            problemMetadata,
-          )
-        : Promise.resolve([]),
-    ]);
+    const files = body.files?.length
+      ? await saveFiles<ProblemFileNode, IProblemFile>(
+          body.files,
+          ProblemFile,
+          null,
+          problemMetadata,
+        )
+      : [];
 
     return NextResponse.json({
       success: true,
       problem: {
         ...problem.toObject(),
         files,
-        solutionFiles,
       },
     });
   } catch (error) {
@@ -116,30 +99,19 @@ export async function GET(req: NextRequest) {
 async function enrichProblemWithFiles(problem: IProblem) {
   const problemId = problem._id.toString();
 
-  const [problemFiles, solutionFiles] = await Promise.all([
-    buildProblemFiles<ProblemFileNode, IProblemFile>(
-      ProblemFile,
-      problemId,
-      (doc) => ({
-        problemId: doc.problemId.toString(),
-        content: doc.content,
-        mode: doc.mode,
-      }),
-    ),
-    buildProblemFiles<SolutionFileNode, ISolutionFile>(
-      SolutionFile,
-      problemId,
-      (doc) => ({
-        problemId: doc.problemId.toString(),
-        content: doc.content,
-      }),
-    ),
-  ]);
+  const problemFiles = await buildProblemFiles<ProblemFileNode, IProblemFile>(
+    ProblemFile,
+    problemId,
+    (doc) => ({
+      problemId: doc.problemId.toString(),
+      content: doc.content,
+      mode: doc.mode,
+    }),
+  );
 
   return {
     ...problem,
     files: flattenTree(problemFiles),
-    solutionFiles: flattenTree(solutionFiles),
   };
 }
 
@@ -236,7 +208,6 @@ async function deleteProblemsByDifficulty(
     return {
       deletedProblems: 0,
       deletedProblemFiles: 0,
-      deletedSolutionFiles: 0,
       deletedUserCodes: 0,
       deletedSovledRecords: 0,
       deletedProblemGuides: 0,
@@ -247,14 +218,12 @@ async function deleteProblemsByDifficulty(
   const [
     deletedProblems,
     deletedProblemFiles,
-    deletedSolutionFiles,
     deletedUserCodes,
     deletedSovledRecords,
     deletedProblemGuides,
   ] = await Promise.all([
     Problem.deleteMany({ _id: { $in: problemIds } }),
     ProblemFile.deleteMany({ problemId: { $in: problemIds } }),
-    SolutionFile.deleteMany({ problemId: { $in: problemIds } }),
     UserCodeFile.deleteMany({ problemId: { $in: problemIds } }),
     ProblemSolveRecord.deleteMany({ problemId: { $in: problemIds } }),
     ProblemSolveRecord.deleteMany({ problemId: { $in: problemIds } }),
@@ -263,7 +232,6 @@ async function deleteProblemsByDifficulty(
   return {
     deletedProblems: deletedProblems.deletedCount,
     deletedProblemFiles: deletedProblemFiles.deletedCount,
-    deletedSolutionFiles: deletedSolutionFiles.deletedCount,
     deletedUserCodes: deletedUserCodes.deletedCount,
     deletedSovledRecords: deletedSovledRecords.deletedCount,
     deletedProblemGuides: deletedProblemGuides.deletedCount,
@@ -281,14 +249,12 @@ async function deleteAllProblems() {
   const [
     deletedProblems,
     deletedProblemFiles,
-    deletedSolutionFiles,
     deletedUserCodes,
     deletedSovledRecords,
     deletedProblemGuides,
   ] = await Promise.all([
     Problem.deleteMany({}),
     ProblemFile.deleteMany({ problemId: { $in: problemIds } }),
-    SolutionFile.deleteMany({ problemId: { $in: problemIds } }),
     UserCodeFile.deleteMany({ problemId: { $in: problemIds } }),
     ProblemSolveRecord.deleteMany({ problemId: { $in: problemIds } }),
     ProblemSolveRecord.deleteMany({ problemId: { $in: problemIds } }),
@@ -297,7 +263,6 @@ async function deleteAllProblems() {
   return {
     deletedProblems: deletedProblems.deletedCount,
     deletedProblemFiles: deletedProblemFiles.deletedCount,
-    deletedSolutionFiles: deletedSolutionFiles.deletedCount,
     deletedUserCodes: deletedUserCodes.deletedCount,
     deletedSovledRecords: deletedSovledRecords.deletedCount,
     deletedProblemGuides: deletedProblemGuides.deletedCount,
@@ -338,21 +303,12 @@ export async function PATCH(req: NextRequest) {
 
     // 2. Optional: Handle file updates if provided in the body
     // Note: This logic assumes you want to replace existing files with new ones
-    if (body.files || body.solutionFiles) {
+    if (body.files) {
       if (body.files) {
         await ProblemFile.deleteMany({ problemId: id });
         await saveFiles<ProblemFileNode, IProblemFile>(
           body.files,
           ProblemFile,
-          null,
-          problemMetadata,
-        );
-      }
-      if (body.solutionFiles) {
-        await SolutionFile.deleteMany({ problemId: id });
-        await saveFiles<SolutionFileNode, ISolutionFile>(
-          body.solutionFiles,
-          SolutionFile,
           null,
           problemMetadata,
         );

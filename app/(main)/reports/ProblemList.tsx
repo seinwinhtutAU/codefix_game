@@ -78,15 +78,6 @@ export default function ProblemsList({
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <div className="flex items-center gap-3 mb-2">
-            <Link
-              href="/reports"
-              className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 p-2 rounded-lg transition-colors"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              Back to Dashboard
-            </Link>
-          </div>
           <h1 className="text-3xl font-bold text-gray-900 tracking-tight">
             Problems Library
           </h1>

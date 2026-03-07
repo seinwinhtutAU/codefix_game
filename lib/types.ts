@@ -31,16 +31,9 @@ export interface CreateProblemRequest {
   order?: number;
   expectedOutput?: string[];
   files?: TreeNode<{ content?: string }>[];
-  solutionFiles?: TreeNode<{ content?: string }>[];
 }
 
 export interface ProblemFileNode {
-  content?: string;
-  problemId?: string;
-  mode?: string;
-}
-
-export interface SolutionFileNode {
   content?: string;
   problemId?: string;
   mode?: string;

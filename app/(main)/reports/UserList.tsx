@@ -96,13 +96,6 @@ export default function UsersList({
       {/* Header Section */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <Link
-            href="/reports"
-            className="inline-flex items-center gap-2 text-sm text-gray-500 hover:text-blue-600 mb-2 transition-colors"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Back to Dashboard
-          </Link>
           <h1 className="text-3xl font-bold text-gray-900 tracking-tight">
             Users Directory
           </h1>

@@ -20,12 +20,6 @@ export interface IProblem {
   order?: number;
   expectedOutput?: string;
   testCases?: ITestCase[];
-  solutionFiles: {
-    name: string;
-    type: "file" | "folder";
-    content: string;
-    order: number;
-  }[];
 }
 
 const problemSchema = new mongoose.Schema<IProblem>({
@@ -75,15 +69,6 @@ const problemSchema = new mongoose.Schema<IProblem>({
     {
       input: { type: String },
       expectedOutput: { type: String, required: true },
-    },
-  ],
-
-  solutionFiles: [
-    {
-      name: { type: String, required: true },
-      type: { type: String, enum: ["file", "folder"], default: "file" },
-      content: { type: String, default: "" },
-      order: { type: Number, default: 0 },
     },
   ],
 });

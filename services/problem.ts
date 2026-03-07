@@ -36,11 +36,8 @@ export interface ProblemByLevelResponse {
 
 export async function fetchProblem(
   problemId: string,
-  includeSolutionFiles: boolean = false,
 ): Promise<ProblemResponse> {
-  const response = await fetch(
-    `/api/problems/id/${problemId}?includeSolutionFiles=${includeSolutionFiles ? "true" : "false"}`
-  );
+  const response = await fetch(`/api/problems/id/${problemId}`);
   return response.json();
 }
 

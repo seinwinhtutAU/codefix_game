@@ -2,10 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import dbConnect from "@/lib/db";
 import Problem, { IProblem } from "@/models/Problem";
 import ProblemFile, { IProblemFile } from "@/models/ProblemFile";
-import SolutionFile, { ISolutionFile } from "@/models/SolutionFile";
 import UserCodeFile from "@/models/UserCodeFile";
 import ProblemSolveRecord from "@/models/ProblemSolveRecord";
-import { ProblemFileNode, SolutionFileNode, TreeNode } from "@/lib/types";
+import { ProblemFileNode } from "@/lib/types";
 import {
   createErrorResponse,
   validateParams,
@@ -25,9 +24,6 @@ export async function GET(
     await dbConnect();
 
     const { id: problemId } = await ctx.params;
-    const includeSolutionFilesParam =
-      req.nextUrl.searchParams.get("includeSolutionFiles");
-    const includeSolutionFiles = includeSolutionFilesParam === "true";
 
     const validationError = validateParams({ problemId });
     if (validationError) {
@@ -39,27 +35,15 @@ export async function GET(
       return NextResponse.json({ error: "Problem not found" }, { status: 404 });
     }
 
-    const [problemFiles, solutionFiles] = await Promise.all([
-      buildProblemFiles<ProblemFileNode, IProblemFile>(
-        ProblemFile,
-        problemId,
-        (doc) => ({
-          problemId: doc.problemId.toString(),
-          content: doc.content,
-          mode: doc.mode,
-        })
-      ),
-      includeSolutionFiles
-        ? buildProblemFiles<SolutionFileNode, ISolutionFile>(
-            SolutionFile,
-            problemId,
-            (doc) => ({
-              problemId: doc.problemId.toString(),
-              content: doc.content,
-            })
-          )
-        : Promise.resolve([] as TreeNode<SolutionFileNode>[]),
-    ]);
+    const problemFiles = await buildProblemFiles<ProblemFileNode, IProblemFile>(
+      ProblemFile,
+      problemId,
+      (doc) => ({
+        problemId: doc.problemId.toString(),
+        content: doc.content,
+        mode: doc.mode,
+      }),
+    );
 
     return NextResponse.json({
       success: true,
@@ -67,9 +51,6 @@ export async function GET(
         ...problem,
         _id: problem._id.toString(),
         files: flattenTree(problemFiles),
-        solutionFiles: includeSolutionFiles
-          ? flattenTree(solutionFiles)
-          : undefined,
       },
     });
   } catch (error) {
@@ -124,14 +105,12 @@ export async function DELETE(
     const [
       deletedProblem,
       deletedProblemFiles,
-      deletedSolutionFiles,
       deletedUserCodeFiles,
       deletedSovledRecords,
     ] = await Promise.all([
       // Delete the main problem
       Problem.findByIdAndDelete(problemId),
       ProblemFile.deleteMany({ problemId }),
-      SolutionFile.deleteMany({ problemId }),
       UserCodeFile.deleteMany({ problemId }),
       ProblemSolveRecord.deleteMany({ problemId }),
     ]);
@@ -146,7 +125,6 @@ export async function DELETE(
       stats: {
         deletedProblem: deletedProblem ? 1 : 0,
         deletedProblemFiles: deletedProblemFiles.deletedCount,
-        deletedSolutionFiles: deletedSolutionFiles.deletedCount,
         deletedUserCodeFiles: deletedUserCodeFiles.deletedCount,
         deletedSovledRecords: deletedSovledRecords.deletedCount,
       },
