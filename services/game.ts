@@ -1,5 +1,4 @@
-import { CreateProblemRequest, IGameProgress } from "@/lib/types";
-import { ProblemResponse } from "./problem";
+import { IGameProgress } from "@/lib/types";
 
 export async function getPlayerProgress() {
   const meRes = await fetch("/api/me");

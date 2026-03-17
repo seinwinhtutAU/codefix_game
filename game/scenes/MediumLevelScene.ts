@@ -3,6 +3,7 @@ import GameScene from "./GameScene";
 import { checkExistingSolveRecord } from "@/services/problem";
 import { EventBus } from "@/game/events";
 import { IGameProgress, ProblemSolveRecord } from "@/lib/types";
+import SkipButton from "../ui/SkipButton";
 
 export interface SolvedPointStatus {
   attempts: number;
@@ -49,6 +50,7 @@ export default class MediumLevelScene extends GameScene {
   private solvedRecords: ProblemSolveRecord[] = [];
   private loadingContainer!: Phaser.GameObjects.Container;
   private loadingText!: Phaser.GameObjects.Text;
+  private skipButton!: SkipButton;
 
   constructor() {
     super("MediumLevelScene");
@@ -59,6 +61,7 @@ export default class MediumLevelScene extends GameScene {
       return;
     }
     super.create();
+    this.createSkipButton();
 
     this.createLoadingUI();
     this.initAudio();
@@ -117,6 +120,25 @@ export default class MediumLevelScene extends GameScene {
     // Wrap them in a container and hide it
     this.tooltipContainer = this.add.container(0, 0, [bg, this.tooltipText]);
     this.tooltipContainer.setDepth(100).setVisible(false);
+  }
+
+  private createSkipButton() {
+    this.skipButton = new SkipButton(this, {
+      onClick: () => {
+        if (this.skipButton) this.skipButton.setEnabled(false);
+        this.skipLevel();
+      },
+    });
+  }
+
+  private skipLevel() {
+    if (this.savedProgress && this.savedProgress.gameState) {
+      this.savedProgress.gameState.eventFlags.mediumLevelCompleted = true;
+      this.savedProgress.gameState.currentScene = "HomeScene";
+    }
+
+    this.emitLevelCompleted(this.savedProgress);
+    this.scene.start("MediumToHomeScene", this.savedProgress);
   }
 
   private triggerSolveParticle(x: number, y: number) {

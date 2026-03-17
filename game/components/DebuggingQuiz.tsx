@@ -22,7 +22,6 @@ import { QUESTIONS } from "./quiz_data";
 
 interface DebuggingQuizProps {
   onClose?: () => void;
-  // Optional: Pass a specific ID to know which flag to update (e.g. "easy_quiz")
   quizId?: string;
 }
 

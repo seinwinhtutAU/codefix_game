@@ -3,11 +3,13 @@ import GameScene from "./GameScene";
 import DialogBox from "../ui/DialogBox";
 import Button from "../ui/Button"; // Import your custom Button class
 import AudioManager from "../AudioManager";
+import SkipButton from "../ui/SkipButton";
 
 export default class OfficeScene extends GameScene {
   private dialogBox!: DialogBox;
   private nextButton!: Button; // Changed type to Button
   private bg!: Phaser.GameObjects.Image;
+  private skipButton!: SkipButton;
 
   constructor() {
     super("OfficeScene");
@@ -47,6 +49,8 @@ export default class OfficeScene extends GameScene {
     });
 
     this.nextButton.setVisible(false).setAlpha(0);
+
+    this.createSkipButton();
 
     this.cameras.main.fadeIn(1000, 0, 0, 0);
 
@@ -99,6 +103,17 @@ export default class OfficeScene extends GameScene {
           },
         });
       });
+    });
+  }
+
+  private createSkipButton() {
+    this.skipButton = new SkipButton(this, {
+      onClick: () => {
+        if (this.skipButton) this.skipButton.setEnabled(false);
+        this.time.removeAllEvents();
+        this.dialogBox.hide();
+        this.completeOffice();
+      },
     });
   }
 

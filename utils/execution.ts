@@ -1,7 +1,5 @@
 import {
-  ExecutionResponse,
   ExecutionResult,
-  HintUsage,
   ProblemFile,
   FileStructure,
   NormalExecutionResponse,
@@ -10,7 +8,7 @@ import {
 
 // Format normal execution response
 export function formatNormalExecutionResult(
-  data: NormalExecutionResponse
+  data: NormalExecutionResponse,
 ): ExecutionResult {
   return {
     success: data.success,
@@ -23,9 +21,9 @@ export function formatNormalExecutionResult(
   };
 }
 
-// // Format test execution response
+// Format test execution response
 export function formatTestExecutionResult(
-  data: TestExecutionResponse
+  data: TestExecutionResponse,
 ): ExecutionResult {
   return {
     success: data.success,
@@ -46,17 +44,20 @@ export function formatTestExecutionResult(
   };
 }
 
-// Original function kept for backward compatibility
-export function formatExecutionResult(
-  data: ExecutionResponse
-): ExecutionResult {
-  return formatTestExecutionResult(data as TestExecutionResponse);
-}
+/*
+Convert a problem file tree into a flat file structure.
 
+- Read the file tree (files and folders)
+- Build full file paths such as:
+  src/main.py
+  src/utils/helper.py
+- Use user-modified content if available, otherwise use original content
+- Return a list of files with name, path, and content
+*/
 export function convertToFileStructure(
   files: ProblemFile[],
   fileContents: Record<string, string>,
-  parentPath = ""
+  parentPath = "",
 ): FileStructure[] {
   const result: FileStructure[] = [];
 
@@ -75,7 +76,7 @@ export function convertToFileStructure(
         const nested = convertToFileStructure(
           file.children,
           fileContents,
-          currentPath
+          currentPath,
         );
         result.push(...nested);
       }
@@ -83,25 +84,4 @@ export function convertToFileStructure(
   }
 
   return result;
-}
-
-export function calculatePoints(hintUsages: HintUsage[]): number {
-  const basePoints = 100;
-  let deduction = 0;
-
-  hintUsages.forEach((usage) => {
-    switch (usage.hintLevel) {
-      case "small":
-        deduction += 10;
-        break;
-      case "medium":
-        deduction += 15;
-        break;
-      case "big":
-        deduction += 20;
-        break;
-    }
-  });
-
-  return Math.max(0, basePoints - deduction);
 }

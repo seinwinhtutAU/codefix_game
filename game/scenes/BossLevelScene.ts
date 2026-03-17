@@ -5,6 +5,7 @@ import { IGameProgress, ProblemSolveRecord } from "@/lib/types";
 import { GameObjects } from "phaser";
 import Button from "../ui/Button";
 import { EventBus } from "../events";
+import SkipButton from "../ui/SkipButton";
 
 export interface BugCount {
   problemId: string;
@@ -64,6 +65,7 @@ export default class BossLevelScene extends GameScene {
   private timerIncrementPerBug: number = 120;
   private pointIncrementPerBug: number = 10;
   private progressGraphics!: Phaser.GameObjects.Graphics;
+  private skipButton!: SkipButton;
 
   constructor() {
     super("BossLevelScene");
@@ -76,6 +78,7 @@ export default class BossLevelScene extends GameScene {
     // }
 
     super.create();
+    this.createSkipButton();
 
     if (this.savedProgress?.gameState?.currentTask?.currentActiveIndex) {
       this.currentPointIndex =
@@ -834,5 +837,14 @@ export default class BossLevelScene extends GameScene {
     const audioManager = AudioManager.getInstance();
     audioManager.init(this.game);
     audioManager.playMusic("bgm", { volume: 0.15, loop: true });
+  }
+
+  private createSkipButton() {
+    this.skipButton = new SkipButton(this, {
+      onClick: () => {
+        if (this.skipButton) this.skipButton.setEnabled(false);
+        this.handleLevelTransition();
+      },
+    });
   }
 }

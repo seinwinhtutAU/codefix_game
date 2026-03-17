@@ -7,11 +7,13 @@ export async function GET(request: NextRequest) {
   try {
     await dbConnect();
 
+    // Read the auth token from cookies
     const token = request.cookies.get(getAuthCookieName())?.value;
     if (!token) {
       return NextResponse.json({ authenticated: false }, { status: 401 });
     }
 
+    // Verify the JWT token
     let payload: { sub: string; email: string };
     try {
       payload = verifyAuthToken(token);
@@ -19,11 +21,13 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ authenticated: false }, { status: 401 });
     }
 
+    // Find the user in the database
     const user = await User.findById(payload.sub).select("-password");
     if (!user) {
       return NextResponse.json({ authenticated: false }, { status: 401 });
     }
 
+    // If valid → return authenticated user info
     return NextResponse.json({
       authenticated: true,
       user: {
@@ -36,8 +40,7 @@ export async function GET(request: NextRequest) {
     console.error(error);
     return NextResponse.json(
       { authenticated: false, message: "Internal server error." },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
-

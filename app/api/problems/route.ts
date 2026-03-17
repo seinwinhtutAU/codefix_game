@@ -115,6 +115,16 @@ async function enrichProblemWithFiles(problem: IProblem) {
   };
 }
 
+/*
+Deletion options:
+- difficulty + confirm=true → delete all problems of that difficulty
+- confirm=true → delete ALL problems
+
+When deleting problems, also remove related data:
+- Problem files
+- User code files
+- Solve records
+*/
 export async function DELETE(req: NextRequest) {
   try {
     const auth = requireAuth(req);
@@ -269,6 +279,7 @@ async function deleteAllProblems() {
   };
 }
 
+// PATCH /api/problems?id=p123
 export async function PATCH(req: NextRequest) {
   try {
     await dbConnect();

@@ -47,7 +47,6 @@ export default function ProblemDetailPage() {
   const userId = useUserId();
   const {
     showProblem,
-    setShowProblem,
     showExplorer,
     setShowExplorer,
     showHints,
@@ -174,7 +173,6 @@ export default function ProblemDetailPage() {
     setIsSolving,
   ]);
 
-  // Find next problem when level problems are loaded or completion changes
   useEffect(() => {
     if (levelProblems.length > 0 && problem?._id) {
       const currentIndex = levelProblems.findIndex(
@@ -188,10 +186,8 @@ export default function ProblemDetailPage() {
     }
   }, [levelProblems, problem?._id]);
 
-  // Add useEffect to refresh problem list when completion changes
   useEffect(() => {
     if (hasCompleted && problem?._id) {
-      // Refresh the problem list completion statuses
       const timer = setTimeout(() => {
         refreshProblemList?.();
       }, 1000);
@@ -203,7 +199,7 @@ export default function ProblemDetailPage() {
   const handleCodeChange = (value: string | undefined) => {
     if (!selectedFile || !problem) return;
 
-    const newValue = value ?? ""; // 🔑 important
+    const newValue = value ?? "";
 
     setFileContents((prev) => ({
       ...prev,
@@ -289,7 +285,6 @@ export default function ProblemDetailPage() {
     try {
       const result = await runTestCode();
 
-      // Only mark as completed if ALL tests pass
       if (
         result?.passedTests === result?.totalTests &&
         result?.totalTests &&
@@ -298,10 +293,7 @@ export default function ProblemDetailPage() {
         setHasCompleted(true);
         handleSaveCode();
 
-        // Force immediate UI update
-        setTimeout(() => {
-          // This will trigger the useEffect that refreshes the problem list
-        }, 100);
+        setTimeout(() => {}, 100);
       }
     } finally {
       setIsTestRunning(false);
@@ -326,23 +318,19 @@ export default function ProblemDetailPage() {
     selectedFile,
     originalFileContents,
   );
+
   const fileModified = isCurrentFileModified(
     selectedFile,
     currentFileContent,
     originalContent,
   );
+
   const anyFileModified = isAnyFileModified(fileContents, originalFileContents);
 
   const handleProblemSelect = (selectedProblem: Problem) => {
     if (selectedProblem._id !== id) {
       router.push(`/problem/${selectedProblem._id}`);
       setShowProblemList(false);
-    }
-  };
-
-  const handleNextProblem = () => {
-    if (nextProblemId) {
-      router.push(`/problem/${nextProblemId}`);
     }
   };
 

@@ -17,7 +17,7 @@ export function createErrorResponse(error: unknown, status = 500) {
  * Validate required parameters
  */
 export function validateParams(
-  params: Record<string, string | undefined>
+  params: Record<string, string | undefined>,
 ): string | null {
   for (const [key, value] of Object.entries(params)) {
     if (!value) {
@@ -29,14 +29,15 @@ export function validateParams(
 
 /**
  * Build file tree for a specific problem
+ * Loads problem files from MongoDB and converts them into a folder/file tree structure
  */
 export async function buildProblemFiles<
   T extends { problemId?: string },
-  D extends IFileDocument
+  D extends IFileDocument,
 >(
   Model: mongoose.Model<D>,
   problemId: string,
-  transform: (doc: D) => T
+  transform: (doc: D) => T,
 ): Promise<TreeNode<T>[]> {
   return buildTree<T, D>(Model, null, transform, { problemId });
 }

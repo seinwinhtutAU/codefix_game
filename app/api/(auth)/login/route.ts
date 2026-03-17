@@ -8,13 +8,14 @@ export async function POST(request: Request) {
   await dbConnect();
   const { email, password } = await request.json();
 
-  const normalizedEmail = typeof email === "string" ? email.trim().toLowerCase() : "";
+  const normalizedEmail =
+    typeof email === "string" ? email.trim().toLowerCase() : "";
   const passwordStr = typeof password === "string" ? password : "";
 
   if (!normalizedEmail || !passwordStr) {
     return NextResponse.json(
       { message: "Email and password required." },
-      { status: 422 }
+      { status: 422 },
     );
   }
 
@@ -24,18 +25,20 @@ export async function POST(request: Request) {
     if (!user) {
       return NextResponse.json(
         { message: "Invalid credentials." },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
+    // Compare the password with the hashed password in the database
     const isValidPassword = await bcrypt.compare(passwordStr, user.password);
     if (!isValidPassword) {
       return NextResponse.json(
         { message: "Invalid credentials." },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
+    // If valid → generate JWT token
     const token = signAuthToken({
       sub: user._id.toString(),
       email: user.email,
@@ -45,13 +48,17 @@ export async function POST(request: Request) {
       message: "Login successful!",
       user: { id: user._id, username: user.username, email: user.email },
     });
+
+    // Set authentication cookie
     setAuthCookie(response, token);
+
+    // Return user information and success message
     return response;
   } catch (error) {
     console.error(error);
     return NextResponse.json(
       { message: "Internal server error." },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

@@ -11,6 +11,7 @@ import { resetUserCodeFilesToOriginal } from "@/utils";
 export function useUserCodeManager() {
   const [hintUsages, setHintUsages] = useState<HintUsage[]>([]);
 
+  // Find a file's content in the user code tree by file name
   const findContentInUserCodeFiles = useCallback(
     (problem: Problem | null, fileName: string): string => {
       if (!problem) return "";
@@ -34,42 +35,48 @@ export function useUserCodeManager() {
 
       return traverse(problem.userCodeFiles);
     },
-    []
+    [],
   );
 
+  /*
+  Get selected file content.
+  Priority: edited content → saved content → original content
+  */
   const getCurrentFileContent = useCallback(
     (
       selectedFile: ProblemFile | null,
       problem: Problem | null,
       fileContents: Record<string, string>,
-      findContentInUserCodeFiles: (fileName: string) => string
+      findContentInUserCodeFiles: (fileName: string) => string,
     ): string => {
       if (!selectedFile || !problem) return "";
 
-      // 🔑 If user has ever edited this file (even to empty), trust it
+      // Priority 1: Content edited by the user (highest priority)
       if (Object.prototype.hasOwnProperty.call(fileContents, selectedFile.id)) {
         return fileContents[selectedFile.id];
       }
 
+      // Priority 2: Previously saved content
       const savedContent = findContentInUserCodeFiles(selectedFile.name);
       if (savedContent !== "") return savedContent;
 
+      // Priority 3: Original Content
       return selectedFile.content ?? "";
     },
-    []
+    [],
   );
 
   const getOriginalFileContent = useCallback(
     (
       selectedFile: ProblemFile | null,
-      originalFileContents: Record<string, string>
+      originalFileContents: Record<string, string>,
     ): string => {
       if (!selectedFile) return "";
       return (
         originalFileContents[selectedFile.id] || selectedFile.content || ""
       );
     },
-    []
+    [],
   );
 
   const updateUserCodeFiles = useCallback(
@@ -77,12 +84,12 @@ export function useUserCodeManager() {
       problem: Problem | null,
       selectedFile: ProblemFile | null,
       fileId: string,
-      newContent: string
+      newContent: string,
     ) => {
       if (!problem || !selectedFile) return null;
 
       function updateNode(
-        nodes: TreeNode<UserCodeFileNode>[]
+        nodes: TreeNode<UserCodeFileNode>[],
       ): TreeNode<UserCodeFileNode>[] {
         return nodes.map((node) => {
           if (node.name === selectedFile?.name && node.type === "file") {
@@ -103,7 +110,7 @@ export function useUserCodeManager() {
         userCodeFiles: updateNode(problem.userCodeFiles),
       };
     },
-    []
+    [],
   );
 
   const resetAllFiles = useCallback(
@@ -112,7 +119,7 @@ export function useUserCodeManager() {
 
       const updatedUserCodeFiles = resetUserCodeFilesToOriginal(
         problem.userCodeFiles,
-        problem.files
+        problem.files,
       );
 
       return {
@@ -120,7 +127,7 @@ export function useUserCodeManager() {
         userCodeFiles: updatedUserCodeFiles,
       };
     },
-    []
+    [],
   );
 
   const recordHintUsage = useCallback(
@@ -132,25 +139,25 @@ export function useUserCodeManager() {
         return [...prev, { hintId, hintLevel, usedAt: new Date() }];
       });
     },
-    []
+    [],
   );
 
   const isCurrentFileModified = useCallback(
     (
       selectedFile: ProblemFile | null,
       currentContent: string,
-      originalContent: string
+      originalContent: string,
     ): boolean => {
       if (!selectedFile) return false;
       return currentContent !== originalContent;
     },
-    []
+    [],
   );
 
   const isAnyFileModified = useCallback(
     (
       fileContents: Record<string, string>,
-      originalFileContents: Record<string, string>
+      originalFileContents: Record<string, string>,
     ): boolean => {
       for (const fileId in fileContents) {
         if (fileContents[fileId] !== originalFileContents[fileId]) {
@@ -159,7 +166,7 @@ export function useUserCodeManager() {
       }
       return false;
     },
-    []
+    [],
   );
 
   return {

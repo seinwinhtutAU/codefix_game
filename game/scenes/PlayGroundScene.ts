@@ -5,6 +5,7 @@ import AudioManager from "../AudioManager";
 import { EventBus } from "@/game/events";
 import { IGameProgress } from "@/lib/types";
 import Button from "../ui/Button";
+import SkipButton from "../ui/SkipButton";
 
 export default class PlayGroundScene extends GameScene {
   // --- ASSETS ---
@@ -30,6 +31,7 @@ export default class PlayGroundScene extends GameScene {
   private isMoving: boolean = true;
 
   private nextButton!: Button;
+  private skipButton!: SkipButton;
 
   constructor() {
     super("PlayGroundScene");
@@ -55,6 +57,7 @@ export default class PlayGroundScene extends GameScene {
     this.dialogBox = new DialogBox(this);
 
     this.createNextButton();
+    this.createSkipButton();
 
     this.cameras.main.fadeIn(1000, 0, 0, 0);
   }
@@ -78,6 +81,19 @@ export default class PlayGroundScene extends GameScene {
     });
 
     this.nextButton.setAlpha(0).setVisible(false).setDepth(1000);
+  }
+
+  private createSkipButton() {
+    this.skipButton = new SkipButton(this, {
+      onClick: async () => {
+        if (this.skipButton) this.skipButton.setEnabled(false);
+        this.time.removeAllEvents();
+        this.isMoving = false;
+        if (this.dialogBox) this.dialogBox.hide();
+        await this.savePlaygroundCompletion();
+        this.transitionToHardLevel();
+      },
+    });
   }
 
   private generateProceduralAssets() {

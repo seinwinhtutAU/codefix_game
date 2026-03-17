@@ -4,6 +4,7 @@ import AudioManager from "../AudioManager";
 import DialogBox from "../ui/DialogBox";
 import GameScene from "./GameScene";
 import Button from "../ui/Button"; // Standardized Button component
+import SkipButton from "../ui/SkipButton";
 import { EventBus } from "../events";
 import { IGameProgress } from "@/lib/types";
 
@@ -30,6 +31,7 @@ export default class IntroScene extends GameScene {
   private wasd!: WASDKeys;
   private canMove: boolean = false;
   private dialogBox!: DialogBox;
+  private skipButton!: SkipButton;
 
   constructor() {
     super("IntroScene");
@@ -100,6 +102,8 @@ export default class IntroScene extends GameScene {
     this.nextButton.setVisible(false);
     this.nextButton.setAlpha(0);
 
+    this.createSkipButton();
+
     // --- START SEQUENCE ---
     this.time.delayedCall(800, () => {
       this.showMorningIntroText(() => {
@@ -155,6 +159,18 @@ export default class IntroScene extends GameScene {
         this.dialogBox.hide();
         this.canMove = true;
       });
+    });
+  }
+
+  private createSkipButton() {
+    this.skipButton = new SkipButton(this, {
+      onClick: () => {
+        if (this.skipButton) this.skipButton.setEnabled(false);
+        this.canMove = false;
+        this.time.removeAllEvents();
+        this.dialogBox.hide();
+        this.completeIntro();
+      },
     });
   }
 

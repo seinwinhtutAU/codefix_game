@@ -8,8 +8,7 @@ import {
   convertToFileStructure,
 } from "@/utils";
 import { SolveRecordRequest } from "@/lib/types";
-import { saveSolveRecord, SolveRecordResponse } from "@/services";
-import { saveFiles } from "@/lib/utils";
+import { SolveRecordResponse } from "@/services";
 
 interface UseExecutorProps {
   problem: Problem | null;
@@ -38,13 +37,26 @@ export function useExecutor({
   bugCounts,
   timeLimited,
 }: UseExecutorProps) {
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isContinuing, setIsContinuing] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false); // Running/Submitting (prevent duplicate clicks)
+  const [isContinuing, setIsContinuing] = useState(false); // Continuing execution (handling input)
   const [executionResult, setExecutionResult] =
-    useState<ExecutionResult | null>(null);
-  const [showOutput, setShowOutput] = useState(false);
+    useState<ExecutionResult | null>(null); // Execution result (output / error / test results)
+  const [showOutput, setShowOutput] = useState(false); // Output panel show/hide
 
+  /*
+  Run normal code (Run button)
+  Function:
+  Send code to the backend for execution and return the output.
+  1. Check for duplicate submission (isSubmitting)
+  2. Set submitting state and open the output panel
+  3. Convert files to the format required by the backend
+  4. Send a POST request to execute the code
+  5. Format the returned result and update the state
+  6. Handle errors (display error message)
+  7. Reset submitting state
+  */
   const runNormalCode = useCallback(async () => {
+    // preventing duplicated click of run code
     if (!problem || isSubmitting) return;
 
     setIsSubmitting(true);
@@ -87,6 +99,14 @@ export function useExecutor({
     }
   }, [problem, fileContents, isSubmitting]);
 
+  /*
+  Test code submission (Submit button)
+  Function:
+  1. Run all test cases
+  2. Show test results (pass / fail)
+  3. Automatically save the solution record if all tests pass
+  4. Calculate final score (base score - hint penalty - attempt penalty + bug bonus)
+  */
   const runTestCode = useCallback(async () => {
     if (!problem || isSubmitting || !userId) return;
 
@@ -149,6 +169,7 @@ export function useExecutor({
           }
         }
 
+        // deduction of points for attempts
         if (pointsEarned > reduceAttemptPoint) {
           pointsEarned = pointsEarned - reduceAttemptPoint;
         }
@@ -210,6 +231,21 @@ export function useExecutor({
     setHasCompleted,
   ]);
 
+  /*
+  Continue executing a program waiting for input.
+  Scenario:
+  The program pauses at input() and requires user input to continue.
+  
+  Parameters:
+  - executionId: ID of the current program execution
+  - input: user input content
+
+  Process:
+  1. Prevent duplicate execution (isContinuing)
+  2. Send input to the backend
+  3. Get the result after continuing execution
+  4. Update execution result
+  */
   const continueExecution = useCallback(
     async (executionId: string, input: string) => {
       if (!executionId || !input.trim() || isContinuing) return;

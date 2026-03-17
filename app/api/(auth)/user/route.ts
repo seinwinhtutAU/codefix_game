@@ -20,17 +20,27 @@ export async function GET(req: NextRequest) {
         success: true,
         data: users,
       },
-      { status: 200 }
+      { status: 200 },
     );
   } catch (error) {
     console.error("Error fetching users:", error);
     return NextResponse.json(
       { success: false, data: null, error: "Failed to fetch users" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
 
+/*
+Deletion options:
+- confirmAll=true → delete all users and related data
+- userId → delete a specific user by ID
+- email → delete a specific user by email
+
+When a user is deleted, also remove:
+- Problem solve records
+- User code files
+*/
 export async function DELETE(req: NextRequest) {
   try {
     const admin = await requireAdmin(req);
@@ -55,7 +65,7 @@ export async function DELETE(req: NextRequest) {
             message: `Operation skipped. ${totalUsers} users were preserved.`,
             note: "Use ?confirmAll=true without &keepUsers=true to delete all users",
           },
-          { status: 200 }
+          { status: 200 },
         );
       }
 
@@ -81,7 +91,7 @@ export async function DELETE(req: NextRequest) {
             deletedUserCodes: deletedUserCodes.deletedCount,
           },
         },
-        { status: 200 }
+        { status: 200 },
       );
     }
 
@@ -93,7 +103,7 @@ export async function DELETE(req: NextRequest) {
             success: false,
             message: "Invalid userId format",
           },
-          { status: 400 }
+          { status: 400 },
         );
       }
 
@@ -113,7 +123,7 @@ export async function DELETE(req: NextRequest) {
             success: false,
             message: "User not found",
           },
-          { status: 404 }
+          { status: 404 },
         );
       }
 
@@ -133,7 +143,7 @@ export async function DELETE(req: NextRequest) {
             },
           },
         },
-        { status: 200 }
+        { status: 200 },
       );
     }
 
@@ -145,7 +155,7 @@ export async function DELETE(req: NextRequest) {
             success: false,
             message: "Invalid email format",
           },
-          { status: 400 }
+          { status: 400 },
         );
       }
 
@@ -158,7 +168,7 @@ export async function DELETE(req: NextRequest) {
             success: false,
             message: "User not found with this email",
           },
-          { status: 404 }
+          { status: 404 },
         );
       }
 
@@ -188,7 +198,7 @@ export async function DELETE(req: NextRequest) {
             },
           },
         },
-        { status: 200 }
+        { status: 200 },
       );
     }
 
@@ -200,7 +210,7 @@ export async function DELETE(req: NextRequest) {
           "Please provide at least one parameter: userId, email, or confirmAll=true",
         note: "To delete all users, use ?confirmAll=true (use &keepUsers=true to skip deletion)",
       },
-      { status: 400 }
+      { status: 400 },
     );
   } catch (error) {
     console.error("Error deleting user:", error);
@@ -210,7 +220,7 @@ export async function DELETE(req: NextRequest) {
         message:
           error instanceof Error ? error.message : "Failed to delete user",
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

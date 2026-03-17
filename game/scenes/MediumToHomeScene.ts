@@ -1,11 +1,14 @@
 import GameScene from "./GameScene";
 import AudioManager from "../AudioManager";
+import SkipButton from "../ui/SkipButton";
 
 export default class MediumToHomeScene extends GameScene {
   private worldContainer!: Phaser.GameObjects.Container;
   private clouds: Phaser.GameObjects.Image[] = [];
   private car!: Phaser.GameObjects.Sprite;
   private dustEmitter!: Phaser.GameObjects.Particles.ParticleEmitter;
+  private skipButton!: SkipButton;
+  private hasTransitioned = false;
 
   constructor() {
     super("MediumToHomeScene");
@@ -95,6 +98,8 @@ export default class MediumToHomeScene extends GameScene {
       yoyo: true,
       repeat: -1,
     });
+
+    this.createSkipButton();
   }
 
   update() {
@@ -155,10 +160,22 @@ export default class MediumToHomeScene extends GameScene {
   }
 
   private transitionToHome() {
+    if (this.hasTransitioned) return;
+    this.hasTransitioned = true;
     this.cameras.main.fadeOut(1500, 0, 0, 0);
     this.cameras.main.once("camerafadeoutcomplete", () => {
       AudioManager.getInstance().stopMusic();
       this.scene.start("HomeScene", this.savedProgress);
+    });
+  }
+
+  private createSkipButton() {
+    this.skipButton = new SkipButton(this, {
+      onClick: () => {
+        if (this.skipButton) this.skipButton.setEnabled(false);
+        this.time.removeAllEvents();
+        this.transitionToHome();
+      },
     });
   }
 }

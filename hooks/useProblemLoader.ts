@@ -8,16 +8,25 @@ import {
 import { extractFileContents, findFirstFile } from "@/utils";
 
 export function useProblemLoader(problemId: string, userId: string) {
-  const [problem, setProblem] = useState<Problem | null>(null);
-  const [selectedFile, setSelectedFile] = useState<ProblemFile | null>(null);
-  const [fileContents, setFileContents] = useState<Record<string, string>>({});
+  const [problem, setProblem] = useState<Problem | null>(null); // problem information
+  const [selectedFile, setSelectedFile] = useState<ProblemFile | null>(null); // currently edited file
+  const [fileContents, setFileContents] = useState<Record<string, string>>({}); // user-modified code
   const [originalFileContents, setOriginalFileContents] = useState<
     Record<string, string>
-  >({});
-  const [isLoading, setIsLoading] = useState(true);
-  const [hasCompleted, setHasCompleted] = useState(false);
-  const [totalTimeSpent, setTotalTimeSpent] = useState<number>(0);
+  >({}); // original problem code
+  const [isLoading, setIsLoading] = useState(true); // whether data is loading
+  const [hasCompleted, setHasCompleted] = useState(false); // whether the problem is completed
+  const [totalTimeSpent, setTotalTimeSpent] = useState<number>(0); // total time spent
 
+  /*
+  Load and initialize problem data.
+
+  1. Fetch problem info, user code, and solve record in parallel
+  2. Merge problem data with user code
+  3. Initialize file contents and select the first file
+  4. Restore completion status, hints, and time if a record exists
+  5. Return progress data (completion, hints, time)
+  */
   const loadProblemData = useCallback(async () => {
     try {
       setIsLoading(true);

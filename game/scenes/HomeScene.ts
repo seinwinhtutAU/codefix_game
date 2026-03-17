@@ -3,10 +3,12 @@ import GameScene from "./GameScene";
 import DialogBox from "../ui/DialogBox";
 import Button from "../ui/Button"; // Your standardized Button class
 import { EventBus } from "@/game/events";
+import SkipButton from "../ui/SkipButton";
 
 export default class HomeScene extends GameScene {
   private dialogBox!: DialogBox;
   private nextButton!: Button;
+  private skipButton!: SkipButton;
 
   constructor() {
     super("HomeScene");
@@ -44,6 +46,8 @@ export default class HomeScene extends GameScene {
 
     this.nextButton.setVisible(false);
     this.nextButton.setAlpha(0);
+
+    this.createSkipButton();
 
     // 4. Start Story Sequence
     this.time.delayedCall(1000, () => {
@@ -207,6 +211,17 @@ export default class HomeScene extends GameScene {
       alpha: 1,
       duration: 500,
       ease: "Power2",
+    });
+  }
+
+  private createSkipButton() {
+    this.skipButton = new SkipButton(this, {
+      onClick: () => {
+        if (this.skipButton) this.skipButton.setEnabled(false);
+        this.time.removeAllEvents();
+        this.dialogBox.hide();
+        this.handleSceneComplete();
+      },
     });
   }
 

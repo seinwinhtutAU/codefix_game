@@ -7,10 +7,6 @@ import { requireAuth, requireSameUser, requireAdmin } from "@/lib/auth-guard";
 
 export const dynamic = "force-dynamic";
 
-// ============================================================================
-// Types & Defaults
-// ============================================================================
-
 type IncomingHint = Omit<HintUsage, "hintId">;
 
 interface GameProgressRequest {
@@ -57,10 +53,10 @@ const DEFAULT_GAME_STATE = {
   bugCounts: [],
 };
 
-// ============================================================================
-// HTTP Methods
-// ============================================================================
-
+/* 
+GET /api/game-progress
+GET /api/game-progress?userId=65fa1b23c9d
+*/
 export async function GET(req: NextRequest) {
   try {
     const auth = requireAuth(req);
@@ -115,6 +111,7 @@ export async function GET(req: NextRequest) {
   }
 }
 
+// POST /api/game-progress
 export async function POST(req: NextRequest) {
   try {
     const body: GameProgressRequest = await req.json();
@@ -174,6 +171,7 @@ export async function POST(req: NextRequest) {
   }
 }
 
+// DELETE /api/game-progress?userId=65fa1b23c9d
 export async function DELETE(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);

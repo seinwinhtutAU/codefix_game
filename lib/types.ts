@@ -184,7 +184,6 @@ export interface TestExecutionResponse {
   total_tests?: number;
 }
 
-// Update ExecutionResult to handle both modes
 export interface ExecutionResult {
   success: boolean;
   output: string;

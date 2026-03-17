@@ -4,12 +4,14 @@ import GameScene from "./GameScene";
 import AudioManager from "../AudioManager";
 import { IGameProgress } from "@/lib/types";
 import { EventBus } from "../events";
+import SkipButton from "../ui/SkipButton";
 
 export default class WarningScene extends GameScene {
   private dialogBox!: DialogBox;
   private warningImg!: Phaser.GameObjects.Image;
   private statusText!: Phaser.GameObjects.Text;
   private overlay!: Phaser.GameObjects.Rectangle;
+  private skipButton!: SkipButton;
 
   private readonly storyMessages: string[] = [
     "Wait—something’s wrong! The system is breaking!!",
@@ -104,6 +106,8 @@ export default class WarningScene extends GameScene {
         this.runWarningSequence();
       },
     });
+
+    this.createSkipButton();
   }
 
   private runWarningSequence() {
@@ -177,6 +181,16 @@ export default class WarningScene extends GameScene {
         this.scene.start("BossLevelScene", this.savedProgress);
       },
     );
+  }
+
+  private createSkipButton() {
+    this.skipButton = new SkipButton(this, {
+      onClick: () => {
+        if (this.skipButton) this.skipButton.setEnabled(false);
+        this.time.removeAllEvents();
+        this.handleExit();
+      },
+    });
   }
 
   private emitWarningCompleted(progress: IGameProgress) {

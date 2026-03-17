@@ -12,7 +12,7 @@ import {
   Trophy,
   LucideIcon,
   Search,
-  Code2, // Added for Normal Mode icon
+  Code2,
 } from "lucide-react";
 
 // --- TYPES ---
@@ -26,7 +26,7 @@ interface ModeCardProps {
   title: string;
   description: string;
   icon: LucideIcon;
-  color: "blue" | "amber" | "indigo"; // Added indigo
+  color: "blue" | "amber" | "indigo";
   benefits: ModeBenefit[];
   isHovered: boolean;
   onHover: () => void;
@@ -176,7 +176,6 @@ export default function ProblemModeSelector() {
 
       <div className="max-w-6xl w-full z-10 py-12">
         {" "}
-        {/* Increased max-w for 3 columns */}
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}

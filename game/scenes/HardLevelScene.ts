@@ -3,6 +3,7 @@ import GameScene from "./GameScene";
 import { checkExistingSolveRecord } from "@/services/problem";
 import { EventBus } from "@/game/events";
 import { IGameProgress, ProblemSolveRecord } from "@/lib/types";
+import SkipButton from "../ui/SkipButton";
 
 export interface SolvedPointStatus {
   attempts: number;
@@ -90,6 +91,7 @@ export default class HardLevelScene extends GameScene {
   private tooltipText!: Phaser.GameObjects.Text;
   private loadingContainer!: Phaser.GameObjects.Container;
   private loadingText!: Phaser.GameObjects.Text;
+  private skipButton!: SkipButton;
 
   constructor() {
     super("HardLevelScene");
@@ -101,6 +103,7 @@ export default class HardLevelScene extends GameScene {
       return;
     }
     super.create();
+    this.createSkipButton();
 
     this.createLoadingUI();
     this.initAudio();
@@ -749,6 +752,25 @@ export default class HardLevelScene extends GameScene {
 
     this.loadingContainer = this.add.container(0, 0, [bg, this.loadingText]);
     this.loadingContainer.setDepth(2000).setVisible(false); // Ensure it's on top of everything
+  }
+
+  private createSkipButton() {
+    this.skipButton = new SkipButton(this, {
+      onClick: () => {
+        if (this.skipButton) this.skipButton.setEnabled(false);
+        this.skipLevel();
+      },
+    });
+  }
+
+  private skipLevel() {
+    if (this.savedProgress && this.savedProgress.gameState) {
+      this.savedProgress.gameState.eventFlags.hardLevelCompleted = true;
+      this.savedProgress.gameState.currentScene = "PlayGroundScene";
+    }
+
+    this.emitLevelCompleted(this.savedProgress);
+    this.scene.start("HardToWarningScene", this.savedProgress);
   }
 
   private showLoading(text: string = "LOADING...") {

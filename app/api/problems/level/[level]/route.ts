@@ -12,6 +12,11 @@ import { requireAuth } from "@/lib/auth-guard";
 
 const VALID_LEVELS = ["easy", "medium", "hard", "boss"] as const;
 
+/* 
+GET /api/problems/level/easy
+GET /api/problems/level/easy?includeFiles=false
+Return the list of problems
+*/
 export async function GET(
   req: NextRequest,
   ctx: RouteContext<"/api/problems/level/[level]">,

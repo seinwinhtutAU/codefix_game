@@ -46,7 +46,7 @@ export async function fetchProblemsByLevel(
   includeFiles: boolean = true,
 ): Promise<ProblemByLevelResponse> {
   const response = await fetch(
-    `/api/problems/level/${level}?includeFiles=${includeFiles ? "true" : "false"}`
+    `/api/problems/level/${level}?includeFiles=${includeFiles ? "true" : "false"}`,
   );
   return response.json();
 }
@@ -104,6 +104,14 @@ export async function checkExistingSolveRecord(
   }
 }
 
+/*
+Save the user's code for a problem.
+
+- Check if the user already has saved code
+- If yes → update the existing code (PUT)
+- If no → create new user code from the problem template (POST)
+- Send the code files to the backend API
+*/
 export async function saveUserCode(
   userId: string,
   problem: Problem,
@@ -116,14 +124,11 @@ export async function saveUserCode(
       existingCode.success && existingCode.files.length > 0;
 
     const method = hasExistingCode ? "PUT" : "POST";
-    console.log("saveUserCode method " + method);
     const payload = {
       files: hasExistingCode
         ? problem.userCodeFiles
         : buildInitialUserCode(problem.files),
     };
-
-    console.log("saveUserCode payload: ", payload);
 
     const response = await fetch(`/api/code/${userId}/${problem._id}`, {
       method,
@@ -140,6 +145,14 @@ export async function saveUserCode(
   }
 }
 
+/*
+Save a solve record for a problem.
+
+- Check if the user already has a solve record for the problem
+- If no record exists, create a new record via API
+- If a record already exists, do nothing
+- Return true if the operation succeeds
+*/
 export async function saveSolveRecord(
   solveRecord: SolveRecordRequest,
 ): Promise<boolean> {
@@ -148,11 +161,6 @@ export async function saveSolveRecord(
     const existingRecord = await checkExistingSolveRecord(
       solveRecord.userId,
       solveRecord.problemId,
-    );
-
-    console.log(
-      "SolveRecordResponse: ",
-      JSON.stringify(existingRecord, null, 2),
     );
 
     if (existingRecord?.data == null) {

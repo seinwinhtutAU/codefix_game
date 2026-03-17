@@ -2,7 +2,7 @@ import { ProblemFile, TreeNode, UserCodeFileNode } from "@/lib/types";
 
 export function findFileByName(
   files: ProblemFile[],
-  name: string
+  name: string,
 ): ProblemFile | null {
   for (const file of files) {
     if (file.name === name) return file;
@@ -25,9 +25,17 @@ export function findFirstFile(files: ProblemFile[]): ProblemFile | null {
   return null;
 }
 
+/*
+Extract file contents from user code and problem files.
+
+- Traverse user files and problem files together
+- Get the current content (user-edited code)
+- Get the original content from the problem
+- Store both using the problem file ID as the key
+*/
 export function extractFileContents(
   userCodeFiles: TreeNode<UserCodeFileNode>[],
-  problemFiles: ProblemFile[]
+  problemFiles: ProblemFile[],
 ): {
   currentContents: Record<string, string>;
   originalContents: Record<string, string>;
@@ -37,7 +45,7 @@ export function extractFileContents(
 
   function traverse(
     userNodes: TreeNode<UserCodeFileNode>[],
-    problemNodes: ProblemFile[]
+    problemNodes: ProblemFile[],
   ): void {
     userNodes.forEach((userNode) => {
       const problemFile = findFileByName(problemNodes, userNode.name);
@@ -59,25 +67,22 @@ export function extractFileContents(
   return { currentContents, originalContents };
 }
 
-export function buildInitialUserCode(
-  files: ProblemFile[]
-): TreeNode<{ content?: string }>[] {
-  return files.map((file) => ({
-    name: file.name,
-    type: file.type,
-    order: file.order,
-    data: file.type === "file" ? { content: file.content || "" } : undefined,
-    children: file.children ? buildInitialUserCode(file.children) : undefined,
-  }));
-}
+/*
+Reset user code files to the original problem code.
 
+- Traverse the user file tree and the problem file tree
+- Find the matching problem file by name
+- If it is a file, replace the user's code with the original problem code
+- If it is a folder, recursively process its children
+- Return the updated file tree
+*/
 export function resetUserCodeFilesToOriginal(
   userCodeFiles: TreeNode<UserCodeFileNode>[],
-  problemFiles: ProblemFile[]
+  problemFiles: ProblemFile[],
 ): TreeNode<UserCodeFileNode>[] {
   function traverse(
     userNodes: TreeNode<UserCodeFileNode>[],
-    problemNodes: ProblemFile[]
+    problemNodes: ProblemFile[],
   ): TreeNode<UserCodeFileNode>[] {
     return userNodes.map((userNode) => {
       const problemFile = findFileByName(problemNodes, userNode.name);

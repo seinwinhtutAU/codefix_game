@@ -13,17 +13,22 @@ export function useProblemList({
   userId,
   currentCompletion,
 }: UseProblemListProps) {
-  const [showProblemList, setShowProblemList] = useState(false);
-  const [levelProblems, setLevelProblems] = useState<Problem[]>([]);
-  const [isLoadingProblems, setIsLoadingProblems] = useState(false);
+  const [showProblemList, setShowProblemList] = useState(false); // whether the problem list panel is visible
+  const [levelProblems, setLevelProblems] = useState<Problem[]>([]); // list of problems in the current level
+  const [isLoadingProblems, setIsLoadingProblems] = useState(false); // loading state for fetching problems
   const [completionStatus, setCompletionStatus] = useState<
     Record<string, boolean>
-  >({});
-  const [hasFetched, setHasFetched] = useState(false); // Track if we've fetched
+  >({}); // record of completed problems
+  const [hasFetched, setHasFetched] = useState(false); // whether the problem list has been fetched
 
-  // -------------------------------------------------------------
-  // Refresh completion statuses
-  // -------------------------------------------------------------
+  /*
+  Refresh completion status for problems in the current level.
+  - Check which problems the user has completed
+  - Fetch solve records in bulk from the backend
+  - Map the results to each problem ID
+  - Update completionStatus state
+  - If the request fails, mark all problems as incomplete
+  */
   const refreshCompletionStatuses = useCallback(
     async (problemsOverride?: Problem[]) => {
       const problemsToCheck = problemsOverride || levelProblems;
@@ -65,9 +70,15 @@ export function useProblemList({
     [userId, levelProblems],
   );
 
-  // -------------------------------------------------------------
-  // 1. Load problems for current difficulty
-  // -------------------------------------------------------------
+  /*
+  Load problems for the current difficulty level.
+
+  - Fetch problems based on the current problem's difficulty
+  - Prevent duplicate loading using loading and fetched flags
+  - Save the problems to state
+  - Mark the list as fetched
+  - Refresh completion status for each problem
+  */
   const loadLevelProblems = useCallback(async () => {
     if (!currentProblem?.difficulty || isLoadingProblems || hasFetched) return;
 
@@ -99,18 +110,14 @@ export function useProblemList({
     refreshCompletionStatuses,
   ]);
 
-  // -------------------------------------------------------------
-  // 2. Load problems ONCE when current problem changes
-  // -------------------------------------------------------------
+  // Load level problems when a new problem is opened
   useEffect(() => {
     if (currentProblem && !hasFetched) {
       loadLevelProblems();
     }
   }, [currentProblem?._id, loadLevelProblems, hasFetched]);
 
-  // -------------------------------------------------------------
-  // 3. Update completion when currentCompletion changes
-  // -------------------------------------------------------------
+  // Update and refresh completion status when a problem is solved
   useEffect(() => {
     if (currentProblem?._id) {
       setCompletionStatus((prev) => ({
@@ -131,23 +138,17 @@ export function useProblemList({
     refreshCompletionStatuses,
   ]);
 
-  // -------------------------------------------------------------
-  // 4. Manual refresh function - only refresh completions
-  // -------------------------------------------------------------
   const refreshProblemList = useCallback(async () => {
     if (userId && userId !== "null") {
       await refreshCompletionStatuses();
     }
   }, [userId, refreshCompletionStatuses]);
 
-  // -------------------------------------------------------------
-  // 5. Synchronous completion checker
-  // -------------------------------------------------------------
   const checkProblemCompletion = useCallback(
     (problemId: string) => {
       return completionStatus[problemId] || false;
     },
-    [completionStatus]
+    [completionStatus],
   );
 
   return {

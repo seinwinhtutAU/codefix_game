@@ -31,7 +31,7 @@ export default function PastePage() {
   const [executionId, setExecutionId] = useState<string | null>(null);
   const [extraInfo, setExtraInfo] = useState("");
 
-  // Problem definition
+  // Create a virtual problem for Paste mode
   const pasteProblem: Problem = useMemo(
     () => ({
       _id: "paste-session",
@@ -79,7 +79,7 @@ export default function PastePage() {
     hintUsages: [],
   });
 
-  // Effects
+  // Open output panel and switch to terminal when code runs
   useEffect(() => {
     if (isSubmitting) {
       setIsOutputVisible(true);
@@ -87,6 +87,14 @@ export default function PastePage() {
     }
   }, [isSubmitting]);
 
+  /*
+  Handle execution results.
+
+  - Check if the result contains output or an error
+  - Save execution ID for interactive programs
+  - Add the result to the session history
+  - If the program is waiting for input, show a prompt message
+  */
   useEffect(() => {
     if (!executionResult) return;
 

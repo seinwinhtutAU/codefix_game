@@ -2,6 +2,7 @@ import Phaser from "phaser";
 import AudioManager from "../AudioManager";
 import DialogBox from "../ui/DialogBox";
 import Button from "../ui/Button";
+import SkipButton from "../ui/SkipButton";
 import { IGameProgress } from "@/lib/types";
 import GameScene from "./GameScene";
 import { EventBus } from "@/game/events";
@@ -19,6 +20,7 @@ export default class CarDriveScene extends GameScene {
   // --- UI ---
   private dialogBox!: DialogBox;
   private solveButton!: Button;
+  private skipButton!: SkipButton;
 
   // --- INPUTS ---
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
@@ -75,6 +77,7 @@ export default class CarDriveScene extends GameScene {
     this.dialogBox = new DialogBox(this);
     // 4. Setup Button
     this.createSolveButton();
+    this.createSkipButton();
 
     // Listen for quiz completion
     EventBus.on("quiz-completed", (data: { score: number; total: number }) => {
@@ -285,6 +288,48 @@ export default class CarDriveScene extends GameScene {
         return;
       }
     }
+  }
+
+  private createSkipButton() {
+    this.skipButton = new SkipButton(this, {
+      onClick: () => {
+        if (this.skipButton) this.skipButton.setEnabled(false);
+        this.time.removeAllEvents();
+        this.skipToOffice();
+      },
+    });
+  }
+
+  private async skipToOffice() {
+    if (this.hasReachedOffice) return;
+    this.hasReachedOffice = true;
+    this.isDriving = false;
+    this.eventTriggered = true;
+
+    if (this.dialogBox) this.dialogBox.setVisible(false);
+    if (this.solveButton) this.solveButton.setVisible(false);
+    if (this.sirenSound && this.sirenSound.isPlaying) this.sirenSound.stop();
+
+    await this.updateProgress({
+      gameState: {
+        currentScene: "OfficeScene",
+        eventFlags: {
+          ...this.savedProgress?.gameState?.eventFlags,
+          arrivedAtOffice: true,
+        },
+        currentTask: {
+          ...this.savedProgress?.gameState?.currentTask,
+          taskType: "none",
+          status: "none",
+        },
+      },
+    });
+
+    this.cameras.main.fadeOut(300, 0, 0, 0);
+    AudioManager.getInstance().stopMusic();
+    this.cameras.main.once("camerafadeoutcomplete", () => {
+      this.scene.start("OfficeScene", this.savedProgress);
+    });
   }
 
   update() {

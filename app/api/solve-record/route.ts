@@ -134,6 +134,11 @@ interface RecordsFilter {
   problemId?: mongoose.Types.ObjectId;
 }
 
+/*
+GET /api/solve-record?userId=65fa1b23c9d
+GET /api/solve-record?userId=65fa1b23c9d&problemId=7012ab45cd9
+GET /api/solve-record?userId=otherUserId -> 403 Forbidden
+*/
 export async function GET(req: NextRequest) {
   try {
     const auth = requireAuth(req);
@@ -154,6 +159,8 @@ export async function GET(req: NextRequest) {
           { status: 400 },
         );
       }
+
+      // If a user tries to access another user's records, return 403 Forbidden
       if (auth.payload.sub !== userIdParam) {
         return NextResponse.json<SolveRecordResponse>(
           { success: false, data: null },
@@ -196,7 +203,24 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// DELETE: Delete solve records
+/*
+Supported delete cases:
+
+1. Delete ALL records
+   ?confirmAll=true
+
+2. Delete a specific record
+   ?recordId=xxx
+
+3. Delete records for a specific user and problem
+   ?userId=xxx&problemId=xxx
+
+4. Delete all records for a specific user
+   ?userId=xxx
+
+5. Delete all records for a specific problem
+   ?problemId=xxx
+*/
 export async function DELETE(req: NextRequest) {
   try {
     const auth = requireAuth(req);

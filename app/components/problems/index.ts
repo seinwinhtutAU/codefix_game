@@ -5,4 +5,3 @@ export { default as OutputPanel } from "./OutputPanel";
 export { default as Toolbar } from "./Toolbar";
 export { default as ProblemListPanel } from "./ProblemListPanel";
 export { default as TestCasePanel } from "./TestCasePanel";
-export { default as GuideRender } from "./GuideRenderer";

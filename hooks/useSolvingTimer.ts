@@ -10,6 +10,12 @@ export function useSolvingTimer(
 ) {
   const storageKey = `timer_${problemId}`;
 
+  /*
+  Initialize total time spent.
+  - Load saved timer value from localStorage if available
+  - If no saved value, use the initial time
+  - Handle SSR by checking if window exists
+  */
   const [totalTimeSpent, setTotalTimeSpent] = useState<number>(() => {
     if (typeof window === "undefined") return initialTimeSpent;
 
@@ -22,17 +28,28 @@ export function useSolvingTimer(
 
     return initialTimeSpent;
   });
-  const [isSolving, setIsSolving] = useState<boolean>(true);
-  const [isTimeUp, setIsTimeUp] = useState(false);
+  const [isSolving, setIsSolving] = useState<boolean>(true); // whether the user is currently solving the problem
+  const [isTimeUp, setIsTimeUp] = useState(false); // whether the time limit has been reached
 
-  // 2. Persist changes to LocalStorage
+  /*
+  Save timer progress.
+  - Store total time spent in localStorage
+  - Only save if the task is not completed
+  - Update whenever time changes
+  */
   useEffect(() => {
     if (!hasCompleted && totalTimeSpent > 0) {
       localStorage.setItem(storageKey, totalTimeSpent.toString());
     }
   }, [totalTimeSpent, storageKey, hasCompleted]);
 
-  // 3. The Interval Logic
+  /*
+  Timer logic for solving the problem.
+  - Start a timer when the user is solving and the task is not completed
+  - Increase total time every second
+  - Stop the timer when time reaches the limit
+  - Mark time as up and stop solving
+  */
   useEffect(() => {
     let interval: ReturnType<typeof setInterval>;
 

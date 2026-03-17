@@ -65,18 +65,18 @@ export function ProblemOverlay({
   ) as React.RefObject<HTMLDivElement>;
   const userId = useUserId();
 
-  // --- UI STATES ---
+  // UI states: success and gameover shown on page
   const [showSuccessPopup, setShowSuccessPopup] = useState(false);
   const [showGameOver, setShowGameOver] = useState(false);
 
-  // --- DATA STATES ---
+  // States for saving solve record and progress
   const [finalRecord, setFinalRecord] = useState<ProblemSolveRecord>();
   const [progress, setProgress] = useState<IGameProgress>();
 
-  // ✅ DERIVED STATE
+  // attempts from progress
   const attempts = progress?.gameState?.currentTask?.attempts ?? 0;
 
-  // --- 1. INITIAL LOAD ---
+  // -- initial progress load --
   useEffect(() => {
     const fetchProgress = async () => {
       try {
@@ -89,11 +89,12 @@ export function ProblemOverlay({
     fetchProgress();
   }, []);
 
-  // --- 2. PROGRESS MODIFIERS ---
+  // -- increase attempts in progress --
   const incrementAttemptsInProgress = () => {
     setProgress((prev) => {
       if (!prev?.gameState?.currentTask) return prev;
       const currentAttempts = prev.gameState.currentTask.attempts ?? 0;
+      // increase attempt
       const newAttempts = currentAttempts + 1 > 5 ? 0 : currentAttempts + 1;
       return {
         ...prev,
@@ -108,14 +109,9 @@ export function ProblemOverlay({
     });
   };
 
-  // --- 3. DATABASE SYNC ---
+  // -- database sync for progress (When progress changes) --
   useEffect(() => {
     if (!progress) return;
-    console.log(
-      "Updated progress in Overlay: ",
-      JSON.stringify(progress, null, 2),
-    );
-    console.log("hintUsages: ", JSON.stringify(hintUsages, null, 2));
     const updateProgress = async () => {
       try {
         await fetch("/api/game-progress", {
@@ -136,6 +132,7 @@ export function ProblemOverlay({
     return () => clearTimeout(timeoutId);
   }, [progress]);
 
+  // -- game progress sync (when progress changes) --
   useEffect(() => {
     if (!progress) return;
     const timeoutId = setTimeout(() => {
@@ -149,7 +146,7 @@ export function ProblemOverlay({
     return () => clearTimeout(timeoutId);
   }, [progress]);
 
-  // --- HOOKS & UI HELPERS ---
+  // manage states for all panels whether show or not
   const {
     showProblem,
     showExplorer,
@@ -162,6 +159,7 @@ export function ProblemOverlay({
     setShowOutput,
   } = useUIState();
 
+  // load all things about problem
   const {
     problem,
     setProblem,
@@ -176,6 +174,7 @@ export function ProblemOverlay({
     loadProblemData,
   } = useProblemLoader(problemId, userId);
 
+  // manage user code including hint usages
   const {
     hintUsages,
     setHintUsages,
@@ -189,21 +188,22 @@ export function ProblemOverlay({
     isAnyFileModified,
   } = useUserCodeManager();
 
+  // show whether hints have been loaded, avoid repeated loading
   const hasHydratedHintsRef = useRef(false);
 
+  // -- update hint usages (when progress, hintusages changes) --
   useEffect(() => {
     if (!progress) return;
+    // If it has already been loaded, do not load it again
     if (hasHydratedHintsRef.current) return;
 
     const storedHints = progress.gameState?.currentTask?.hintUsages ?? [];
 
     setHintUsages(storedHints);
     hasHydratedHintsRef.current = true;
-
-    console.log("Hydrated hintUsages from progress:", storedHints);
   }, [progress, setHintUsages]);
 
-  // --- TIMER LOGIC ---
+  // --- timer logic ---
   type Difficulty = "easy" | "medium" | "hard" | "boss";
 
   const DIFFICULTY_CONFIG: Record<
@@ -243,6 +243,7 @@ export function ProblemOverlay({
   const timerIncrementPerBug: number = 120;
   const pointIncrementPerBug: number = 10;
 
+  // The more bugs → The more time, the more points
   const calculateTimeAndPoints = (bugCount: number) => {
     const config = DIFFICULTY_CONFIG[difficulty as Difficulty];
 
@@ -255,6 +256,7 @@ export function ProblemOverlay({
     return { calculatedTime, calculatedPoints };
   };
 
+  // -- recalculate the time and the base points (when bug count changes) --
   useEffect(() => {
     if (currentBugCount) {
       const { calculatedTime, calculatedPoints } = calculateTimeAndPoints(
@@ -265,11 +267,17 @@ export function ProblemOverlay({
     }
   }, [currentBugCount]);
 
+  // states about timer
   const { totalTimeSpent, timeLeft, isTimeUp, resetTimer, setIsSolving } =
     useSolvingTimer(0, hasCompleted, problem, problemId, timeLimited);
 
   const level = problem ? problem.difficulty : "no level";
 
+  // - runNormalCode: Run the code (display output)
+  // - runTestCode: Run the test cases (submit answers)
+  // - continueExecution: Handle situations where the program is waiting for input
+  // - executionResult: Execution result (output/error/test result)
+  // - isSubmitting/isContinuing: Execution status (prevents repeated submissions)
   const {
     isSubmitting,
     isContinuing,
@@ -291,24 +299,27 @@ export function ProblemOverlay({
     timeLimited: timeLimited,
   });
 
-  const [isSaving, setIsSaving] = useState(false);
-  const [isTestRunning, setIsTestRunning] = useState(false);
+  // Prevent duplicate submission
+  const [isSaving, setIsSaving] = useState(false); // Code is being saved
+  const [isTestRunning, setIsTestRunning] = useState(false); // Test is running
 
-  // Panel dimensions
+  // Panel sizes
   const [fileExplorerWidth, setFileExplorerWidth] = useState(200);
   const [hintsPanelWidth, setHintsPanelWidth] = useState(300);
   const [outputPanelWidth, setOutputPanelWidth] = useState(400);
   const [testCasePanelHeight, setTestCasePanelHeight] = useState(200);
 
   // --- GAME OVER LOGIC ---
+
+  // -- Timeout: increase attempts and show fail popup if time runs out --
   useEffect(() => {
     if (isTimeUp && !hasCompleted) {
       incrementAttemptsInProgress();
       setShowGameOver(true);
     }
-     
   }, [isTimeUp, hasCompleted]);
 
+  // -- Final failure handling: when attempts reach 5, save a failure record (0 score) --
   useEffect(() => {
     if (!progress) return;
     if (hasCompleted) return;
@@ -329,11 +340,13 @@ export function ProblemOverlay({
     }
   }, [attempts]);
 
+  // try again after game over
   const handleTryAgain = () => {
     setShowGameOver(false);
     resetTimer();
   };
 
+  // calculate editor width by subtracting open panel widths
   const editorWidth = () => {
     let width = "100%";
     if (showExplorer)
@@ -343,6 +356,7 @@ export function ProblemOverlay({
     return width;
   };
 
+  // -- Init: load problem, set completion status, load previous hint usages --
   useEffect(() => {
     if (userId && userId !== "null") {
       loadProblemData().then((result) => {
@@ -358,6 +372,7 @@ export function ProblemOverlay({
     }
   }, [problemId, userId, loadProblemData, setHasCompleted, setIsSolving]);
 
+  // Handle code changes: update file content and problem state
   const handleCodeChange = (value: string | undefined) => {
     if (!selectedFile || !problem || isTimeUp) return;
     const newValue = value ?? "";
@@ -371,6 +386,7 @@ export function ProblemOverlay({
     if (updatedProblem) setProblem(updatedProblem);
   };
 
+  // save user code
   const handleSaveCode = async () => {
     if (!problem || !userId || userId === "null" || isSaving) return;
     setIsSaving(true);
@@ -381,16 +397,16 @@ export function ProblemOverlay({
     }
   };
 
-  // ✅ 1. NEW HANDLER: Run Code & Auto-Show Output
+  // run normal code and show ouput panel
   const handleRunCode = () => {
     setShowOutput(true);
     runNormalCode();
   };
 
+  // Submit answer: run test cases; if all pass, complete the task and show success message
   const handleSubmitCode = async () => {
     if (hasCompleted || isTimeUp) return;
 
-    // ✅ 2. MODIFIED: Auto-Show Test Cases
     setShowTestCases(true);
     setIsTestRunning(true);
 
@@ -422,6 +438,7 @@ export function ProblemOverlay({
     }
   };
 
+  // Send user input to the program waiting for input
   const handleContinueExecution = async (
     executionId: string,
     input: string,
@@ -445,6 +462,7 @@ export function ProblemOverlay({
     3: "big",
   };
 
+  // Get the highest hint level used (for score deduction)
   const getHighestHintLevelUsed = useCallback(
     (usages: HintUsage[]): HintLevel => {
       let highestHintLevel = 0;
@@ -459,6 +477,7 @@ export function ProblemOverlay({
     [],
   );
 
+  // -- When hint usage changes, update the highest hint level in progress --
   useEffect(() => {
     if (!progress) return;
     if (
@@ -485,6 +504,12 @@ export function ProblemOverlay({
     });
   }, [hintUsages, getHighestHintLevelUsed]);
 
+  // -- Exit handler (on popup close) --
+  // - Update task status, attempts, and hint level
+  // - Determine next task index
+  // - Save progress to database
+  // - If completed: clear timer and trigger success event
+  // - Return to game and close popup
   const handleFinalExit = async () => {
     const currentIndex =
       progress?.gameState.currentTask.currentActiveIndex ?? 0;
@@ -539,6 +564,7 @@ export function ProblemOverlay({
     onClose();
   };
 
+  // calculate estimated points based on highest hint level used and attempts
   const calculateEstimatedPoints = () => {
     if (hasCompleted && finalRecord) return finalRecord.pointsEarned;
     if (attempts >= 5) return 0;
@@ -560,6 +586,7 @@ export function ProblemOverlay({
 
   const estimatedPoints = calculateEstimatedPoints();
 
+  // reset current user code to original problem code
   const resetCurrentFile = () => {
     if (!selectedFile || !problem) return;
     const originalContent = getOriginalFileContent(
@@ -581,6 +608,7 @@ export function ProblemOverlay({
     }
   };
 
+  // reset all files into original problem files
   const handleResetAllFiles = async () => {
     if (
       !problem ||
@@ -597,15 +625,6 @@ export function ProblemOverlay({
     }
   };
 
-  const resetAllFileInTryAgain = async () => {
-    if (!problem) return;
-    setFileContents(originalFileContents);
-    const updatedProblem = resetAllFiles(problem, originalFileContents);
-    if (updatedProblem) {
-      setProblem(updatedProblem);
-    }
-  };
-
   if (isLoading || !problem) {
     return (
       <div className="absolute inset-0 z-[200] flex flex-col items-center justify-center bg-violet-50/90 backdrop-blur-sm gap-4">
@@ -614,7 +633,6 @@ export function ProblemOverlay({
     );
   }
 
-  // Helper for Sidebar Buttons
   const SidebarButton = ({
     active,
     onClick,
@@ -639,13 +657,12 @@ export function ProblemOverlay({
   );
 
   return (
-    // MAIN CONTAINER: 柔和的暖白色背景，适应 768px 高度
     <div
       className="absolute inset-0 z-[150] bg-[#FDFBF7] flex flex-row animate-in fade-in zoom-in duration-200 overflow-hidden font-sans"
       onKeyDown={(e) => e.stopPropagation()}
     >
       <AnimatePresence>
-        {/* SUCCESS POPUP */}
+        {/* --- SUCCESS POPUP --- */}
         {showSuccessPopup && (
           <GameNotification
             type="SUCCESS"
@@ -659,7 +676,7 @@ export function ProblemOverlay({
           />
         )}
 
-        {/* GAME OVER POPUP */}
+        {/* --- GAME OVER POPUP --- */}
         {showGameOver && (
           <GameNotification
             type="GAMEOVER"
@@ -714,7 +731,7 @@ export function ProblemOverlay({
 
       {/* --- MAIN CONTENT AREA --- */}
       <div className="flex-1 flex flex-col min-h-0 overflow-hidden p-3 gap-3">
-        {/* 1. HEADER (Compact & Cute) */}
+        {/* HEADER */}
         <div className="flex items-center justify-between bg-white px-4 py-2 rounded-2xl border border-slate-100 shadow-sm shrink-0 h-14">
           <div className="flex items-center gap-4">
             <h2 className="text-lg font-bold text-slate-700 tracking-tight flex items-center gap-2">
@@ -722,7 +739,7 @@ export function ProblemOverlay({
               {problem.title}
             </h2>
 
-            {/* TIMER - Capsule Style */}
+            {/* TIMER */}
             <div
               className={`flex items-center gap-2 px-3 py-1 rounded-full border ${
                 timeLeft < 10
@@ -792,7 +809,7 @@ export function ProblemOverlay({
           </div>
         </div>
 
-        {/* 2. DESCRIPTION AREA */}
+        {/* DESCRIPTION AREA */}
         <AnimatePresence>
           {showProblem && (
             <motion.div
@@ -811,7 +828,7 @@ export function ProblemOverlay({
           )}
         </AnimatePresence>
 
-        {/* 3. WORKSPACE AREA (Panels + Editor) */}
+        {/* --- WORKSPACE AREA (Panels + Editor) --- */}
         <div className="flex-1 flex gap-3 min-h-0 relative">
           {/* EXPLORER PANEL */}
           <FileExplorer
@@ -823,7 +840,7 @@ export function ProblemOverlay({
             defaultWidth={200}
           />
 
-          {/* EDITOR CONTAINER - The Core */}
+          {/* EDITOR */}
           <div
             className="flex flex-col min-w-0 rounded-2xl bg-white shadow-sm border border-slate-200 overflow-hidden relative transition-all duration-300"
             style={{ width: editorWidth() }}
@@ -854,7 +871,7 @@ export function ProblemOverlay({
               />
             </div>
 
-            {/* Editor Body - Added min-h-0 and overflow-hidden to fix layout overflow */}
+            {/* Editor Body */}
             <div className="flex-1 min-h-0 overflow-hidden relative bg-white">
               <Editor
                 height="100%"
@@ -881,7 +898,7 @@ export function ProblemOverlay({
               />
             </div>
 
-            {/* ACTION BAR (Footer) - Fixed Visibility */}
+            {/* ACTION BAR (Footer) */}
             <div className="flex items-center justify-between px-4 py-3 border-t border-slate-100 bg-slate-50/80 backdrop-blur-sm shrink-0 z-10">
               {/* Left side: Status or Info */}
               <div className="flex items-center gap-2 text-xs text-slate-400 font-medium">
@@ -927,7 +944,7 @@ export function ProblemOverlay({
             </div>
           </div>
 
-          {/* HINTS & OUTPUT PANELS (Side by side with editor if open) */}
+          {/* HINTS & OUTPUT PANELS */}
           {showHints && problem.hints && (
             <HintsPanel
               hints={problem.hints}
@@ -955,7 +972,7 @@ export function ProblemOverlay({
           )}
         </div>
 
-        {/* 4. BOTTOM AREA (Test Cases) */}
+        {/* BOTTOM AREA (Test Cases) */}
         {showTestCases && (
           <div className="flex-shrink-0 animate-in slide-in-from-bottom-4 duration-300">
             <div className="rounded-2xl border border-slate-200 overflow-hidden shadow-sm bg-white">
