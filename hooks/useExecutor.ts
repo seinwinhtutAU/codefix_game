@@ -72,7 +72,7 @@ export function useExecutor({
       };
 
       const response = await fetch(
-        "https://fastapi-code.up.railway.app/api/execute/normal",
+        "https://fastapi1-05lo.onrender.com/api/execute/normal",
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -128,7 +128,7 @@ export function useExecutor({
       console.log("test cases: ", JSON.stringify(request, null, 2));
 
       const response = await fetch(
-        "https://fastapi-code.up.railway.app/api/execute/test",
+        "https://fastapi1-05lo.onrender.com/api/execute/test",
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -256,7 +256,7 @@ export function useExecutor({
         const request = { input };
 
         const response = await fetch(
-          `https://fastapi-code.up.railway.app/api/execute/normal/${executionId}/continue`,
+          `https://fastapi1-05lo.onrender.com/api/execute/normal/${executionId}/continue`,
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },
